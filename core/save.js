@@ -36,7 +36,7 @@ function getStatCost(curVal) { return curVal < 50 ? 1 : 2; }
 function addOutExpAndSeed(expGain, seedGain) {
   saveData.seed += seedGain;
   saveData.outExp += expGain;
-  while (saveData.outLv < 60 && saveData.outExp >= getNextOutExp(saveData.outLv)) {
+  while (saveData.outLv < 62 && saveData.outExp >= getNextOutExp(saveData.outLv)) {
     saveData.outExp -= getNextOutExp(saveData.outLv);
     saveData.outLv++;
     saveData.freePts += getLevelPts(saveData.outLv);
@@ -109,7 +109,7 @@ function debugDropLoot() {
   const pool = ['white', 'white', 'green', 'blue', 'purple', 'gold'];
   for (let i = 0; i < 5; i++) {
     const r = pool[Math.floor(Math.random() * pool.length)];
-    saveData.bag.push(createUnidentifiedDrop(r, Math.max(15, saveData.outLv + 10)));
+    saveData.bag.push(createUnidentifiedDrop(r, Math.min(62, Math.max(15, saveData.outLv + 10))));
   }
   writeSave(); renderLobby();
 }
@@ -197,8 +197,8 @@ function resetStats() {
 function debugAddExp() { addOutExpAndSeed(getNextOutExp(saveData.outLv), 500); renderLobby(); }
 
 function debugMaxLv60() {
-  while (saveData.outLv < 60) { saveData.outLv++; saveData.freePts += getLevelPts(saveData.outLv); }
-  saveData.seed += 50000; writeSave(); renderLobby();
+  while (saveData.outLv < 62) { saveData.outLv++; saveData.freePts += getLevelPts(saveData.outLv); }
+  saveData.seed += 80000; writeSave(); renderLobby();
 }
 function getLobbyTooltipEl() {
   let tip = document.getElementById('lobbyTooltip');
@@ -274,7 +274,7 @@ function toggleCharDetailModal(show) {
     return `<div>• <strong>${fullNames[k]}</strong>：總計 <strong style="color:#fde047;">${st[k]}</strong>（本體 <strong>${naked}</strong> + 裝備 <strong style="color:#4ade80;">+${eq}</strong>）</div>`;
   }).join('');
   document.getElementById('charDetailContent').innerHTML = `
-    <div class="status-sec"><h3 style="color:#38bdf8;margin-bottom:6px;">👤 基本與七大素質明細</h3><div>角色：<strong>${charInfo.name}</strong>（${charInfo.title}）</div><div>局外等級：<strong>LV.${saveData.outLv} / 60</strong> ｜ 剩餘配點：<strong>${getWorkingFreePts()}</strong></div><hr style="border-color:#334155;margin:6px 0;">${statLines}</div>
+    <div class="status-sec"><h3 style="color:#38bdf8;margin-bottom:6px;">👤 基本與七大素質明細</h3><div>角色：<strong>${charInfo.name}</strong>（${charInfo.title}）</div><div>局外等級：<strong>LV.${saveData.outLv} / 62</strong> ｜ 剩餘配點：<strong>${getWorkingFreePts()}</strong></div><hr style="border-color:#334155;margin:6px 0;">${statLines}</div>
     <div class="status-sec"><h3 style="color:#4ade80;margin-bottom:6px;">⚔️ 衍生戰鬥數值面板</h3><div>❤️ 最大生命：<strong>${d.maxHp}</strong> ｜ 🛡️ 減傷率：<strong>${getLobbyDmgReducePct(d)}%</strong></div><div>💚 每秒回血：<strong>+${d.regen.toFixed(1)}/秒</strong></div><div>⚡ 冷卻縮減：<strong>-${(d.cdReduce * 100).toFixed(1)}%</strong> ｜ 範圍擴大：<strong>+${(d.areaBonus * 100).toFixed(1)}%</strong></div><div>💥 基礎暴擊率：<strong>${(d.critRate * 100).toFixed(1)}%</strong> ｜ 暴擊傷害：<strong>${Math.round(d.critDmg * 100)}%</strong></div><div>✨ 魔法額外彈幕：<strong>+${d.extraProj} 發</strong> ｜ 🔮 異常倍率：<strong>${d.statusCritMult.toFixed(2)}x</strong></div><div>👟 移動速度：<strong>${Math.round(d.moveSpeed)}</strong> ｜ 拾取範圍：<strong>${Math.round(d.pickupRange)}</strong></div></div>`;
   modal.style.display = 'flex';
 }
@@ -297,10 +297,14 @@ function renderPaperDoll() {
 }
 function renderLobby() {
   hideLobbyTooltip();
+  document.querySelectorAll('#lobbyModal button').forEach(b => {
+    if (b.textContent.includes('開始出征')) b.innerHTML = '🔥 出發冒險';
+    if (b.textContent.includes('一鍵60等')) b.innerHTML = '⚡ [測試]一鍵62等';
+  });
   const d = getDerivedCombatStats(), st = d.st;
   const curFree = getWorkingFreePts(), alloc = getWorkingAlloc();
   const pendingTag = pendingAlloc ? ' <span style="color:#fde047;">(預覽微調中)</span>' : '';
-  document.getElementById('lobbyHeader').innerHTML = `${saveData.charName} ｜ 局外等級：LV.${saveData.outLv}/60 ｜ 剩餘配點：<strong>${curFree}</strong>${pendingTag} ｜ 持有 Seed：${saveData.seed}`;
+  document.getElementById('lobbyHeader').innerHTML = `${saveData.charName} ｜ 局外等級：LV.${saveData.outLv}/62 ｜ 剩餘配點：<strong>${curFree}</strong>${pendingTag} ｜ 持有 Seed：${saveData.seed}`;
 
   const fullLabels = { S: 'STAB', H: 'HACK', I: 'INT', DEF: 'DEF', MR: 'MR', DEX: 'DEX', AGI: 'AGI' };
   const rowsHtml = Object.keys(fullLabels).map(k => {
@@ -337,18 +341,19 @@ function renderLobby() {
   }).join('');
 
   const dmgRedPct = getLobbyDmgReducePct(d);
+  const miniBox = 'background:rgba(15,23,42,0.75);border:1px solid #334155;border-radius:4px;padding:3px 6px;display:flex;justify-content:space-between;align-items:center;white-space:nowrap;';
   document.getElementById('lobbyPreview').innerHTML = `
-    <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;">
-      <canvas id="paperDollCanvas" width="84" height="92" style="background:#0f172a;border:1px solid #475569;border-radius:8px;flex-shrink:0;"></canvas>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+      <canvas id="paperDollCanvas" width="76" height="92" style="background:#0f172a;border:1px solid #475569;border-radius:8px;flex-shrink:0;"></canvas>
       <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:11px;">
-        <div style="background:rgba(15,23,42,0.75);border:1px solid #334155;border-radius:4px;padding:3px 6px;display:flex;justify-content:space-between;"><span style="color:#94a3b8;">❤️ 生命</span><strong>${d.maxHp}</strong></div>
-        <div style="background:rgba(15,23,42,0.75);border:1px solid #334155;border-radius:4px;padding:3px 6px;display:flex;justify-content:space-between;"><span style="color:#94a3b8;">🛡️ 減傷</span><strong style="color:#4ade80;">${dmgRedPct}%</strong></div>
-        <div style="background:rgba(15,23,42,0.75);border:1px solid #334155;border-radius:4px;padding:3px 6px;display:flex;justify-content:space-between;"><span style="color:#94a3b8;">⚡ 冷卻</span><strong style="color:#38bdf8;">-${(d.cdReduce * 100).toFixed(1)}%</strong></div>
-        <div style="background:rgba(15,23,42,0.75);border:1px solid #334155;border-radius:4px;padding:3px 6px;display:flex;justify-content:space-between;"><span style="color:#94a3b8;">🌐 範圍</span><strong>+${(d.areaBonus * 100).toFixed(1)}%</strong></div>
-        <div style="background:rgba(15,23,42,0.75);border:1px solid #334155;border-radius:4px;padding:3px 6px;display:flex;justify-content:space-between;"><span style="color:#94a3b8;">💥 暴率</span><strong>${(d.critRate * 100).toFixed(1)}%</strong></div>
-        <div style="background:rgba(15,23,42,0.75);border:1px solid #334155;border-radius:4px;padding:3px 6px;display:flex;justify-content:space-between;"><span style="color:#94a3b8;">🔥 暴傷</span><strong>${Math.round(d.critDmg * 100)}%</strong></div>
-        <div style="background:rgba(15,23,42,0.75);border:1px solid #334155;border-radius:4px;padding:3px 6px;display:flex;justify-content:space-between;"><span style="color:#94a3b8;">✨ 彈幕</span><strong>+${d.extraProj}</strong></div>
-        <div style="background:rgba(15,23,42,0.75);border:1px solid #334155;border-radius:4px;padding:3px 6px;display:flex;justify-content:space-between;"><span style="color:#94a3b8;">🔮 異常</span><strong style="color:#4ade80;">${d.statusCritMult.toFixed(2)}x</strong></div>
+        <div style="${miniBox}"><span style="color:#94a3b8;">❤️ 生命</span><strong>${d.maxHp}</strong></div>
+        <div style="${miniBox}"><span style="color:#94a3b8;">🛡️ 減傷</span><strong style="color:#4ade80;">${dmgRedPct}%</strong></div>
+        <div style="${miniBox}"><span style="color:#94a3b8;">⚡ 冷卻</span><strong style="color:#38bdf8;">-${(d.cdReduce * 100).toFixed(1)}%</strong></div>
+        <div style="${miniBox}"><span style="color:#94a3b8;">🌐 範圍</span><strong>+${(d.areaBonus * 100).toFixed(1)}%</strong></div>
+        <div style="${miniBox}"><span style="color:#94a3b8;">💥 暴率</span><strong>${(d.critRate * 100).toFixed(1)}%</strong></div>
+        <div style="${miniBox}"><span style="color:#94a3b8;">🔥 暴傷</span><strong>${Math.round(d.critDmg * 100)}%</strong></div>
+        <div style="${miniBox}"><span style="color:#94a3b8;">✨ 彈幕</span><strong>+${d.extraProj}</strong></div>
+        <div style="${miniBox}"><span style="color:#94a3b8;">🔮 異常</span><strong style="color:#4ade80;">${d.statusCritMult.toFixed(2)}x</strong></div>
       </div>
     </div>
     <div>${slotsHtml}</div>`;
@@ -392,7 +397,7 @@ function renderLobby() {
 }
 
 function startBattle() {
-  if (pendingAlloc) { alert('請先按下「✅ 確認配點」或「↩️ 取消微調」後再開始出征！'); return; }
+  if (pendingAlloc) { alert('請先按下「✅ 確認配點」或「↩️ 取消微調」後再出發冒險！'); return; }
   const d = getDerivedCombatStats(), w = saveData.equip.weapon || { name: '徒手', startSkill: 'renga' };
   if (typeof EQUIPPED_WEAPON !== 'undefined') { EQUIPPED_WEAPON.name = w.name; EQUIPPED_WEAPON.startSkill = w.startSkill; }
   if (typeof player !== 'undefined') {

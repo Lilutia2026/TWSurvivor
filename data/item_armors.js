@@ -1,25 +1,71 @@
-// 初代 7 大防具與飾品資料庫（衣服、手飾、頭盔、手部、腳部、翅膀、文物）
-const ITEM_ARMORS = [
-    // 衣服（armor）：輕鎧All / 重鎧非小愛 / 忍服美拉娜雅 / 法袍小愛 / 魔鎧波里斯麥克斯明
-    { tplId: 'a_light_4',   slot: 'armor',  subType: 'light',     name: '光耀輕鎧',   reqLv: 4,  reqStats: { DEF: 4 },  allowChars: ['all'], base: { DEF: { min: 3, max: 6 }, AGI: { min: 2, max: 4 }, hp: { min: 20, max: 40 } } },
-    { tplId: 'a_heavy_15',  slot: 'armor',  subType: 'heavy',     name: '精鋼鱗甲',   reqLv: 15, reqStats: { DEF: 16 }, allowChars: ['lucien', 'boris', 'maximin', 'mila', 'naya', 'sivelin', 'ispin'], base: { DEF: { min: 9, max: 15 }, hp: { min: 50, max: 90 } } },
-    { tplId: 'a_heavy_30',  slot: 'armor',  subType: 'heavy',     name: '皇家板甲',   reqLv: 30, reqStats: { DEF: 35 }, allowChars: ['lucien', 'boris', 'maximin', 'mila', 'naya', 'sivelin', 'ispin'], base: { DEF: { min: 18, max: 28 }, hp: { min: 100, max: 160 } } },
-    { tplId: 'a_ninja_15',  slot: 'armor',  subType: 'ninja',     name: '疾風忍服',   reqLv: 15, reqStats: { DEX: 14, DEF: 8 }, allowChars: ['mila', 'naya'], base: { AGI: { min: 7, max: 12 }, DEX: { min: 5, max: 9 } } },
-    { tplId: 'a_robe_15',   slot: 'armor',  subType: 'robe',      name: '星辰法師袍', reqLv: 15, reqStats: { MR: 14 }, allowChars: ['tichiel'], base: { I: { min: 7, max: 12 }, MR: { min: 7, max: 12 } } },
-    { tplId: 'a_magic_15',  slot: 'armor',  subType: 'magicarmor',name: '符文魔鎧',   reqLv: 15, reqStats: { DEF: 12, I: 12 }, allowChars: ['boris', 'maximin'], base: { DEF: { min: 6, max: 10 }, I: { min: 6, max: 10 }, MR: { min: 5, max: 9 } } },
-  
-    // 手飾/副手（sub）：盾牌、水晶石、白金戒指、指虎、護腕
-    { tplId: 's_shield_15', slot: 'sub',    subType: 'shield',    name: '騎士圓盾',   reqLv: 15, reqStats: { DEF: 16 }, allowChars: ['lucien', 'boris', 'maximin', 'ispin'], base: { DEF: { min: 8, max: 13 }, hp: { min: 40, max: 75 } } },
-    { tplId: 's_crystal_15',slot: 'sub',    subType: 'crystal',   name: '元素水晶石', reqLv: 15, reqStats: { I: 12 },   allowChars: ['all'], base: { I: { min: 6, max: 11 }, MR: { min: 5, max: 9 }, critRate: { min: 4, max: 9 } } },
-    { tplId: 's_ring_20',   slot: 'sub',    subType: 'ring',      name: '白金戒指',   reqLv: 20, reqStats: {},          allowChars: ['all'], base: { S: { min: 3, max: 6 }, H: { min: 3, max: 6 }, DEX: { min: 4, max: 7 }, AGI: { min: 4, max: 7 } } },
-    { tplId: 's_knuckle_15',slot: 'sub',    subType: 'knuckle',   name: '暗黑指虎',   reqLv: 15, reqStats: { H: 15 },   allowChars: ['boris', 'maximin', 'sivelin'], base: { S: { min: 5, max: 9 }, H: { min: 5, max: 9 }, critRate: { min: 5, max: 10 } } },
-    { tplId: 's_bracer_15', slot: 'sub',    subType: 'bracer',    name: '運動護腕',   reqLv: 15, reqStats: { AGI: 15 }, allowChars: ['mila', 'naya'], base: { AGI: { min: 6, max: 11 }, DEX: { min: 5, max: 9 } } },
-  
-    // 頭盔、手部、腳部、翅膀、文物（全角色通用）
-    { tplId: 'h_helm_10',   slot: 'head',   subType: 'helm',      name: '青銅戰盔',   reqLv: 10, reqStats: { DEF: 8 },  allowChars: ['all'], base: { hp: { min: 25, max: 50 }, MR: { min: 3, max: 6 } } },
-    { tplId: 'g_glove_10',  slot: 'gloves', subType: 'gloves',    name: '獵人皮手套', reqLv: 10, reqStats: { DEX: 10 }, allowChars: ['all'], base: { DEX: { min: 4, max: 7 }, S: { min: 2, max: 4 }, H: { min: 2, max: 4 } } },
-    { tplId: 'sh_boot_10',  slot: 'shoes',  subType: 'shoes',     name: '疾風長靴',   reqLv: 10, reqStats: { AGI: 10 }, allowChars: ['all'], base: { AGI: { min: 5, max: 9 }, spd: { min: 10, max: 18 } } },
-    { tplId: 'b_wing_20',   slot: 'back',   subType: 'wing',      name: '惡魔之翼',   reqLv: 20, reqStats: {},          allowChars: ['all'], base: { S: { min: 4, max: 8 }, H: { min: 4, max: 8 }, I: { min: 4, max: 8 }, AGI: { min: 4, max: 8 } } },
-    { tplId: 'r_relic_15',  slot: 'relic',  subType: 'relic',     name: '古文明懷錶', reqLv: 15, reqStats: {},          allowChars: ['all'], base: { MR: { min: 4, max: 8 }, critDmg: { min: 12, max: 22 } } }
-  ];
-  
+// 《天翼之鍊》原作 7 部位防具與飾品資料庫（LV.1 ～ LV.62 畢業里程碑）
+const ARMOR_TEMPLATES = [
+  // === 副手（盾牌 / 指虎 / 護腕 / 手鐲） ===
+  { tplId: 'sub_sh_1',  slot: 'sub', name: '木製圓盾',       reqLv: 1,  reqStats: {},              allowChars: ['all'], DEF: 2, hp: 10 },
+  { tplId: 'sub_sh_12', slot: 'sub', name: '銅製圓盾',       reqLv: 12, reqStats: {},              allowChars: ['all'], DEF: 4, MR: 1, hp: 20 },
+  { tplId: 'sub_sh_20', slot: 'sub', name: '鋼鐵圓盾',       reqLv: 20, reqStats: {},              allowChars: ['all'], DEF: 6, MR: 2, dmgReduce: 2 },
+  { tplId: 'sub_sh_28', slot: 'sub', name: '龍鱗圓盾',       reqLv: 28, reqStats: {},              allowChars: ['all'], DEF: 10, MR: 3, dmgReduce: 3 },
+  { tplId: 'sub_sh_35', slot: 'sub', name: '騎士之盾',       reqLv: 35, reqStats: { DEF: 5 },      allowChars: ['all'], DEF: 16, MR: 4, dmgReduce: 4 },
+  { tplId: 'sub_sh_42', slot: 'sub', name: '紋章盾',         reqLv: 42, reqStats: { DEF: 5, MR: 5 }, allowChars: ['all'], DEF: 19, MR: 8, dmgReduce: 5 },
+  { tplId: 'sub_sh_52', slot: 'sub', name: '普雷斯特之盾',   reqLv: 52, reqStats: { DEF: 7 },      allowChars: ['all'], DEF: 23, MR: 12, dmgReduce: 6 },
+  { tplId: 'sub_sh_62', slot: 'sub', name: '🛡️ 凡泰克之盾', reqLv: 62, reqStats: { DEF: 10 },     allowChars: ['all'], DEF: 28, MR: 16, dmgReduce: 8, hp: 60 },
+  { tplId: 'sub_kn_24', slot: 'sub', name: '浴血指虎',       reqLv: 24, reqStats: {},              allowChars: ['all'], S: 3, H: 3, critRate: 2 },
+  { tplId: 'sub_kn_42', slot: 'sub', name: '傳說指虎',       reqLv: 42, reqStats: {},              allowChars: ['all'], S: 5, H: 5, critRate: 4 },
+  { tplId: 'sub_kn_62', slot: 'sub', name: '🥊 冥符指虎',   reqLv: 62, reqStats: {},              allowChars: ['all'], S: 7, H: 7, critRate: 5, critDmg: 15 },
+  { tplId: 'sub_br_35', slot: 'sub', name: '疾風手鏈',       reqLv: 35, reqStats: {},              allowChars: ['all'], AGI: 4, spd: 12 },
+  { tplId: 'sub_br_62', slot: 'sub', name: '🌿 古符護腕',   reqLv: 62, reqStats: {},              allowChars: ['all'], AGI: 8, DEX: 4, spd: 20 },
+  { tplId: 'sub_ba_35', slot: 'sub', name: '魔法師手鐲',     reqLv: 35, reqStats: {},              allowChars: ['all'], I: 7, MR: 6 },
+  { tplId: 'sub_ba_62', slot: 'sub', name: '🔮 公主手鐲',   reqLv: 62, reqStats: {},              allowChars: ['all'], I: 10, MR: 9, critDmg: 12 },
+
+  // === 身體鎧甲（輕鎧 / 重鎧 / 紅焰＆冰寒套裝鎧甲） ===
+  { tplId: 'arm_4',     slot: 'armor', name: '光耀布衣',     reqLv: 4,  reqStats: {},          allowChars: ['all'], DEF: 3, hp: 15 },
+  { tplId: 'arm_12',    slot: 'armor', name: '光耀緊身衣',   reqLv: 12, reqStats: { DEF: 3 },  allowChars: ['all'], DEF: 8, MR: 3, hp: 30 },
+  { tplId: 'arm_20',    slot: 'armor', name: '光耀金屬鎧甲', reqLv: 20, reqStats: { DEF: 4 },  allowChars: ['all'], DEF: 16, MR: 5, hp: 50 },
+  { tplId: 'arm_28',    slot: 'armor', name: '光耀魔晶甲',   reqLv: 28, reqStats: { DEF: 5 },  allowChars: ['all'], DEF: 22, MR: 6, AGI: 2, hp: 70 },
+  { tplId: 'arm_35',    slot: 'armor', name: '天鷹戰甲',     reqLv: 35, reqStats: { DEF: 10 }, allowChars: ['all'], DEF: 25, MR: 12, AGI: 3, hp: 95 },
+  { tplId: 'arm_42',    slot: 'armor', name: '聖石鎧甲',     reqLv: 42, reqStats: { DEF: 14 }, allowChars: ['all'], DEF: 28, MR: 16, AGI: 4, hp: 120 },
+  { tplId: 'arm_52',    slot: 'armor', name: '聖騎士之鎧',   reqLv: 52, reqStats: { DEF: 18 }, allowChars: ['all'], DEF: 32, MR: 20, AGI: 5, hp: 150 },
+  { tplId: 'arm_61_f',  slot: 'armor', name: '🔥 紅焰鎧甲',  reqLv: 61, reqStats: { DEF: 20 }, allowChars: ['all'], DEF: 40, MR: 28, critRate: 5, hp: 200, dmgReduce: 6 },
+  { tplId: 'arm_61_i',  slot: 'armor', name: '❄️ 冰寒鎧甲',  reqLv: 61, reqStats: { DEF: 20 }, allowChars: ['all'], DEF: 40, MR: 32, critRate: 5, hp: 200, dmgReduce: 6 },
+  { tplId: 'arm_62',    slot: 'armor', name: '⚡ 極速戰甲',  reqLv: 62, reqStats: { DEF: 22 }, allowChars: ['all'], DEF: 36, MR: 24, AGI: 8, spd: 18, hp: 180 },
+  // === 頭部（頭盔 / 帽子） ===
+  { tplId: 'hd_8',      slot: 'head', name: '爆炸頭',        reqLv: 8,  reqStats: {}, allowChars: ['all'], DEF: 4, MR: 4, DEX: 2 },
+  { tplId: 'hd_18',     slot: 'head', name: '礦工帽',        reqLv: 18, reqStats: {}, allowChars: ['all'], DEF: 8, AGI: 2 },
+  { tplId: 'hd_24',     slot: 'head', name: '牛魔王角盔',    reqLv: 24, reqStats: {}, allowChars: ['all'], DEF: 9, H: 3 },
+  { tplId: 'hd_35',     slot: 'head', name: '金角頭盔',      reqLv: 35, reqStats: {}, allowChars: ['all'], DEF: 14, MR: 11 },
+  { tplId: 'hd_55',     slot: 'head', name: '竹編帽',        reqLv: 55, reqStats: {}, allowChars: ['all'], DEF: 14, MR: 14, DEX: 3, critRate: 2 },
+  { tplId: 'hd_61_f',   slot: 'head', name: '🔥 紅焰頭盔',   reqLv: 61, reqStats: {}, allowChars: ['all'], DEF: 18, MR: 14, S: 4, H: 4, critRate: 4 },
+  { tplId: 'hd_61_i',   slot: 'head', name: '❄️ 冰寒頭盔',   reqLv: 61, reqStats: {}, allowChars: ['all'], DEF: 18, MR: 16, S: 4, H: 4, critRate: 4 },
+
+  // === 手部（手套 / 手環） ===
+  { tplId: 'gl_4',      slot: 'gloves', name: '棉製手套',    reqLv: 4,  reqStats: {}, allowChars: ['all'], DEX: 1 },
+  { tplId: 'gl_12',     slot: 'gloves', name: '戰爭手套',    reqLv: 12, reqStats: {}, allowChars: ['all'], DEF: 2, DEX: 2, critRate: 1 },
+  { tplId: 'gl_24',     slot: 'gloves', name: '能量手套',    reqLv: 24, reqStats: {}, allowChars: ['all'], S: 2, H: 2, DEF: 3, critRate: 2 },
+  { tplId: 'gl_45',     slot: 'gloves', name: '明庫護手',    reqLv: 45, reqStats: {}, allowChars: ['all'], S: 3, H: 3, DEX: 4, critRate: 3 },
+  { tplId: 'gl_52',     slot: 'gloves', name: '無痕手套',    reqLv: 52, reqStats: {}, allowChars: ['all'], S: 4, H: 4, I: 3, DEX: 5 },
+  { tplId: 'gl_61_f',   slot: 'gloves', name: '🔥 紅焰手鐲', reqLv: 61, reqStats: {}, allowChars: ['all'], S: 5, H: 5, MR: 5, DEX: 6, critRate: 5 },
+  { tplId: 'gl_61_i',   slot: 'gloves', name: '❄️ 冰寒手鐲', reqLv: 61, reqStats: {}, allowChars: ['all'], S: 5, H: 5, MR: 6, DEX: 6, critRate: 5 },
+
+  // === 腳部（鞋子 / 戰靴） ===
+  { tplId: 'sh_4',      slot: 'shoes', name: '涼鞋',         reqLv: 4,  reqStats: {}, allowChars: ['all'], spd: 8 },
+  { tplId: 'sh_20',     slot: 'shoes', name: '敏捷之鞋',     reqLv: 20, reqStats: {}, allowChars: ['all'], AGI: 3, spd: 16 },
+  { tplId: 'sh_28',     slot: 'shoes', name: '風之靴',       reqLv: 28, reqStats: {}, allowChars: ['all'], DEF: 3, AGI: 4, spd: 24 },
+  { tplId: 'sh_45',     slot: 'shoes', name: '明庫之靴',     reqLv: 45, reqStats: {}, allowChars: ['all'], DEF: 4, MR: 4, AGI: 6, spd: 32, critRate: 2 },
+  { tplId: 'sh_61_f',   slot: 'shoes', name: '🔥 紅焰之靴',  reqLv: 61, reqStats: {}, allowChars: ['all'], AGI: 8, DEX: 5, spd: 42, critRate: 4 },
+  { tplId: 'sh_61_i',   slot: 'shoes', name: '❄️ 冰寒之靴',  reqLv: 61, reqStats: {}, allowChars: ['all'], AGI: 8, DEX: 5, spd: 42, critRate: 4 },
+
+  // === 背部（書包 / 翅膀） ===
+  { tplId: 'bk_15',     slot: 'back', name: '幼兒園書包',    reqLv: 15, reqStats: {}, allowChars: ['all'], DEF: 6, MR: 3, hp: 25 },
+  { tplId: 'bk_30_a',   slot: 'back', name: '天使翅膀(S)',   reqLv: 30, reqStats: {}, allowChars: ['all'], DEF: 5, MR: 5, AGI: 3, spd: 12 },
+  { tplId: 'bk_30_d',   slot: 'back', name: '惡魔翅膀(S)',   reqLv: 30, reqStats: {}, allowChars: ['all'], S: 4, H: 4, I: 3, critRate: 3 },
+  { tplId: 'bk_52',     slot: 'back', name: '金銀角的葫蘆',  reqLv: 52, reqStats: {}, allowChars: ['all'], S: 5, H: 5, DEF: 8, hp: 80 },
+  { tplId: 'bk_61_f',   slot: 'back', name: '🔥 紅焰翅膀',   reqLv: 61, reqStats: {}, allowChars: ['all'], S: 6, H: 6, I: 5, AGI: 6, spd: 20, critDmg: 18 },
+  { tplId: 'bk_61_i',   slot: 'back', name: '❄️ 冰寒翅膀',   reqLv: 61, reqStats: {}, allowChars: ['all'], S: 6, H: 6, I: 6, MR: 6, AGI: 6, critDmg: 18 },
+
+  // === 聖物（面具 / 耳環 / 頭飾） ===
+  { tplId: 'rel_4',     slot: 'relic', name: '防菌口罩',     reqLv: 4,  reqStats: {}, allowChars: ['all'], DEX: 1, hp: 10 },
+  { tplId: 'rel_18',    slot: 'relic', name: '天使耳環',     reqLv: 18, reqStats: {}, allowChars: ['all'], S: 2, H: 2, I: 2, DEF: 2, MR: 2, critRate: 2 },
+  { tplId: 'rel_28',    slot: 'relic', name: '蝙蝠面罩',     reqLv: 28, reqStats: {}, allowChars: ['all'], DEX: 5, critRate: 3 },
+  { tplId: 'rel_35',    slot: 'relic', name: '妖精之耳',     reqLv: 35, reqStats: {}, allowChars: ['all'], S: 3, I: 4, AGI: 5, critDmg: 12 },
+  { tplId: 'rel_52',    slot: 'relic', name: '怪俠面罩',     reqLv: 52, reqStats: {}, allowChars: ['all'], S: 6, H: 6, DEF: 4, AGI: 4, critRate: 4, critDmg: 15 }
+];
