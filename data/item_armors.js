@@ -28,44 +28,66 @@ const ARMOR_TEMPLATES = [
   { tplId: 'arm_61_f',  slot: 'armor', name: '🔥 紅焰鎧甲',  reqLv: 61, reqStats: { DEF: 20 }, allowChars: ['all'], DEF: 40, MR: 28, critRate: 5, hp: 200, dmgReduce: 6 },
   { tplId: 'arm_61_i',  slot: 'armor', name: '❄️ 冰寒鎧甲',  reqLv: 61, reqStats: { DEF: 20 }, allowChars: ['all'], DEF: 40, MR: 32, critRate: 5, hp: 200, dmgReduce: 6 },
   { tplId: 'arm_62',    slot: 'armor', name: '⚡ 極速戰甲',  reqLv: 62, reqStats: { DEF: 22 }, allowChars: ['all'], DEF: 36, MR: 24, AGI: 8, spd: 18, hp: 180 },
-  // === 頭部（頭盔 / 帽子） ===
-  { tplId: 'hd_8',      slot: 'head', name: '爆炸頭',        reqLv: 8,  reqStats: {}, allowChars: ['all'], DEF: 4, MR: 4, DEX: 2 },
-  { tplId: 'hd_18',     slot: 'head', name: '礦工帽',        reqLv: 18, reqStats: {}, allowChars: ['all'], DEF: 8, AGI: 2 },
-  { tplId: 'hd_24',     slot: 'head', name: '牛魔王角盔',    reqLv: 24, reqStats: {}, allowChars: ['all'], DEF: 9, H: 3 },
-  { tplId: 'hd_35',     slot: 'head', name: '金角頭盔',      reqLv: 35, reqStats: {}, allowChars: ['all'], DEF: 14, MR: 11 },
-  { tplId: 'hd_55',     slot: 'head', name: '竹編帽',        reqLv: 55, reqStats: {}, allowChars: ['all'], DEF: 14, MR: 14, DEX: 3, critRate: 2 },
-  { tplId: 'hd_61_f',   slot: 'head', name: '🔥 紅焰頭盔',   reqLv: 61, reqStats: {}, allowChars: ['all'], DEF: 18, MR: 14, S: 4, H: 4, critRate: 4 },
-  { tplId: 'hd_61_i',   slot: 'head', name: '❄️ 冰寒頭盔',   reqLv: 61, reqStats: {}, allowChars: ['all'], DEF: 18, MR: 16, S: 4, H: 4, critRate: 4 },
+  // === 頭部（頭盔 / 紅焰＆冰寒頭盔） ===
+  { tplId: 'hd_8',      slot: 'head', name: '爆炸頭',       reqLv: 8,  reqStats: {}, allowChars: ['all'], DEF: 3, MR: 3, DEX: 2 },
+  { tplId: 'hd_18',     slot: 'head', name: '礦工帽',       reqLv: 18, reqStats: {}, allowChars: ['all'], DEF: 8, MR: 2, hp: 25 },
+  { tplId: 'hd_24',     slot: 'head', name: '牛魔王角盔',   reqLv: 24, reqStats: {}, allowChars: ['all'], DEF: 10, MR: 4, H: 3 },
+  { tplId: 'hd_28',     slot: 'head', name: '沙漠頭巾',     reqLv: 28, reqStats: {}, allowChars: ['all'], DEF: 12, AGI: 3, hp: 40 },
+  { tplId: 'hd_35',     slot: 'head', name: '金角頭盔',     reqLv: 35, reqStats: {}, allowChars: ['all'], DEF: 15, MR: 12, hp: 60 },
+  { tplId: 'hd_55',     slot: 'head', name: '竹編帽',       reqLv: 55, reqStats: {}, allowChars: ['all'], DEF: 16, MR: 16, DEX: 4, critRate: 2 },
+  { tplId: 'hd_61_f',   slot: 'head', name: '🔥 紅焰頭盔',  reqLv: 61, reqStats: {}, allowChars: ['all'], S: 4, H: 4, I: 4, DEF: 18, MR: 14, critRate: 4 },
+  { tplId: 'hd_61_i',   slot: 'head', name: '❄️ 冰寒頭盔',  reqLv: 61, reqStats: {}, allowChars: ['all'], S: 4, H: 4, I: 4, DEF: 18, MR: 16, critRate: 4 },
 
-  // === 手部（手套 / 手環） ===
-  { tplId: 'gl_4',      slot: 'gloves', name: '棉製手套',    reqLv: 4,  reqStats: {}, allowChars: ['all'], DEX: 1 },
-  { tplId: 'gl_12',     slot: 'gloves', name: '戰爭手套',    reqLv: 12, reqStats: {}, allowChars: ['all'], DEF: 2, DEX: 2, critRate: 1 },
-  { tplId: 'gl_24',     slot: 'gloves', name: '能量手套',    reqLv: 24, reqStats: {}, allowChars: ['all'], S: 2, H: 2, DEF: 3, critRate: 2 },
-  { tplId: 'gl_45',     slot: 'gloves', name: '明庫護手',    reqLv: 45, reqStats: {}, allowChars: ['all'], S: 3, H: 3, DEX: 4, critRate: 3 },
-  { tplId: 'gl_52',     slot: 'gloves', name: '無痕手套',    reqLv: 52, reqStats: {}, allowChars: ['all'], S: 4, H: 4, I: 3, DEX: 5 },
-  { tplId: 'gl_61_f',   slot: 'gloves', name: '🔥 紅焰手鐲', reqLv: 61, reqStats: {}, allowChars: ['all'], S: 5, H: 5, MR: 5, DEX: 6, critRate: 5 },
-  { tplId: 'gl_61_i',   slot: 'gloves', name: '❄️ 冰寒手鐲', reqLv: 61, reqStats: {}, allowChars: ['all'], S: 5, H: 5, MR: 6, DEX: 6, critRate: 5 },
+  // === 手部（手套 / 手鐲） ===
+  { tplId: 'gl_4',      slot: 'gloves', name: '棉製手套',   reqLv: 4,  reqStats: {}, allowChars: ['all'], DEX: 2 },
+  { tplId: 'gl_12',     slot: 'gloves', name: '戰爭手套',   reqLv: 12, reqStats: {}, allowChars: ['all'], DEF: 2, DEX: 3, critRate: 1 },
+  { tplId: 'gl_24',     slot: 'gloves', name: '能量手套',   reqLv: 24, reqStats: {}, allowChars: ['all'], S: 2, H: 2, DEF: 3, DEX: 3, critRate: 2 },
+  { tplId: 'gl_45',     slot: 'gloves', name: '明庫護手',   reqLv: 45, reqStats: {}, allowChars: ['all'], S: 3, H: 3, DEF: 3, DEX: 5, critRate: 3 },
+  { tplId: 'gl_52',     slot: 'gloves', name: '無痕手套',   reqLv: 52, reqStats: {}, allowChars: ['all'], S: 4, H: 4, I: 3, DEX: 6, critRate: 4 },
+  { tplId: 'gl_61_f',   slot: 'gloves', name: '🔥 紅焰手鐲', reqLv: 61, reqStats: {}, allowChars: ['all'], S: 5, H: 5, I: 6, MR: 6, DEX: 6, critRate: 5, critDmg: 12 },
+  { tplId: 'gl_61_i',   slot: 'gloves', name: '❄️ 冰寒手鐲', reqLv: 61, reqStats: {}, allowChars: ['all'], S: 5, H: 5, I: 6, MR: 6, DEX: 6, critRate: 5, critDmg: 12 },
 
   // === 腳部（鞋子 / 戰靴） ===
-  { tplId: 'sh_4',      slot: 'shoes', name: '涼鞋',         reqLv: 4,  reqStats: {}, allowChars: ['all'], spd: 8 },
-  { tplId: 'sh_20',     slot: 'shoes', name: '敏捷之鞋',     reqLv: 20, reqStats: {}, allowChars: ['all'], AGI: 3, spd: 16 },
-  { tplId: 'sh_28',     slot: 'shoes', name: '風之靴',       reqLv: 28, reqStats: {}, allowChars: ['all'], DEF: 3, AGI: 4, spd: 24 },
-  { tplId: 'sh_45',     slot: 'shoes', name: '明庫之靴',     reqLv: 45, reqStats: {}, allowChars: ['all'], DEF: 4, MR: 4, AGI: 6, spd: 32, critRate: 2 },
-  { tplId: 'sh_61_f',   slot: 'shoes', name: '🔥 紅焰之靴',  reqLv: 61, reqStats: {}, allowChars: ['all'], AGI: 8, DEX: 5, spd: 42, critRate: 4 },
-  { tplId: 'sh_61_i',   slot: 'shoes', name: '❄️ 冰寒之靴',  reqLv: 61, reqStats: {}, allowChars: ['all'], AGI: 8, DEX: 5, spd: 42, critRate: 4 },
+  { tplId: 'sh_4',      slot: 'shoes', name: '涼鞋',        reqLv: 4,  reqStats: {}, allowChars: ['all'], spd: 8 },
+  { tplId: 'sh_12',     slot: 'shoes', name: '木屐',        reqLv: 12, reqStats: {}, allowChars: ['all'], DEF: 2, spd: 12 },
+  { tplId: 'sh_20',     slot: 'shoes', name: '敏捷之鞋',    reqLv: 20, reqStats: {}, allowChars: ['all'], AGI: 3, spd: 18 },
+  { tplId: 'sh_28',     slot: 'shoes', name: '風之靴',      reqLv: 28, reqStats: {}, allowChars: ['all'], DEF: 2, AGI: 4, spd: 24 },
+  { tplId: 'sh_45',     slot: 'shoes', name: '明庫之靴',    reqLv: 45, reqStats: {}, allowChars: ['all'], DEF: 4, MR: 4, AGI: 5, spd: 32, critRate: 2 },
+  { tplId: 'sh_61_f',   slot: 'shoes', name: '🔥 紅焰之靴', reqLv: 61, reqStats: {}, allowChars: ['all'], AGI: 7, DEX: 6, spd: 42, critRate: 4 },
+  { tplId: 'sh_61_i',   slot: 'shoes', name: '❄️ 冰寒之靴', reqLv: 61, reqStats: {}, allowChars: ['all'], AGI: 7, DEX: 6, spd: 42, critRate: 4 },
 
-  // === 背部（書包 / 翅膀） ===
-  { tplId: 'bk_15',     slot: 'back', name: '幼兒園書包',    reqLv: 15, reqStats: {}, allowChars: ['all'], DEF: 6, MR: 3, hp: 25 },
-  { tplId: 'bk_30_a',   slot: 'back', name: '天使翅膀(S)',   reqLv: 30, reqStats: {}, allowChars: ['all'], DEF: 5, MR: 5, AGI: 3, spd: 12 },
-  { tplId: 'bk_30_d',   slot: 'back', name: '惡魔翅膀(S)',   reqLv: 30, reqStats: {}, allowChars: ['all'], S: 4, H: 4, I: 3, critRate: 3 },
-  { tplId: 'bk_52',     slot: 'back', name: '金銀角的葫蘆',  reqLv: 52, reqStats: {}, allowChars: ['all'], S: 5, H: 5, DEF: 8, hp: 80 },
-  { tplId: 'bk_61_f',   slot: 'back', name: '🔥 紅焰翅膀',   reqLv: 61, reqStats: {}, allowChars: ['all'], S: 6, H: 6, I: 5, AGI: 6, spd: 20, critDmg: 18 },
-  { tplId: 'bk_61_i',   slot: 'back', name: '❄️ 冰寒翅膀',   reqLv: 61, reqStats: {}, allowChars: ['all'], S: 6, H: 6, I: 6, MR: 6, AGI: 6, critDmg: 18 },
+  // === 背部（翅膀 / 披風） ===
+  { tplId: 'bk_15',     slot: 'back', name: '幼兒園書包',   reqLv: 15, reqStats: {}, allowChars: ['all'], DEF: 6, MR: 3, hp: 30 },
+  { tplId: 'bk_30_a',   slot: 'back', name: '天使翅膀(S)',  reqLv: 30, reqStats: {}, allowChars: ['all'], DEF: 4, MR: 4, AGI: 3, spd: 15 },
+  { tplId: 'bk_30_d',   slot: 'back', name: '惡魔翅膀(S)',  reqLv: 30, reqStats: {}, allowChars: ['all'], S: 4, H: 4, I: 3, DEX: 3, critRate: 2 },
+  { tplId: 'bk_52',     slot: 'back', name: '金銀角的葫蘆', reqLv: 52, reqStats: {}, allowChars: ['all'], S: 5, H: 5, DEF: 8, hp: 80 },
+  { tplId: 'bk_61_f',   slot: 'back', name: '🔥 紅焰翅膀',  reqLv: 61, reqStats: {}, allowChars: ['all'], S: 6, H: 6, I: 6, DEF: 6, MR: 6, AGI: 6, DEX: 5, critDmg: 15 },
+  { tplId: 'bk_61_i',   slot: 'back', name: '❄️ 冰寒翅膀',  reqLv: 61, reqStats: {}, allowChars: ['all'], S: 6, H: 6, I: 6, DEF: 6, MR: 7, AGI: 6, DEX: 5, critDmg: 15 },
 
   // === 聖物（面具 / 耳環 / 頭飾） ===
-  { tplId: 'rel_4',     slot: 'relic', name: '防菌口罩',     reqLv: 4,  reqStats: {}, allowChars: ['all'], DEX: 1, hp: 10 },
-  { tplId: 'rel_18',    slot: 'relic', name: '天使耳環',     reqLv: 18, reqStats: {}, allowChars: ['all'], S: 2, H: 2, I: 2, DEF: 2, MR: 2, critRate: 2 },
-  { tplId: 'rel_28',    slot: 'relic', name: '蝙蝠面罩',     reqLv: 28, reqStats: {}, allowChars: ['all'], DEX: 5, critRate: 3 },
-  { tplId: 'rel_35',    slot: 'relic', name: '妖精之耳',     reqLv: 35, reqStats: {}, allowChars: ['all'], S: 3, I: 4, AGI: 5, critDmg: 12 },
-  { tplId: 'rel_52',    slot: 'relic', name: '怪俠面罩',     reqLv: 52, reqStats: {}, allowChars: ['all'], S: 6, H: 6, DEF: 4, AGI: 4, critRate: 4, critDmg: 15 }
+  { tplId: 'rel_4',     slot: 'relic', name: '防菌口罩',    reqLv: 4,  reqStats: {}, allowChars: ['all'], DEX: 1, critRate: 1 },
+  { tplId: 'rel_8',     slot: 'relic', name: '貓鬍鬚',      reqLv: 8,  reqStats: {}, allowChars: ['all'], I: 3, DEF: 3, MR: 2, critRate: 2 },
+  { tplId: 'rel_18',    slot: 'relic', name: '天使耳環',    reqLv: 18, reqStats: {}, allowChars: ['all'], S: 3, H: 3, I: 3, DEF: 3, MR: 3, DEX: 3, critRate: 2 },
+  { tplId: 'rel_28',    slot: 'relic', name: '蝙蝠面罩',    reqLv: 28, reqStats: {}, allowChars: ['all'], DEX: 5, critRate: 4 },
+  { tplId: 'rel_35',    slot: 'relic', name: '妖精之耳',    reqLv: 35, reqStats: {}, allowChars: ['all'], I: 5, DEF: 3, AGI: 5, spd: 12 },
+  { tplId: 'rel_55',    slot: 'relic', name: '怪俠面罩',    reqLv: 55, reqStats: {}, allowChars: ['all'], S: 6, H: 6, DEF: 4, AGI: 4, DEX: 4, critRate: 4, critDmg: 15 }
 ];
+
+ARMOR_TEMPLATES.forEach(a => {
+  if (!a.subType) {
+    a.subType = a.tplId.startsWith('sub_sh_') ? 'shield'
+              : (a.tplId.startsWith('sub_kn_') ? 'ring'
+              : (a.tplId.startsWith('sub_ba_') ? 'crystal' : a.slot));
+  }
+  if (!a.base) {
+    a.base = {};
+    for (const k of ['S', 'H', 'I', 'DEF', 'MR', 'DEX', 'AGI', 'hp', 'spd', 'critRate', 'critDmg', 'dmgReduce']) {
+      if (a[k]) {
+        const v = a[k];
+        a.base[k] = { min: Math.max(1, Math.floor(v * 0.88)), max: Math.ceil(v * 1.12) };
+      }
+    }
+  }
+});
+const ITEM_ARMORS = ARMOR_TEMPLATES;
+const ARMOR_POOL = ARMOR_TEMPLATES;

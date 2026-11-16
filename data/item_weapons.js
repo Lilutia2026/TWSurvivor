@@ -30,3 +30,18 @@ const WEAPON_TEMPLATES = [
   { tplId: 'w_bld_52', slot: 'weapon', type: 'blade',     name: '一臻文字',     reqLv: 52, reqStats: { H: 70 },          allowChars: ['all'],             startSkill: 'renga',  H: 64, S: 25, critRate: 11, DEX: 8 },
   { tplId: 'w_bld_62', slot: 'weapon', type: 'blade',     name: '🩸 炎風',      reqLv: 62, reqStats: { H: 83 },          allowChars: ['all'],             startSkill: 'renga',  H: 76, S: 30, critRate: 15, critDmg: 25, AGI: 12, spd: 15 }
 ];
+
+WEAPON_TEMPLATES.forEach(w => {
+  if (!w.subType) w.subType = w.type || 'weapon';
+  if (!w.base) {
+    w.base = {};
+    for (const k of ['S', 'H', 'I', 'DEF', 'MR', 'DEX', 'AGI', 'hp', 'spd', 'critRate', 'critDmg', 'dmgReduce']) {
+      if (w[k]) {
+        const v = w[k];
+        w.base[k] = { min: Math.max(1, Math.floor(v * 0.88)), max: Math.ceil(v * 1.12) };
+      }
+    }
+  }
+});
+const ITEM_WEAPONS = WEAPON_TEMPLATES;
+const WEAPON_POOL = WEAPON_TEMPLATES;
