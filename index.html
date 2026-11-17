@@ -1,114 +1,125 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
-  <title>天翼之鍊 2D 紙片風倖存者 v0.7</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>天翼之鍊 2D 紙片風倖存者 V2.4</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
-    body { overflow: hidden; background: #1e293b; font-family: "Microsoft JhengHei", sans-serif; color: #f8fafc; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: "Microsoft JhengHei", sans-serif; user-select: none; }
+    body { background: #0f172a; color: #f8fafc; overflow: hidden; }
     canvas { display: block; }
-    #hud { position: fixed; top: 0; left: 0; width: 100%; padding: 12px 20px; pointer-events: none; display: flex; justify-content: space-between; align-items: flex-start; }
-    .panel { background: rgba(15, 23, 42, 0.85); border: 2px solid #94a3b8; border-radius: 10px; padding: 8px 14px; }
-    .bar-bg { width: 220px; height: 14px; background: #334155; border-radius: 7px; overflow: hidden; margin-top: 4px; border: 1px solid #64748b; }
-    #hpBar { height: 100%; width: 100%; background: linear-gradient(90deg, #ef4444, #f87171); }
-    #expBar { height: 100%; width: 0%; background: linear-gradient(90deg, #38bdf8, #818cf8); }
-    #skillList { margin-top: 8px; font-size: 13px; color: #e2e8f0; }
-    .modal { position: fixed; inset: 0; background: rgba(2, 6, 23, 0.9); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 20; }
-    .cards { display: flex; gap: 18px; margin-top: 20px; flex-wrap: wrap; justify-content: center; }
-    .card { width: 240px; background: #1e293b; border: 2px solid #cbd5e1; border-radius: 12px; padding: 18px; cursor: pointer; text-align: left; }
-    .card:hover { border-color: #facc15; background: #273549; }
-    .card-key { display: inline-block; background: #facc15; color: #0f172a; font-weight: bold; padding: 2px 8px; border-radius: 6px; font-size: 12px; margin-bottom: 8px; }
-    .card-title { font-size: 17px; font-weight: bold; color: #fef08a; margin-bottom: 8px; }
-    .card-desc { font-size: 13px; color: #e2e8f0; line-height: 1.45; margin-bottom: 10px; }
-    .card-tag { font-size: 12px; color: #38bdf8; }
-    #banner { position: fixed; top: 90px; left: 50%; transform: translateX(-50%); background: rgba(234, 179, 8, 0.95); color: #0f172a; font-weight: bold; padding: 8px 22px; border-radius: 20px; font-size: 16px; display: none; z-index: 99; box-shadow: 0 4px 15px rgba(0,0,0,0.6); }
-    .btn { padding: 10px 24px; font-size: 15px; font-weight: bold; background: #38bdf8; color: #0f172a; border: none; border-radius: 8px; cursor: pointer; }
-    .btn-warn { background: #f59e0b; color: #0f172a; }
-    .lobby-box { width: 1080px; max-width: 96vw; background: #0f172a; border: 2px solid #38bdf8; border-radius: 14px; padding: 18px; display: grid; grid-template-columns: 1fr 1.1fr 1.1fr; gap: 14px; }
-    .stat-row, .eq-slot, .bag-item { display: flex; justify-content: space-between; align-items: center; background: #1e293b; padding: 6px 10px; border-radius: 6px; margin-bottom: 5px; font-size: 13px; }
-    .stat-btn { background: #38bdf8; color: #0f172a; border: none; border-radius: 4px; width: 26px; height: 24px; font-weight: bold; cursor: pointer; margin-left: 4px; }
-    .stat-btn:disabled { background: #475569; color: #94a3b8; cursor: not-allowed; }
-    .status-box { width: 680px; max-width: 92vw; background: #0f172a; border: 2px solid #facc15; border-radius: 14px; padding: 22px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; text-align: left; }
-    .status-sec { background: #1e293b; border: 1px solid #475569; border-radius: 8px; padding: 12px; font-size: 13px; line-height: 1.65; }
+    #hud { position: fixed; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; pointer-events: none; z-index: 10; }
+    .hud-box { background: rgba(15, 23, 42, 0.85); border: 1px solid #475569; border-radius: 10px; padding: 8px 12px; }
+    #banner { position: fixed; top: 82px; left: 50%; transform: translateX(-50%); background: rgba(180, 83, 9, 0.94); border: 2px solid #facc15; padding: 8px 20px; border-radius: 999px; font-weight: bold; display: none; z-index: 15; }
+    .modal { position: fixed; inset: 0; background: rgba(2, 6, 23, 0.86); display: none; align-items: center; justify-content: center; z-index: 30; }
+    .panel { background: #1e293b; border: 2px solid #eab308; border-radius: 14px; padding: 18px; width: min(1040px, 95vw); max-height: 92vh; overflow-y: auto; }
+    .lobby-grid { display: grid; grid-template-columns: 1fr 1.15fr 1.15fr; gap: 12px; margin-top: 12px; }
+    .lobby-col { background: rgba(15, 23, 42, 0.72); border: 1px solid #334155; border-radius: 10px; padding: 10px; max-height: 58vh; overflow-y: auto; }
+    .stat-row, .eq-slot, .bag-item { display: flex; justify-content: space-between; align-items: center; padding: 5px 8px; margin-bottom: 5px; background: rgba(30, 41, 59, 0.8); border-radius: 6px; font-size: 13px; }
+    .stat-btn { background: #38bdf8; color: #0f172a; border: none; border-radius: 4px; width: 24px; height: 22px; font-weight: bold; cursor: pointer; }
+    .stat-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .card-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 14px; }
+    .card { background: #0f172a; border: 2px solid #475569; border-radius: 12px; padding: 14px; cursor: pointer; transition: 0.15s; }
+    .card:hover { border-color: #facc15; transform: translateY(-3px); }
+    .card-key { font-size: 11px; color: #facc15; margin-bottom: 4px; }
+    .card-title { font-size: 15px; font-weight: bold; color: #fef08a; margin-bottom: 6px; }
+    .card-desc { font-size: 12px; color: #cbd5e1; line-height: 1.5; }
+    .card-tag { margin-top: 8px; font-size: 11px; color: #38bdf8; }
+    .status-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin-top: 10px; }
+    .status-sec { background: rgba(15, 23, 42, 0.78); border: 1px solid #334155; border-radius: 10px; padding: 10px; font-size: 13px; line-height: 1.6; min-width: 0; overflow: hidden; }
   </style>
 </head>
 <body>
   <canvas id="gameCanvas"></canvas>
-  <div id="lobbyModal" class="modal" style="display:flex;">
-    <h2 style="color:#fde047;margin-bottom:4px;">⚔️ TW倖存者 — 卡雷德準備大廳</h2>
-    <p id="lobbyHeader" style="color:#cbd5e1;margin-bottom:10px;font-size:13px;"></p>
-    <div class="lobby-box">
-      <div>
-        <h3 style="color:#38bdf8;margin-bottom:8px;font-size:15px;">📊 七大素質配點</h3>
-        <div id="statRows"></div>
-        <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
-          <button class="btn btn-warn" style="padding:6px 12px;font-size:13px;" onclick="resetStats()">🔄 洗點</button>
-          <button class="btn" style="background:#475569;color:#fff;padding:6px 10px;font-size:12px;" onclick="debugAddExp()">[測試]+1級＆Seed</button>
-          <button class="btn" style="background:#8b5cf6;color:#fff;padding:6px 10px;font-size:12px;" onclick="debugDropLoot()">[測試]掉落5件裝備</button>
-          <button class="btn" style="background:#ef4444;color:#fff;padding:6px 10px;font-size:12px;" onclick="hardResetSave()">🗑️ 重置存檔</button>
-          <button class="btn" style="background:#0ea5e9;color:#fff;padding:6px 10px;font-size:12px;" onclick="debugMaxLv60()">⚡ [測試]一鍵60等</button>
-          <button class="btn" style="background:#10b981;color:#fff;padding:6px 10px;font-size:12px;" onclick="toggleCharDetailModal(true)">📊 角色詳細資訊</button>
-        </div>
-      </div>
-      <div class="status-sec">
-        <h3 style="color:#fde047;margin-bottom:6px;font-size:15px;">🛡️ 8 格裝備與紙娃娃</h3>
-        <div id="lobbyPreview"></div>
-      </div>
-      <div class="status-sec" style="display:flex;flex-direction:column;max-height:390px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-          <h3 style="color:#4ade80;font-size:15px;margin:0;">🔍 鑑定工坊與背包</h3>
-          <button class="stat-btn" style="width:auto;padding:4px 10px;background:#facc15;" onclick="identifyAllItems()">✨ 一鍵全部鑑定</button>
-        </div>
-        <div id="bagList" style="overflow-y:auto;flex:1;padding-right:4px;"></div>
-      </div>
-    </div>
-    <button class="btn" style="margin-top:12px;font-size:17px;padding:10px 40px;background:#22c55e;" onclick="startBattle()">🔥 出發冒險</button>
-  </div>
   <div id="hud">
-    <div class="panel">
-      <div><strong>路西安．卡爾茲</strong> <span id="lvText">LV.1</span> ｜ 武器：<span id="weaponText"></span></div>
-      <div class="bar-bg"><div id="hpBar"></div></div>
-      <div class="bar-bg"><div id="expBar"></div></div>
-      <div id="skillList"></div>
-    </div>
-    <div class="panel" style="text-align:right;">
-      <div id="timeText" style="font-size:20px;font-weight:bold;color:#fde047;">00:00</div>
-      <div>擊殺：<span id="killText">0</span> ｜ 連擊：<span id="comboText">0</span></div>
-      <div style="font-size:11px;color:#94a3b8;margin-top:4px;">[ESC/P]角色狀態 [L]升級 [B]精英王 [T]+1分</div>
+    <div class="hud-box"></div>
+    <div class="hud-box" style="text-align:right;font-size:13px;line-height:1.5;">
+      <div id="timeText" style="font-size:18px;font-weight:bold;color:#fde047;">00:00</div>
+      <div>擊殺：<strong id="killText">0</strong> ｜ 連擊：<strong id="comboText">0</strong></div>
+      <div style="font-size:11px;color:#94a3b8;">[ESC/P]角色狀態 [L]升級 [B]精英王 [G]狂暴王 [T]+1分</div>
     </div>
   </div>
   <div id="banner"></div>
-  <div id="levelModal" class="modal">
-    <h2 style="color:#fde047;">✨ 選擇強化（天翼技能覺醒）</h2>
-    <p id="modalSub" style="color:#cbd5e1;margin-top:6px;">點擊一張卡片，或按鍵盤 1 / 2 / 3</p>
-    <div id="cardContainer" class="cards"></div>
-  </div>
-  <div id="charDetailModal" class="modal">
-    <h2 style="color:#fde047;margin-bottom:12px;">📊 路西安．卡爾茲 — 完整素質與公式明細</h2>
-    <div id="charDetailContent" class="status-box"></div>
-    <button class="btn" style="margin-top:14px;" onclick="toggleCharDetailModal(false)">關閉視窗</button>
+  <!-- 卡雷德準備大廳 -->
+  <div id="lobbyModal" class="modal" style="display:flex;">
+    <div class="panel">
+      <h2 style="color:#fde047;text-align:center;">⚔ TW倖存者 — 卡雷德準備大廳（V2.4）</h2>
+      <div id="lobbyHeader" style="text-align:center;font-size:13px;color:#cbd5e1;margin-top:6px;"></div>
+      <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-top:8px;">
+        <button class="stat-btn" style="width:auto;padding:4px 10px;background:#64748b;color:#fff;" onclick="resetStats()">🔄 洗點</button>
+        <button class="stat-btn" style="width:auto;padding:4px 10px;" onclick="debugAddExp()">[測試]+1級＆Seed</button>
+        <button class="stat-btn" style="width:auto;padding:4px 10px;background:#a855f7;color:#fff;" onclick="debugDropLoot()">[測試]掉落5件裝備</button>
+        <button class="stat-btn" style="width:auto;padding:4px 10px;background:#ef4444;color:#fff;" onclick="hardResetSave()">🗑 重置存檔</button>
+        <button class="stat-btn" style="width:auto;padding:4px 10px;background:#facc15;" onclick="debugMaxLv60()">⚡ [測試]一鍵255等</button>
+        <button class="stat-btn" style="width:auto;padding:4px 10px;background:#22c55e;" onclick="toggleCharDetailModal(true)">📊 角色詳細資訊</button>
+      </div>
+      <div class="lobby-grid">
+        <div class="lobby-col"><h3 style="color:#38bdf8;margin-bottom:8px;">📊 七大素質配點</h3><div id="statRows"></div></div>
+        <div class="lobby-col"><h3 style="color:#4ade80;margin-bottom:8px;">🛡 8 格裝備與紙娃娃</h3><div id="lobbyPreview"></div></div>
+        <div class="lobby-col">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <h3 style="color:#facc15;">🔍 鑑定工坊與背包</h3>
+            <button class="stat-btn" style="width:auto;padding:3px 8px;background:#eab308;" onclick="identifyAllItems()">✨ 一鍵全部鑑定</button>
+          </div>
+          <div id="bagList"></div>
+        </div>
+      </div>
+      <div style="text-align:center;margin-top:14px;">
+        <button class="stat-btn" style="width:220px;height:38px;font-size:16px;background:#ef4444;color:#fff;" onclick="startBattle()">🔥 出發冒險</button>
+      </div>
+    </div>
   </div>
 
+  <!-- 升級選卡視窗 -->
+  <div id="levelModal" class="modal">
+    <div class="panel" style="max-width:780px;">
+      <h2 style="color:#fde047;text-align:center;">✨ 選擇強化</h2>
+      <div id="modalSub" style="text-align:center;font-size:13px;color:#94a3b8;margin-top:4px;">點擊一張卡片，或按鍵盤 1 / 2 / 3</div>
+      <div id="cardContainer" class="card-grid"></div>
+    </div>
+  </div>
+
+  <!-- 角色詳細資訊視窗 -->
+  <div id="charDetailModal" class="modal">
+    <div class="panel" style="max-width:760px;">
+      <h2 style="color:#fde047;text-align:center;">📊 角色完整素質與 V2.4 公式明細</h2>
+      <div id="charDetailContent" class="status-grid"></div>
+      <div style="text-align:center;margin-top:12px;">
+        <button class="stat-btn" style="width:140px;height:32px;" onclick="toggleCharDetailModal(false)">關閉視窗</button>
+      </div>
+    </div>
+  </div>
+  <!-- ESC 暫停狀態面板 -->
   <div id="pauseModal" class="modal">
-    <h2 style="color:#fde047;margin-bottom:14px;">⏸️ 遊戲暫停 — 路西安角色狀態</h2>
-    <div id="pauseContent" class="status-box"></div>
-    <button class="btn" style="margin-top:14px;" onclick="togglePause()">繼續戰鬥 (ESC / P)</button>
+    <div class="panel" style="max-width:860px;">
+      <h2 style="color:#fde047;text-align:center;">⏸ 遊戲暫停 — 角色即時狀態</h2>
+      <div id="pauseContent" class="status-grid"></div>
+      <div style="text-align:center;margin-top:14px;">
+        <button class="stat-btn" style="width:180px;height:34px;background:#22c55e;" onclick="togglePause()">繼續戰鬥 (ESC / P)</button>
+      </div>
+    </div>
   </div>
+
+  <!-- 結算視窗 -->
   <div id="endModal" class="modal">
-    <h2 id="endTitle" style="font-size:32px;color:#f87171;">天翼斷裂</h2>
-    <p id="endSummary" style="margin-top:10px;font-size:16px;color:#e2e8f0;"></p>
-    <button class="btn" style="margin-top:16px;" onclick="location.reload()">返回準備大廳</button>
+    <div class="panel" style="max-width:520px;text-align:center;">
+      <h2 id="endTitle" style="color:#fde047;">天翼斷裂</h2>
+      <div id="endSummary" style="margin:14px 0;font-size:14px;line-height:1.7;"></div>
+      <button class="stat-btn" style="width:160px;height:36px;background:#38bdf8;" onclick="location.reload()">返回準備大廳</button>
+    </div>
   </div>
+
+  <!-- 依相依性順序載入所有核心腳本 -->
   <script src="data/characters.js"></script>
   <script src="data/item_weapons.js"></script>
   <script src="data/item_armors.js"></script>
-  <script src="data/items_consumable.js"></script>
+  <script src="data/item_consumable.js"></script>
+  <script src="core/equip.js"></script>
   <script src="core/resonance.js"></script>
   <script src="skills/skill_common.js"></script>
   <script src="skills/skill_lucien.js"></script>
-  <script src="core/equip.js"></script>
+  <script src="skills/skill_tichiel.js"></script>
   <script src="core/save.js"></script>
   <script src="core/game.js"></script>
 </body>
 </html>
-

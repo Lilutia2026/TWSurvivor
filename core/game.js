@@ -5,7 +5,7 @@ resize();
 window.addEventListener('resize', resize);
 
 const EQUIPPED_WEAPON = { name: '學徒長劍', startSkill: 'enbu' };
-const LUCIEN_SKILLS = getActiveSkillPool();
+const ACTIVE_SKILLS = getActiveSkillPool();
 const MAX_ACTIVE_SKILLS = 5;
 const MAX_PASSIVE_SKILLS = 7;
 
@@ -15,20 +15,31 @@ let lastEliteMin = 0, lastMegaBossMin = 0;
 
 const player = {
   x: 0, y: 0, size: 28, baseSpeed: 235,
-  hp: 120, maxHp: 120, shield: 0, maxShield: 0, shieldTimer: 0, thornsCd: 0,
+  hp: 200, maxHp: 200, shield: 0, maxShield: 0, shieldTimer: 0, thornsCd: 0,
   regen: 0, lv: 1, exp: 0, nextExp: 5, pickupRange: 115,
   facingAngle: 0, lastMoveAngle: 0, flipX: 1, walkCycle: 0,
   dmgMult: 1.0, cdMult: 1.0, areaMult: 1.0, speedMult: 1.0,
-  bonusCritRate: 0, resonanceDmgMult: 1.0, dropRateMult: 1.0,
-  expMult: 1.0, curseMult: 1.0
+  bonusCritRate: 0, superCritMult: 1.5, resonanceDmgMult: 1.0,
+  dropRateMult: 1.0, expMult: 1.0, curseMult: 1.0, angelUsed: false
 };
-
 
 function getEffectiveCdMult(extraFactor = 1.0) {
   return Math.max(0.35, player.cdMult * extraFactor);
 }
 
-// 升級左上角角色卡片為《天翼之鍊》原作頭像與經典雙層狀態條風格（保留右上時間與擊殺HUD）
+function getEffectivePhysReducePct(cs) {
+  const basePct = (cs && cs.physReducePct) ? cs.physReducePct : 0;
+  const wallLv = (typeof ownedPassives !== 'undefined' && ownedPassives.lightWall) ? ownedPassives.lightWall : 0;
+  const rawMult = (1 - basePct / 100) * Math.pow(0.97, wallLv);
+  return Math.min(70, Math.round((1 - rawMult) * 100));
+}
+
+function getEffectiveMagReducePct(cs) {
+  const basePct = (cs && cs.magReducePct) ? cs.magReducePct : 0;
+  const msLv = (typeof ownedPassives !== 'undefined' && ownedPassives.magicShield) ? ownedPassives.magicShield : 0;
+  const rawMult = (1 - basePct / 100) * Math.pow(0.97, msLv);
+  return Math.min(70, Math.round((1 - rawMult) * 100));
+}
 function upgradeClassicHud() {
   const hud = document.getElementById('hud');
   const card = hud ? hud.firstElementChild : null;
@@ -44,12 +55,12 @@ function upgradeClassicHud() {
       </div>
       <div style="flex:1;min-width:0;">
         <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;margin-bottom:4px;">
-          <strong style="color:#fef08a;letter-spacing:0.5px;">路西安．卡爾茲</strong>
+          <strong id="hudCharName" style="color:#fef08a;letter-spacing:0.5px;">路西安．卡爾茲</strong>
           <span id="weaponText" style="font-size:11px;color:#93c5fd;background:rgba(30,58,138,0.6);padding:1px 6px;border-radius:4px;border:1px solid #3b82f6;">學徒長劍</span>
         </div>
         <div style="position:relative;height:11px;background:#450a0a;border:1px solid #7f1d1d;border-radius:6px;overflow:hidden;margin-bottom:4px;">
           <div id="hpBar" style="height:100%;width:100%;background:linear-gradient(90deg,#dc2626,#f87171);transition:width 0.15s;"></div>
-          <span id="hpNumText" style="position:absolute;inset:0;font-size:9px;line-height:10px;text-align:center;color:#fff;font-weight:bold;text-shadow:0 1px 2px #000;">120/120</span>
+          <span id="hpNumText" style="position:absolute;inset:0;font-size:9px;line-height:10px;text-align:center;color:#fff;font-weight:bold;text-shadow:0 1px 2px #000;">200/200</span>
         </div>
         <div id="shieldBox" style="display:none;position:relative;height:9px;background:#0c4a6e;border:1px solid #0284c7;border-radius:6px;overflow:hidden;margin-bottom:4px;">
           <div id="shieldBar" style="height:100%;width:100%;background:linear-gradient(90deg,#06b6d4,#67e8f9);transition:width 0.15s;"></div>
@@ -61,23 +72,20 @@ function upgradeClassicHud() {
         </div>
       </div>
     </div>
-    <div id="skillList" style="margin-top:7px;padding-top:5px;border-top:1px solid rgba(148,163,184,0.25);display:flex;flex-wrap:wrap;gap:4px;font-size:11px;"></div>`;
+    <div id="skillList" style="margin-top:7px;padding-top:5px;border-top:1px solid rgba(148,163,184,0.25);display:flex;flex-wrap:wrap;gap:5px;font-size:11px;"></div>`;
 }
-
-
 upgradeClassicHud();
 
-const ownedSkills = { [EQUIPPED_WEAPON.startSkill]: { lv: 1, evolved: false } };
+const ownedSkills = { [EQUIPPED_WEAPON.startSkill]: { lv: 1, evolved: false, disabled: false } };
 const ownedPassives = {};
-let enemies = [], slashes = [], projectiles = [], lightnings = [], gems = [], chests = [], damageTexts = [];
+let enemies = [], slashes = [], projectiles = [], lightnings = [], zones = [], damageTexts = [], gems = [], chests = [];
 let lootBags = [], runLoot = [];
 const keys = {};
 window.addEventListener('keydown', e => {
   keys[e.code] = true;
   if (gameOver && e.code === 'KeyR') location.reload();
   if (!gameOver && (e.code === 'Escape' || e.code === 'KeyP') && document.getElementById('levelModal').style.display !== 'flex' && document.getElementById('lobbyModal').style.display !== 'flex') {
-    togglePause();
-    return;
+    togglePause(); return;
   }
   if (isPaused && !gameOver) {
     if (e.code === 'Digit1') selectUpgrade(0);
@@ -100,278 +108,305 @@ function showBanner(text) {
 }
 
 function getSkillRawDmg(id, lv, evolved) {
-  const sk = LUCIEN_SKILLS[id];
-  const cs = typeof getDerivedCombatStats === 'function' ? getDerivedCombatStats() : { st: {} };
+  const sk = ACTIVE_SKILLS[id];
+  if (!sk) return 20;
+  const cs = typeof getDerivedCombatStats === 'function' ? getDerivedCombatStats() : { st: {}, defThornsDmg: 0, physDmgMult: 1, magDmgMult: 1 };
   const st = cs.st || {};
-  const wType = (typeof saveData !== 'undefined' && saveData.equip.weapon) ? saveData.equip.weapon.type : 'longsword';
+  const w = (typeof saveData !== 'undefined' && saveData.equip) ? saveData.equip.weapon : null;
+  const wType = w ? w.type : 'longsword';
   const wm = WEAPON_MOD[wType] || WEAPON_MOD.longsword;
-  const mainBonus = (st[sk.mainStat] || 0) * (wm[sk.mainStat] || 1.0);
-  const subBonus = (st[sk.subStat] || 0) * (wm[sk.subStat] || 1.0) * 0.3;
-  return ((sk.baseDmg + lv * sk.perLv) + mainBonus + subBonus) * player.dmgMult * (evolved ? 1.45 : 1.0);
+
+  const tags = sk.statTags || (sk.mainStat ? [sk.mainStat === 'I' ? 'INT' : sk.mainStat] : ['H']);
+  const balanceCoef = tags.length >= 3 ? 0.65 : (tags.length === 2 ? 0.85 : 1.0);
+  let stage1 = 0;
+  for (const tag of tags) {
+    if (tag === 'H') stage1 += ((st.H || 0) * 1.0 + (st.S || 0) * 0.3) * (wm.H || 1.0);
+    else if (tag === 'S') stage1 += ((st.S || 0) * 1.0 + (st.H || 0) * 0.3) * (wm.S || 1.0);
+    else if (tag === 'INT') stage1 += ((st.I || 0) * 1.0 + (st.MR || 0) * 0.3) * (wm.I || 1.0);
+    else if (tag === 'MR') stage1 += ((st.MR || 0) * 1.0 + (st.I || 0) * 0.3) * (wm.MR || 1.0);
+  }
+  stage1 *= balanceCoef;
+
+  const isPhysWeapon = ['blade', 'rapier', 'longsword', 'mace'].includes(wType);
+  const hasPhysTag = tags.includes('H') || tags.includes('S');
+  const hasMagTag = tags.includes('INT') || tags.includes('MR');
+  let stage2 = 0;
+  if (isPhysWeapon && !hasPhysTag) stage2 = Math.max(st.S || 0, st.H || 0) * 0.65;
+  else if (!isPhysWeapon && !hasMagTag) stage2 = Math.max(st.I || 0, st.MR || 0) * 0.65;
+
+  // 嚴格依【物理】或【魔法】標籤套用對應增傷乘區
+  const isPhysSkill = sk.type === 'physical' || hasPhysTag;
+  const isMagSkill = sk.type === 'magic' || (!isPhysSkill && hasMagTag);
+  const typeDmgMult = (isPhysSkill ? (cs.physDmgMult || 1.0) : 1.0) * (isMagSkill ? (cs.magDmgMult || 1.0) : 1.0);
+
+  const isMelee = !(sk.behaviorTags || []).includes('射彈') && hasPhysTag;
+  const defAdd = isMelee ? (cs.defThornsDmg || 0) : 0;
+  const blessMult = 1 + (ownedPassives.blessing || 0) * 0.03;
+  const angelMult = ownedPassives.angelWish ? 0.90 : 1.0;
+  const evoMult = (evolved && !sk.isSuperWeapon) ? 1.45 : 1.0;
+  return ((sk.baseDmg + lv * sk.perLv) + stage1 + stage2 + defAdd) * player.dmgMult * typeDmgMult * blessMult * angelMult * evoMult;
 }
 
-function triggerSkills(dt) {
-  const cs = typeof getDerivedCombatStats === 'function' ? getDerivedCombatStats() : { extraProj: 0, statusDurMult: 1 };
-  for (const [id, st] of Object.entries(ownedSkills)) {
-    const sk = LUCIEN_SKILLS[id];
-    if (!sk || (sk.timer -= dt) > 0) continue;
-    const cdFactor = getEffectiveCdMult(Math.pow(0.92, st.lv - 1));
-    const rawDmg = getSkillRawDmg(id, st.lv, st.evolved);
-    const hasResonance = st.evolved && sk.resonanceSkill && ownedSkills[sk.resonanceSkill];
+function getSpellBase() {
+  const st = typeof getTotalStats === 'function' ? getTotalStats() : {};
+  return (st.I || 1) * 1.0 + (st.MR || 1) * 0.3;
+}
 
-    if (id === 'renga') {
-      const near = enemies.reduce((a, b) => (!a || Math.hypot(b.x - player.x, b.y - player.y) < Math.hypot(a.x - player.x, a.y - player.y)) ? b : a, null);
-      if (near && Math.hypot(near.x - player.x, near.y - player.y) < 460) { player.facingAngle = Math.atan2(near.y - player.y, near.x - player.x); player.flipX = Math.cos(player.facingAngle) >= 0 ? 1 : -1; }
-      const range = (125 + st.lv * 10) * player.areaMult * (st.evolved ? 1.35 : 1), arc = st.evolved ? Math.PI * 2 : (1.8 + st.lv * 0.1);
-      const swings = st.lv >= 4 ? 2 : 1, hitTag = hasResonance ? 'renga_fire' : 'physical';
-      for (let s = 0; s < swings; s++) {
-        slashes.push({ type: hasResonance ? 'fireboom' : 'renga', angle: player.facingAngle + (s * 0.35 - 0.15), range, arc, life: 0.18 + s * 0.08, evolved: st.evolved });
-        damageArea(player.x, player.y, range, player.facingAngle, arc, rawDmg * (swings === 2 ? 0.72 : 1), 16, hitTag);
+function triggerThunderChain(srcEnemy, spellBase) {
+  const res = typeof getResonanceParams === 'function' ? getResonanceParams('thunder') : null;
+  if (!res || (srcEnemy.chainIcd || 0) > 0) return;
+  srcEnemy.chainIcd = res.icd;
+  let cur = srcEnemy;
+  const visited = new Set([srcEnemy]);
+  for (let j = 0; j < res.jumps; j++) {
+    let nextIdx = -1, minD = 240;
+    for (let i = 0; i < enemies.length; i++) {
+      const cand = enemies[i];
+      if (!visited.has(cand)) {
+        const d = Math.hypot(cand.x - cur.x, cand.y - cur.y);
+        if (d < minD) { minD = d; nextIdx = i; }
       }
-      sk.timer = Math.max(0.18, sk.baseCd * cdFactor * (st.evolved ? 0.55 : 1));
-    } else if (id === 'aurora') {
-      const reach = (115 + st.lv * 8) * player.areaMult * (st.evolved ? 1.3 : 1);
-      const near = enemies.reduce((a, b) => (!a || Math.hypot(b.x - player.x, b.y - player.y) < Math.hypot(a.x - player.x, a.y - player.y)) ? b : a, null);
-      if (near && Math.hypot(near.x - player.x, near.y - player.y) <= reach + 180) { player.facingAngle = Math.atan2(near.y - player.y, near.x - player.x); player.flipX = Math.cos(player.facingAngle) >= 0 ? 1 : -1; }
-      const ang = player.facingAngle;
-      slashes.push({ type: 'aurora', angle: ang, range: reach, arc: 0.35, life: 0.12, evolved: st.evolved });
-      let targetIdx = -1, minD = reach + 25;
-      for (let i = 0; i < enemies.length; i++) {
-        const e = enemies[i], dx = e.x - player.x, dy = e.y - player.y, d = Math.hypot(dx, dy);
-        if (d <= reach + e.radius) { let diff = Math.atan2(dy, dx) - ang; while (diff > Math.PI) diff -= Math.PI * 2; while (diff < -Math.PI) diff += Math.PI * 2; if (Math.abs(diff) <= 0.4 && d < minD) { minD = d; targetIdx = i; } }
-      }
-      if (targetIdx !== -1) {
-        const target = enemies[targetIdx];
-        if (hasResonance) { lightnings.push({ x: target.x, y: target.y, life: 0.22 }); target.shockTimer = 2.0 * (cs.statusDurMult || 1); }
-        hitEnemy(targetIdx, rawDmg * (st.evolved ? 1.25 : 1), st.lv >= 4 ? 'aurora_crit' : 'aurora');
-      }
-      sk.timer = Math.max(0.16, sk.baseCd * cdFactor * (st.evolved ? 0.65 : 1));
-    } else if (id === 'enbu') {
-      const range = (115 + st.lv * 13) * player.areaMult * (st.evolved ? 1.45 : 1);
-      slashes.push({ type: 'enbu', angle: 0, range, arc: Math.PI * 2, life: st.lv >= 4 ? 0.55 : 0.28, evolved: st.evolved });
-      damageArea(player.x, player.y, range, 0, Math.PI * 2, rawDmg, 45, 'enbu');
-      if (hasResonance) {
-        for (let k = 0; k < 4; k++) { const a = (Math.PI / 2) * k + gameTime; projectiles.push({ type: 'wind', x: player.x, y: player.y, vx: Math.cos(a) * 520, vy: Math.sin(a) * 520, radius: 11, dmg: rawDmg * 0.45, pierce: 3, life: 0.8, evolved: true, hitSet: new Set() }); }
-      }
-      sk.timer = Math.max(0.45, sk.baseCd * cdFactor * (st.evolved ? 0.5 : 1));
-    } else if (id === 'windblade' || id === 'firearrow') {
-      const baseShots = 1 + Math.floor(st.lv / 3) + (cs.extraProj || 0);
-      for (let i = 0; i < baseShots; i++) {
-        const t = enemies[Math.floor(Math.random() * enemies.length)];
-        const ang = (t ? Math.atan2(t.y - player.y, t.x - player.x) : Math.random() * Math.PI * 2) + (Math.random() - 0.5) * 0.24;
-        projectiles.push({ type: id === 'windblade' ? 'wind' : 'fire', x: player.x, y: player.y, vx: Math.cos(ang) * 560, vy: Math.sin(ang) * 560, radius: 10 * player.areaMult, dmg: rawDmg, pierce: (id === 'windblade' && st.lv >= 4) ? 2 : 1, life: 1.4, evolved: false, hitSet: new Set() });
-      }
-      sk.timer = Math.max(0.22, sk.baseCd * cdFactor);
-    } else if (id === 'thunder' && enemies.length > 0) {
-      const strikes = 1 + Math.floor(st.lv / 3) + (cs.extraProj || 0);
-      for (let i = 0; i < strikes; i++) {
-        const idx = Math.floor(Math.random() * enemies.length), e = enemies[idx];
-        if (e) { e.shockTimer = 2.2 * (cs.statusDurMult || 1); lightnings.push({ x: e.x, y: e.y, life: 0.25 }); hitEnemy(idx, rawDmg, 'magic'); }
-      }
-      sk.timer = Math.max(0.5, sk.baseCd * cdFactor);
     }
+    if (nextIdx === -1) break;
+    const nextE = enemies[nextIdx];
+    visited.add(nextE);
+    lightnings.push({ x1: cur.x, y1: cur.y, x2: nextE.x, y2: nextE.y, life: 0.22 });
+    hitEnemy(nextIdx, spellBase * res.mult, { element: 'thunder', isChain: true });
+    cur = nextE;
   }
 }
-function damageArea(cx, cy, range, facing, arc, baseDmg, kb, tag) {
-  for (let i = enemies.length - 1; i >= 0; i--) {
-    const e = enemies[i], dx = e.x - cx, dy = e.y - cy;
-    if (Math.hypot(dx, dy) <= range + e.radius) {
-      let diff = Math.atan2(dy, dx) - facing;
-      while (diff > Math.PI) diff -= Math.PI * 2; while (diff < -Math.PI) diff += Math.PI * 2;
-      if (arc >= Math.PI * 1.9 || Math.abs(diff) <= arc / 2) {
-        const ang = Math.atan2(dy, dx), res = (e.isElite || e.isMegaBoss || e.isFinalBoss) ? 0.15 : 1;
-        e.x += Math.cos(ang) * kb * res; e.y += Math.sin(ang) * kb * res;
-        hitEnemy(i, baseDmg, tag);
-      }
+
+function spawnHolySealWave(cx, cy, baseRadius, sealChance) {
+  const r = baseRadius * player.areaMult;
+  slashes.push({ type: 'holywave', x: cx, y: cy, range: r, arc: Math.PI * 2, life: 0.35 });
+  for (const e of enemies) {
+    if (Math.hypot(e.x - cx, e.y - cy) <= r + e.radius && Math.random() < sealChance) {
+      if (typeof applyHolySeal === 'function') applyHolySeal(e, 1);
     }
   }
 }
 
-function hitEnemy(idx, rawDmg, tag = 'magic') {
-  const e = enemies[idx]; if (!e) return;
-  const cs = typeof getDerivedCombatStats === 'function' ? getDerivedCombatStats() : { critRate: 0.1, critDmg: 1.5, statusCritMult: 1.5, statusDurMult: 1 };
-  if (tag === 'renga_fire') e.burnTimer = Math.max(e.burnTimer || 0, 3.0 * (cs.statusDurMult || 1));
-  const totalCritRate = Math.min(0.95, (cs.critRate || 0.1) + (player.bonusCritRate || 0));
-  let mult = 0.94 + Math.random() * 0.12, crit = Math.random() < totalCritRate;
-  if (crit) mult *= cs.critDmg;
-  if ((tag === 'physical' || tag === 'enbu' || tag === 'renga_fire') && (e.shockTimer > 0 || e.burnTimer > 0)) { mult *= cs.statusCritMult * player.resonanceDmgMult; crit = true; }
-  if ((tag === 'aurora' || tag === 'aurora_crit') && (e.slowTimer > 0 || e.shockTimer > 0)) { mult *= cs.statusCritMult * player.resonanceDmgMult; crit = true; }
-  if (tag === 'burn') { mult *= player.resonanceDmgMult; }
-  const dmg = Math.round(rawDmg * mult); e.hp -= dmg; e.hitFlash = 0.08;
-  damageTexts.push({ x: e.x, y: e.y - e.radius, text: crit ? `💥${dmg}` : dmg, color: crit ? '#fde047' : '#fff', life: 0.55 });
+function hitEnemy(idx, rawDmg, opts = {}) {
+  const e = enemies[idx];
+  if (!e) return;
+  const cs = typeof getDerivedCombatStats === 'function' ? getDerivedCombatStats() : { critRate: 0.1, critDmg: 1.5, doubleHitChance: 0 };
+  const elem = opts.element || 'none';
+  const isStrikeOrLight = elem === 'light' || opts.isStrike;
+
+  const iceRes = (elem === 'ice' && e.freezeTimer > 0 && typeof getResonanceParams === 'function') ? getResonanceParams('ice') : null;
+  if (iceRes) { rawDmg += getSpellBase() * iceRes.mult; e.freezeTimer = 0; }
+
+  if (opts.consumeSeal && (e.holySeal || 0) >= 3) {
+    const lRes = typeof getResonanceParams === 'function' ? getResonanceParams('light') : null;
+    const mult = opts.sealBurstMult || (lRes ? lRes.polyMult : 3.2);
+    rawDmg += getSpellBase() * mult;
+    e.holySeal = 0;
+    const wR = 135 * (1 + (lRes ? lRes.waveRadiusBonus : 0));
+    spawnHolySealWave(e.x, e.y, wR, lRes ? lRes.waveSealChance : 0.4);
+  }
+  const mod = typeof calcStatusDamageMods === 'function' ? calcStatusDamageMods(e, elem, isStrikeOrLight) : { addMult: 1, endMult: 1 };
+  const talentIgnore = (ownedPassives.mageTalent || 0) * 0.03;
+  const bossResist = (e.isFinalBoss ? 0.20 : (e.isMegaBoss ? 0.12 : 0)) * (1 - talentIgnore);
+  let finalDmg = rawDmg * mod.addMult * (1 - bossResist) * mod.endMult * (0.95 + Math.random() * 0.10);
+
+  const totalCrit = (cs.critRate || 0.05) + (player.bonusCritRate || 0);
+  const isCrit = Math.random() < Math.min(1.0, totalCrit);
+  let isSuperCrit = false;
+  if (isCrit) {
+    finalDmg *= (cs.critDmg || 1.5);
+    const overflow = Math.max(0, totalCrit - 1.0);
+    if (overflow > 0 && Math.random() < overflow) {
+      isSuperCrit = true;
+      finalDmg *= (player.superCritMult || 1.5);
+    }
+  }
+
+  const dmgInt = Math.max(1, Math.round(finalDmg));
+  e.hp -= dmgInt; e.hitFlash = 0.08;
+  const tagIcon = isSuperCrit ? '💢' : (isCrit ? '💥' : '');
+  const tagColor = isSuperCrit ? '#ff4d4f' : (isCrit ? '#fde047' : '#fff');
+  damageTexts.push({ x: e.x, y: e.y - e.radius, txt: `${tagIcon}${dmgInt}`, color: tagColor, life: 0.55 });
+
+  if (elem === 'thunder' && !opts.isChain && e.shockTimer > 0) triggerThunderChain(e, getSpellBase());
+
+  if (!opts.isDouble && Math.random() < (cs.doubleHitChance || 0)) {
+    hitEnemy(idx, rawDmg * 0.75, { ...opts, isDouble: true, consumeSeal: false });
+    return;
+  }
+
   if (e.hp <= 0) {
-    if ((tag === 'enbu' || tag === 'renga_fire' || tag === 'fire') && e.burnTimer > 0) {
-      slashes.push({ type: 'fireboom', x: e.x, y: e.y, range: 95 * player.areaMult, arc: Math.PI * 2, life: 0.25 });
-      damageArea(e.x, e.y, 95 * player.areaMult, 0, Math.PI * 2, rawDmg * 0.75 * player.resonanceDmgMult, 15, 'magic');
+    const fireRes = (e.burnTimer > 0 && !opts.isMartyrBoom && typeof getResonanceParams === 'function') ? getResonanceParams('fire') : null;
+    if (fireRes) {
+      const boomR = fireRes.radius * player.areaMult;
+      slashes.push({ type: 'fireboom', x: e.x, y: e.y, range: boomR, arc: Math.PI * 2, life: 0.25 });
+      damageArea(e.x, e.y, boomR, 0, Math.PI * 2, getSpellBase() * fireRes.mult, 12, { element: 'fire', isMartyrBoom: true });
     }
     if (e.isFinalBoss) { endGame(true); return; }
     if (e.isMegaBoss) chests.push({ x: e.x, y: e.y, kind: 'gold' });
     else if (e.isElite) chests.push({ x: e.x, y: e.y, kind: 'silver' });
+
     const baseDropChance = 0.015 * (player.dropRateMult || 1.0);
     if (e.isFinalBoss || e.isMegaBoss || e.isElite || Math.random() < baseDropChance) {
       const dropCount = (e.isFinalBoss || e.isMegaBoss) ? 2 : 1;
       for (let d = 0; d < dropCount; d++) {
         const rRoll = Math.random();
-        let rar = (e.isFinalBoss || e.isMegaBoss) ? (rRoll < 0.20 ? 'gold' : (rRoll < 0.75 ? 'purple' : 'blue')) : (e.isElite ? (rRoll < 0.05 ? 'gold' : (rRoll < 0.30 ? 'purple' : (rRoll < 0.80 ? 'blue' : 'green'))) : (rRoll < 0.002 ? 'gold' : (rRoll < 0.02 ? 'purple' : (rRoll < 0.10 ? 'blue' : (rRoll < 0.35 ? 'green' : 'white')))));
+        let rar = (e.isFinalBoss || e.isMegaBoss) ? (rRoll < 0.20 ? 'gold' : (rRoll < 0.75 ? 'purple' : 'blue'))
+          : (e.isElite ? (rRoll < 0.05 ? 'gold' : (rRoll < 0.30 ? 'purple' : (rRoll < 0.80 ? 'blue' : 'green')))
+          : (rRoll < 0.002 ? 'gold' : (rRoll < 0.02 ? 'purple' : (rRoll < 0.10 ? 'blue' : (rRoll < 0.35 ? 'green' : 'white')))));
         const dropItem = typeof createUnidentifiedDrop === 'function' ? createUnidentifiedDrop(rar, saveData.outLv + 10, null, (e.isFinalBoss || e.isMegaBoss) && d === 0) : null;
         if (dropItem) lootBags.push({ x: e.x + (d * 24 - 12), y: e.y, item: dropItem, color: RARITIES[rar].color, rarName: RARITIES[rar].name });
       }
     }
-    gems.push({ x: e.x, y: e.y, val: e.expValue }); enemies.splice(idx, 1); kills++; combo++; comboTimer = 2.5;
+    gems.push({ x: e.x, y: e.y, val: e.expValue });
+    enemies.splice(idx, 1); kills++; combo++; comboTimer = 2.5;
+  }
+}
+function damageArea(cx, cy, range, facing, arc, baseDmg, kb, opts = {}) {
+  const cs = typeof getDerivedCombatStats === 'function' ? getDerivedCombatStats() : { knockbackMult: 1 };
+  const kbFinal = kb * (cs.knockbackMult || 1);
+  let hitCount = 0;
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    if (opts.maxTargets && hitCount >= opts.maxTargets) break;
+    const e = enemies[i], dx = e.x - cx, dy = e.y - cy;
+    if (Math.hypot(dx, dy) <= range + e.radius) {
+      let diff = Math.atan2(dy, dx) - facing;
+      while (diff > Math.PI) diff -= Math.PI * 2; while (diff < -Math.PI) diff += Math.PI * 2;
+      if (arc >= Math.PI * 1.9 || Math.abs(diff) <= arc / 2) {
+        hitCount++;
+        const ang = Math.atan2(dy, dx), res = (e.isElite || e.isMegaBoss || e.isFinalBoss) ? 0.15 : 1;
+        e.x += Math.cos(ang) * kbFinal * res; e.y += Math.sin(ang) * kbFinal * res;
+        if (opts.onTargetHit) opts.onTargetHit(e);
+        hitEnemy(i, baseDmg, opts);
+      }
+    }
   }
 }
 
-function renderChoiceModal(subText) {
-  const box = document.getElementById('cardContainer'); box.innerHTML = '';
-  document.getElementById('modalSub').textContent = subText;
-  currentChoices.forEach((c, idx) => {
-    const div = document.createElement('div'); div.className = 'card'; div.onclick = () => selectUpgrade(idx);
-    div.innerHTML = `<div class="card-key">按鍵 ${idx + 1}</div><div class="card-title">${c.title}</div><div class="card-desc">${c.desc}</div><div class="card-tag">${c.tag}</div>`;
-    box.appendChild(div);
-  });
-  document.getElementById('levelModal').style.display = 'flex';
+function findNearestEnemy(maxDist) {
+  let near = null, minD = maxDist;
+  for (const e of enemies) {
+    const d = Math.hypot(e.x - player.x, e.y - player.y);
+    if (d < minD) { minD = d; near = e; }
+  }
+  return near;
 }
 
-function levelUp() {
-  isPaused = true; const pool = [];
-  const activePassives = getActivePassivePool();
-  for (const [k, sk] of Object.entries(LUCIEN_SKILLS)) {
-    const o = ownedSkills[k], maxL = sk.maxLv || 8;
-    if (o && o.lv < maxL) {
-      const nextLv = o.lv + 1;
-      const note = (sk.lvNotes && sk.lvNotes[nextLv]) ? `<br><strong style="color:#fde047;">${sk.lvNotes[nextLv]}</strong>` : '';
-      const tagText = sk.canEvolve ? `LV.${maxL}配【${activePassives[sk.reqPassive]?.name || ''}】覺醒` : '元素異常連鎖技（不可超武進化）';
-      pool.push({ kind: 'skill', id: k, weight: 2.5, title: `${sk.name} LV.${o.lv}→${nextLv} (上限${maxL})`, desc: sk.desc + note, tag: tagText });
-    } else if (!o && Object.keys(ownedSkills).length < MAX_ACTIVE_SKILLS) {
-      pool.push({ kind: 'skill', id: k, weight: 1.0, title: `【新技能】${sk.name}`, desc: sk.desc, tag: sk.canEvolve ? `可進化為 ${sk.evoName}` : '元素異常輔助（MAX LV.10）' });
+function triggerSkills(dt) {
+  const cs = typeof getDerivedCombatStats === 'function' ? getDerivedCombatStats() : { statusDurMult: 1, statusChanceBonus: 0, extraProj: 0 };
+  const spellBase = getSpellBase();
+  for (const [id, st] of Object.entries(ownedSkills)) {
+    const sk = ACTIVE_SKILLS[id];
+    if (!sk || st.disabled || (sk.timer -= dt) > 0) continue;
+    const cdFactor = getEffectiveCdMult(Math.pow(0.95, st.lv - 1));
+    const bTags = sk.behaviorTags || [];
+    const areaFactor = bTags.includes('範圍') ? player.areaMult : 1.0;
+    const bonusProj = bTags.includes('射彈') ? (cs.extraProj || 0) : 0;
+    const rawDmg = getSkillRawDmg(id, st.lv, st.evolved);
+    const partnerId = sk.resonancePartner || sk.resonanceSkill;
+    const hasResonance = st.evolved && partnerId && ownedSkills[partnerId];
+
+    if (id === 'renga' || id === 'aurora' || id === 'enbu') {
+      const range = (125 + st.lv * 10) * areaFactor * (st.evolved ? 1.35 : 1);
+      if (id === 'renga' || id === 'aurora') {
+        const target = findNearestEnemy(range + 220);
+        if (target) { player.facingAngle = Math.atan2(target.y - player.y, target.x - player.x); player.flipX = Math.cos(player.facingAngle) >= 0 ? 1 : -1; }
+      }
+      const arc = id === 'enbu' ? Math.PI * 2 : (id === 'aurora' ? 0.55 : (st.evolved ? Math.PI * 2 : 1.85));
+      const swings = (id === 'renga' && st.lv >= 4) ? 2 : 1;
+      for (let s = 0; s < swings; s++) {
+        slashes.push({ type: hasResonance ? 'fireboom' : id, angle: player.facingAngle + (s * 0.3 - 0.15), range, arc, life: 0.18 + s * 0.06, evolved: st.evolved });
+        damageArea(player.x, player.y, range, player.facingAngle, arc, rawDmg * (swings === 2 ? 0.72 : 1), id === 'enbu' ? 40 : 16, {
+          element: hasResonance ? (id === 'renga' ? 'fire' : (id === 'aurora' ? 'thunder' : 'wind')) : 'none',
+          onTargetHit: (e) => {
+            if (!hasResonance) return;
+            if (id === 'renga') applyBaseStatusOnHit(e, 'fire', spellBase, cs, 0.5);
+            if (id === 'aurora') { applyBaseStatusOnHit(e, 'thunder', spellBase, cs, 0.5); lightnings.push({ x1: e.x, y1: e.y - 60, x2: e.x, y2: e.y, life: 0.2 }); }
+            if (id === 'enbu') applyBaseStatusOnHit(e, 'wind', spellBase, cs, 0.6);
+          }
+        });
+      }
+      sk.timer = sk.baseCd * cdFactor;
+    } else if (id === 'windblade' || id === 'firearrow' || id === 'thunder') {
+      const shots = 1 + Math.floor(st.lv / 3) + bonusProj;
+      for (let i = 0; i < shots; i++) {
+        const t = enemies[Math.floor(Math.random() * enemies.length)];
+        const ang = t ? Math.atan2(t.y - player.y, t.x - player.x) : Math.random() * Math.PI * 2;
+        if (id === 'thunder' && t) {
+          applyBaseStatusOnHit(t, 'thunder', spellBase, cs, 0.45);
+          lightnings.push({ x1: t.x, y1: t.y - 80, x2: t.x, y2: t.y, life: 0.22 });
+          hitEnemy(enemies.indexOf(t), rawDmg, { element: 'thunder' });
+        } else {
+          projectiles.push({ type: id === 'windblade' ? 'wind' : 'fire', elem: id === 'windblade' ? 'wind' : 'fire', x: player.x, y: player.y, vx: Math.cos(ang) * 560, vy: Math.sin(ang) * 560, radius: 10 * areaFactor, dmg: rawDmg, pierce: (id === 'windblade' && st.lv >= 4) ? 2 : 1, life: 1.4, hitSet: new Set() });
+        }
+      }
+      sk.timer = sk.baseCd * cdFactor;
+    } else if (id === 'holylight') {
+      const shots = 1 + Math.floor(st.lv / 2) + bonusProj;
+      for (let i = 0; i < shots; i++) {
+        const t = enemies[Math.floor(Math.random() * enemies.length)];
+        const ang = (t ? Math.atan2(t.y - player.y, t.x - player.x) : Math.random() * Math.PI * 2) + (i - (shots - 1) / 2) * 0.14;
+        projectiles.push({ type: 'holy', elem: 'light', x: player.x, y: player.y, vx: Math.cos(ang) * 620, vy: Math.sin(ang) * 620, radius: 9 * areaFactor, dmg: rawDmg, pierce: 4, life: 1.3, sealChance: 0.30 + st.lv * 0.02, hitSet: new Set() });
+      }
+      sk.timer = sk.baseCd * cdFactor;
+    } else if (id === 'radiance' || id === 'healLight' || id === 'holypoly') {
+      const t = enemies[Math.floor(Math.random() * enemies.length)];
+      const tx = t ? t.x : player.x + (Math.random() - 0.5) * 160, ty = t ? t.y : player.y + (Math.random() - 0.5) * 160;
+      const rad = (id === 'holypoly' ? (140 + st.lv * 25) : 110) * areaFactor;
+      zones.push({ kind: id, x: tx, y: ty, radius: rad, life: id === 'holypoly' ? 2.0 : (3.0 + Math.floor(st.lv / 5) * 0.5), tickTimer: 0.5, dmg: rawDmg, lv: st.lv, sealChance: 0.32 + st.lv * 0.02 });
+      sk.timer = sk.baseCd * cdFactor;
+    } else if (id === 'armorbreak' || id === 'earthhammer' || id === 'frenzyhammer') {
+      const is360 = id !== 'armorbreak';
+      const range = (is360 ? 135 : 145) * areaFactor;
+      if (!is360) { const near = findNearestEnemy(range + 160); if (near) { player.facingAngle = Math.atan2(near.y - player.y, near.x - player.x); player.flipX = Math.cos(player.facingAngle) >= 0 ? 1 : -1; } }
+      const maxT = id === 'armorbreak' ? (3 + (st.lv >= 5 ? 1 : 0) + (st.lv >= 8 ? 1 : 0)) : 999;
+      slashes.push({ type: 'holywave', x: player.x, y: player.y, angle: player.facingAngle, range, arc: is360 ? Math.PI * 2 : 1.7, life: 0.22 });
+      damageArea(player.x, player.y, range, player.facingAngle, is360 ? Math.PI * 2 : 1.7, rawDmg, id === 'earthhammer' ? 42 : 20, {
+        element: 'light', isStrike: true, maxTargets: maxT, consumeSeal: id === 'frenzyhammer',
+        onTargetHit: (e) => {
+          applyBaseStatusOnHit(e, 'light', spellBase, cs, 0.45, { sealStacks: 2 });
+          if (id === 'armorbreak' && Math.random() < 0.65) e.armorBreakTimer = Math.max(e.armorBreakTimer || 0, (3.0 + Math.floor(st.lv / 2) * 0.5) * (cs.statusDurMult || 1));
+          if (id === 'frenzyhammer') e.stunTimer = Math.max(e.stunTimer || 0, 0.9);
+        }
+      });
+      sk.timer = sk.baseCd * cdFactor;
+    } else if (id.startsWith('fire') || id.startsWith('ice') || id.startsWith('thunder')) {
+      const elem = id.startsWith('fire') ? 'fire' : (id.startsWith('ice') ? 'ice' : 'thunder');
+      const baseCount = id === 'fire1' ? (1 + Math.floor(st.lv / 2))
+        : (id === 'fire3' ? (4 + Math.floor(st.lv / 2.5))
+        : (id === 'thunder1' ? (2 + Math.floor(st.lv / 3))
+        : (id === 'thunder4' ? (3 + Math.floor(st.lv / 3)) : (1 + Math.floor(st.lv / 3)))));
+      const count = baseCount + bonusProj;
+      for (let i = 0; i < count; i++) {
+        const t = enemies[Math.floor(Math.random() * enemies.length)];
+        const ang = id === 'fire3' ? ((Math.PI * 2 / count) * i) : (t ? Math.atan2(t.y - player.y, t.x - player.x) + (Math.random() - 0.5) * 0.25 : Math.random() * Math.PI * 2);
+        if (elem === 'thunder' && (id === 'thunder1' || id === 'thunder4' || id === 'thunder5')) {
+          const tx = t ? t.x + (Math.random() - 0.5) * 40 : player.x + (Math.random() - 0.5) * 200;
+          const ty = t ? t.y + (Math.random() - 0.5) * 40 : player.y + (Math.random() - 0.5) * 200;
+          lightnings.push({ x1: tx, y1: ty - 110, x2: tx, y2: ty, life: 0.24 });
+          const r = (id === 'thunder5' ? 125 : (id === 'thunder4' ? 85 : 38)) * areaFactor;
+          damageArea(tx, ty, r, 0, Math.PI * 2, rawDmg, 10, {
+            element: 'thunder', onTargetHit: (e) => applyBaseStatusOnHit(e, 'thunder', spellBase, cs, 0.45)
+          });
+        } else if (id === 'ice2' || id === 'thunder2') {
+          const tx = (id === 'ice2' && t) ? t.x : player.x;
+          const ty = (id === 'ice2' && t) ? t.y : player.y;
+          zones.push({ kind: id, x: tx, y: ty, radius: 120 * areaFactor, life: 1.0, tickTimer: 0.35, dmg: rawDmg, lv: st.lv, sealChance: 0.45 });
+        } else {
+          const isOrb = id === 'ice3', isBounce = id === 'ice1' || id === 'thunder3';
+          projectiles.push({
+            type: elem, elem, skillId: id, x: player.x, y: player.y,
+            vx: Math.cos(ang) * (isOrb ? 210 : 520), vy: Math.sin(ang) * (isOrb ? 210 : 520),
+            radius: (isOrb ? 22 : (id.endsWith('4') || id.endsWith('5') ? 26 : 11)) * areaFactor,
+            dmg: rawDmg, pierce: isOrb ? 99 : (isBounce ? (2 + Math.floor(st.lv / 3)) : 1),
+            life: isOrb ? 2.8 : 1.4, orbShootCd: 0.45, hitSet: new Set()
+          });
+        }
+      }
+      sk.timer = sk.baseCd * cdFactor;
     }
   }
-  for (const [k, p] of Object.entries(activePassives)) {
-    const lv = ownedPassives[k] || 0, maxP = p.maxLv || 5;
-    if (lv < maxP && (lv > 0 || Object.keys(ownedPassives).length < MAX_PASSIVE_SKILLS)) {
-      pool.push({ kind: 'passive', id: k, weight: lv > 0 ? 2.5 : 1.0, title: lv > 0 ? `${p.name} LV.${lv}→${lv + 1}` : `【新輔助】${p.name}`, desc: p.desc, tag: '輔助強化' });
-    }
-  }
-  if (!pool.length) {
-    currentChoices = [
-      { kind: 'heal', title: '💚 女神聖光祝福（回復 40% 生命）', desc: '全技能已臻巔峰！立即恢復大量生命值維持戰線。', tag: '生存補給' },
-      { kind: 'seed', title: '💰 黃金種子袋（獲得 +50 Seed）', desc: '全技能已臻巔峰！立即將 50 Seed 存入局外錢包。', tag: '資源農裝' }
-    ];
-    renderChoiceModal(`目前等級 LV.${player.lv}（全技能滿級突破獎勵）｜ 按 1 / 2 選擇`);
-    return;
-  }
-  currentChoices = []; const tempPool = [...pool];
-  while (currentChoices.length < 3 && tempPool.length > 0) {
-    const totalW = tempPool.reduce((sum, item) => sum + (item.weight || 1), 0);
-    let r = Math.random() * totalW, pickedIdx = 0;
-    for (let i = 0; i < tempPool.length; i++) { r -= (tempPool[i].weight || 1); if (r <= 0) { pickedIdx = i; break; } }
-    currentChoices.push(tempPool[pickedIdx]); tempPool.splice(pickedIdx, 1);
-  }
-  renderChoiceModal(`目前等級 LV.${player.lv} ｜ 技能欄 ${Object.keys(ownedSkills).length}/${MAX_ACTIVE_SKILLS} 主動・${Object.keys(ownedPassives).length}/${MAX_PASSIVE_SKILLS} 被動 ｜ 按 1 / 2 / 3`);
-}
-function selectUpgrade(idx) {
-  const c = currentChoices[idx]; if (!c) return;
-  if (c.kind === 'evolve') {
-    const sk = LUCIEN_SKILLS[c.id];
-    if (ownedSkills[c.id] && sk) {
-      ownedSkills[c.id].evolved = true;
-      const hasRes = sk.resonanceSkill && ownedSkills[sk.resonanceSkill];
-      showBanner(`🌟 超武覺醒！【${sk.name}】進化為【${sk.evoName}】${hasRes ? '（✨觸發元素共鳴！）' : ''}！`);
-    }
-  } else if (c.kind === 'skill') {
-    ownedSkills[c.id] ? ownedSkills[c.id].lv++ : (ownedSkills[c.id] = { lv: 1, evolved: false });
-  } else if (c.kind === 'passive') {
-    ownedPassives[c.id] = (ownedPassives[c.id] || 0) + 1;
-    if (c.id === 'fastsword') { player.cdMult *= 0.92; player.speedMult += 0.04; }
-    if (c.id === 'guard') player.areaMult += 0.10;
-    if (c.id === 'haste') player.cdMult *= 0.92;
-    if (c.id === 'might') player.dmgMult += 0.08;
-    if (c.id === 'cdr') player.cdMult *= 0.94;
-    if (c.id === 'area') player.areaMult += 0.10;
-    if (c.id === 'crit') player.bonusCritRate += 0.04;
-    if (c.id === 'resonance') player.resonanceDmgMult += 0.12;
-    if (c.id === 'lucky') player.dropRateMult += 0.20;
-    if (c.id === 'expGain') player.expMult += 0.12;
-    if (c.id === 'curse') player.curseMult += 0.12;
-    if (c.id === 'windBoot') player.speedMult += 0.09;
-    if (c.id === 'heal') { player.regen += 1.2; }
-  } else if (c.kind === 'seed') {
-    if (typeof saveData !== 'undefined') { saveData.seed = (saveData.seed || 0) + 50; writeSave(); }
-    showBanner('💰 獲得黃金種子袋！局外錢包 Seed +50！');
-  } else {
-    player.hp = Math.min(player.maxHp, player.hp + player.maxHp * 0.4);
-  }
-  document.getElementById('levelModal').style.display = 'none'; isPaused = false;
 }
 
-function openChest(kind) {
-  if (kind === 'silver') {
-    const roll = Math.random();
-    const rolls = roll < 0.15 ? 3 : (roll < 0.50 ? 2 : 1);
-    const activePassives = getActivePassivePool();
-    const upgradable = [];
-    for (const [k, o] of Object.entries(ownedSkills)) { if (o.lv < (LUCIEN_SKILLS[k]?.maxLv || 8)) upgradable.push({ kind: 'skill', id: k, name: LUCIEN_SKILLS[k].name }); }
-    for (const [k, lv] of Object.entries(ownedPassives)) { if (lv < (activePassives[k]?.maxLv || 5)) upgradable.push({ kind: 'passive', id: k, name: activePassives[k].name }); }
-    if (upgradable.length === 0) {
-      const seedBonus = rolls * 35;
-      if (typeof saveData !== 'undefined') { saveData.seed = (saveData.seed || 0) + seedBonus; writeSave(); }
-      showBanner(`🎁 白銀寶箱（${rolls}連開）！全技能已滿級，轉換為 Seed +${seedBonus}！`);
-      return;
-    }
-    const gained = [];
-    for (let r = 0; r < rolls && upgradable.length > 0; r++) {
-      const pickIdx = Math.floor(Math.random() * upgradable.length);
-      const t = upgradable[pickIdx];
-      if (t.kind === 'skill') { ownedSkills[t.id].lv++; gained.push(`${t.name} LV.${ownedSkills[t.id].lv}`); if (ownedSkills[t.id].lv >= (LUCIEN_SKILLS[t.id]?.maxLv || 8)) upgradable.splice(pickIdx, 1); }
-      else { ownedPassives[t.id]++; gained.push(`${t.name} LV.${ownedPassives[t.id]}`); if (t.id === 'fastsword') { player.cdMult *= 0.92; player.speedMult += 0.04; } if (t.id === 'guard') player.areaMult += 0.10; if (t.id === 'haste') player.cdMult *= 0.92; if (t.id === 'might') player.dmgMult += 0.08; if (t.id === 'cdr') player.cdMult *= 0.94; if (t.id === 'area') player.areaMult += 0.10; if (t.id === 'crit') player.bonusCritRate += 0.04; if (t.id === 'resonance') player.resonanceDmgMult += 0.12; if (t.id === 'lucky') player.dropRateMult += 0.20; if (t.id === 'expGain') player.expMult += 0.12; if (t.id === 'curse') player.curseMult += 0.12; if (t.id === 'windBoot') player.speedMult += 0.09; if (t.id === 'heal') player.regen += 1.2; if (ownedPassives[t.id] >= (activePassives[t.id]?.maxLv || 5)) upgradable.splice(pickIdx, 1); }
-    }
-    showBanner(`🎁 白銀幸運寶箱（${rolls}連強化）！提升：${gained.join('、')}`);
-    return;
-  }
-  const readyList = [];
-  for (const [k, st] of Object.entries(ownedSkills)) {
-    const sk = LUCIEN_SKILLS[k];
-    if (sk && sk.canEvolve && !st.evolved && st.lv >= sk.maxLv && sk.reqPassive && ownedPassives[sk.reqPassive]) readyList.push({ id: k, sk });
-  }
-  if (readyList.length === 1) {
-    const { id, sk } = readyList; ownedSkills[id].evolved = true;
-    const hasRes = sk.resonanceSkill && ownedSkills[sk.resonanceSkill];
-    showBanner(`🌟 超武覺醒！【${sk.name}】進化為【${sk.evoName}】${hasRes ? '（✨觸發元素共鳴！）' : ''}！`);
-    return;
-  }
-  if (readyList.length > 1) {
-    isPaused = true;
-    currentChoices = readyList.slice(0, 3).map(({ id, sk }) => ({ kind: 'evolve', id, title: `🌟 覺醒【${sk.evoName}】`, desc: `由【${sk.name} LV.${sk.maxLv}】突破覺醒！<br>${sk.resonanceDesc || sk.desc}`, tag: (sk.resonanceSkill && ownedSkills[sk.resonanceSkill]) ? '✨ 已持有共鳴元素・覺醒即觸發共鳴！' : '🔥 巔峰超武覺醒' }));
-    renderChoiceModal('📦 開啟金色超武寶箱！多把武器已達覺醒條件，請選擇要優先進化的超武（按 1 / 2 / 3）');
-    return;
-  }
-  player.hp = Math.min(player.maxHp, player.hp + 50);
-  showBanner('📦 開啟金色寶箱！生命回復 +50（本系主動滿級+對應輔助可覺醒超武）');
-}
-
-function spawnEnemy() {
-  if (bossSpawned) return;
-  const ang = Math.random() * Math.PI * 2, dist = Math.max(canvas.width, canvas.height) * 0.62, mins = gameTime / 60;
-  const type = mins >= 8 && Math.random() < 0.35 ? 'honey' : (mins >= 4 && Math.random() < 0.4 ? 'red' : (mins >= 2 && Math.random() < 0.45 ? 'green' : 'yellow'));
-  const sp = { yellow: { r: 14, hp: 18 + mins * 6.5, spd: 95, c: '#facc15', exp: 1 }, green: { r: 15, hp: 30 + mins * 9, spd: 105, c: '#4ade80', exp: 2 }, red: { r: 18, hp: 58 + mins * 15, spd: 90, c: '#ef4444', exp: 3 }, honey: { r: 17, hp: 45 + mins * 11, spd: 145, c: '#d97706', exp: 3 } }[type];
-  enemies.push({ x: player.x + Math.cos(ang) * dist, y: player.y + Math.sin(ang) * dist, radius: sp.r, hp: sp.hp * player.curseMult, maxHp: sp.hp * player.curseMult, speed: sp.spd * (1 + (player.curseMult - 1) * 0.5), color: sp.c, expValue: sp.exp, shockTimer: 0, burnTimer: 0, slowTimer: 0, burnTick: 0, hitFlash: 0 });
-}
-
-function spawnEliteBoss(tier) {
-  const ang = Math.random() * Math.PI * 2, mins = Math.max(1, gameTime / 60);
-  const isFinal = tier === 'final', isMega = tier === 'mega', isElite = tier === 'elite';
-  const hpVal = (isFinal ? 5500 : (isMega ? 950 + mins * 180 : 320 + mins * 110)) * player.curseMult;
-  enemies.push({
-    x: player.x + Math.cos(ang) * 380, y: player.y + Math.sin(ang) * 380,
-    radius: isFinal ? 50 : (isMega ? 38 : 28), hp: hpVal, maxHp: hpVal,
-    speed: isFinal ? 88 : (isMega ? 80 : 84),
-    color: isFinal ? '#9333ea' : (isMega ? '#dc2626' : '#f97316'),
-    name: isFinal ? '暗黑魔王' : (isMega ? '狂暴首領' : '精英魔物'),
-    expValue: isMega ? 25 : 12, isElite, isMegaBoss: isMega, isFinalBoss: isFinal,
-    shockTimer: 0, burnTimer: 0, slowTimer: 0, burnTick: 0, hitFlash: 0
-  });
-  showBanner(isFinal ? '⚠️ 20分鐘最終決戰！暗黑魔王降臨！' : (isMega ? '👑 狂暴大首領登場！擊敗掉落【金色超武寶箱】！' : '⚔️ 精英魔物出現！擊敗掉落【白銀幸運寶箱】！'));
-}
 function update(dt) {
   if (isPaused || gameOver) return;
   gameTime += dt; if (bannerTimer > 0 && (bannerTimer -= dt) <= 0) document.getElementById('banner').style.display = 'none';
@@ -385,79 +420,113 @@ function update(dt) {
 
   let mx = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0);
   let my = (keys.KeyS || keys.ArrowDown ? 1 : 0) - (keys.KeyW || keys.ArrowUp ? 1 : 0);
-  if (mx || my) { const l = Math.hypot(mx, my); player.x += (mx / l) * player.baseSpeed * player.speedMult * dt; player.y += (my / l) * player.baseSpeed * player.speedMult * dt; player.lastMoveAngle = Math.atan2(my, mx); if (mx) player.flipX = mx > 0 ? 1 : -1; player.walkCycle += dt * 14; } else player.walkCycle = 0;
+  if (mx || my) {
+    const l = Math.hypot(mx, my);
+    player.x += (mx / l) * player.baseSpeed * player.speedMult * dt;
+    player.y += (my / l) * player.baseSpeed * player.speedMult * dt;
+    player.lastMoveAngle = Math.atan2(my, mx);
+    if (!enemies.length) player.facingAngle = player.lastMoveAngle;
+    if (mx) player.flipX = mx > 0 ? 1 : -1;
+    player.walkCycle += dt * 14;
+  } else player.walkCycle = 0;
 
   if ((spawnTimer -= dt) <= 0) { spawnEnemy(); spawnTimer = Math.max(0.14, (0.85 - (gameTime / 60) * 0.035) / player.curseMult); }
   triggerSkills(dt);
 
-  const cs = typeof getDerivedCombatStats === 'function' ? getDerivedCombatStats() : { defReduce: 0, statusDurMult: 1 };
-  projectiles = projectiles.filter(p => {
-    if (p.type === 'wind' && enemies.length > 0) {
-      let target = null, minD = 550;
-      for (const e of enemies) { if (!p.hitSet.has(e)) { const d = Math.hypot(e.x - p.x, e.y - p.y); if (d < minD) { minD = d; target = e; } } }
-      if (target) {
-        const desired = Math.atan2(target.y - p.y, target.x - p.x), cur = Math.atan2(p.vy, p.vx);
-        let diff = desired - cur; while (diff > Math.PI) diff -= Math.PI * 2; while (diff < -Math.PI) diff += Math.PI * 2;
-        const nextAng = cur + Math.max(-(p.evolved ? 12 : 8.5) * dt, Math.min((p.evolved ? 12 : 8.5) * dt, diff)), spd = Math.hypot(p.vx, p.vy);
-        p.vx = Math.cos(nextAng) * spd; p.vy = Math.sin(nextAng) * spd;
+  const cs = typeof getDerivedCombatStats === 'function' ? getDerivedCombatStats() : { statusDurMult: 1, statusChanceBonus: 0 };
+  const spellBase = getSpellBase();
+
+  zones = zones.filter(z => {
+    z.life -= dt; z.tickTimer -= dt;
+    if (z.kind === 'holypoly') {
+      for (const e of enemies) {
+        const d = Math.hypot(z.x - e.x, z.y - e.y);
+        if (d < z.radius && d > 12) { const a = Math.atan2(z.y - e.y, z.x - e.x); e.x += Math.cos(a) * 95 * dt; e.y += Math.sin(a) * 95 * dt; }
       }
     }
-    p.x += p.vx * dt; p.y += p.vy * dt; if ((p.life -= dt) <= 0) return false;
-    for (let j = enemies.length - 1; j >= 0; j--) {
-      const e = enemies[j];
-      if (!p.hitSet.has(e) && Math.hypot(e.x - p.x, e.y - p.y) <= p.radius + e.radius) {
-        p.hitSet.add(e);
-        if (p.type === 'wind') { e.slowTimer = 2.0 * (cs.statusDurMult || 1); e.x += (player.x - e.x) * 0.08; e.y += (player.y - e.y) * 0.08; }
-        if (p.type === 'fire') e.burnTimer = 3.0 * (cs.statusDurMult || 1);
-        hitEnemy(j, p.dmg, p.type); if (--p.pierce <= 0) return false;
+    if (z.kind === 'healLight' && Math.hypot(player.x - z.x, player.y - z.y) <= z.radius) {
+      const healPct = z.lv >= 10 ? 0.025 : (z.lv >= 5 ? 0.020 : 0.015);
+      player.hp = Math.min(player.maxHp, player.hp + player.maxHp * healPct * dt * 2);
+    }
+    if (z.tickTimer <= 0) {
+      z.tickTimer = 0.5;
+      if (z.kind !== 'ice5_mist') {
+        damageArea(z.x, z.y, z.radius, 0, Math.PI * 2, z.dmg * 0.55, 4, {
+          element: z.kind.startsWith('ice') ? 'ice' : (z.kind.startsWith('thunder') ? 'thunder' : 'light'),
+          onTargetHit: (e) => applyBaseStatusOnHit(e, z.kind.startsWith('ice') ? 'ice' : (z.kind.startsWith('thunder') ? 'thunder' : 'light'), spellBase, cs, z.sealChance || 0.35)
+        });
+      } else {
+        for (const e of enemies) if (Math.hypot(e.x - z.x, e.y - z.y) <= z.radius + e.radius) applyBaseStatusOnHit(e, 'ice', spellBase, cs, 0.65);
       }
+    }
+    if (z.life <= 0) {
+      if (z.kind === 'holypoly') damageArea(z.x, z.y, z.radius * 1.15, 0, Math.PI * 2, z.dmg, 24, { element: 'light', consumeSeal: true });
+      return false;
     }
     return true;
   });
 
+  projectiles = projectiles.filter(p => {
+    p.x += p.vx * dt; p.y += p.vy * dt; if ((p.life -= dt) <= 0) return false;
+    if (p.skillId === 'ice3' && (p.orbShootCd -= dt) <= 0 && enemies.length > 0) {
+      p.orbShootCd = 0.55;
+      const t = enemies[Math.floor(Math.random() * enemies.length)];
+      const a = Math.atan2(t.y - p.y, t.x - p.x);
+      projectiles.push({ type: 'ice', elem: 'ice', skillId: 'ice1', x: p.x, y: p.y, vx: Math.cos(a) * 520, vy: Math.sin(a) * 520, radius: 9, dmg: p.dmg * 0.55, pierce: 2, life: 1.1, hitSet: new Set() });
+    }
+    for (let j = enemies.length - 1; j >= 0; j--) {
+      const e = enemies[j];
+      if (!p.hitSet.has(e) && Math.hypot(e.x - p.x, e.y - p.y) <= p.radius + e.radius) {
+        p.hitSet.add(e);
+        applyBaseStatusOnHit(e, p.elem || 'none', spellBase, cs, p.sealChance || 0.38);
+        hitEnemy(j, p.dmg, { element: p.elem || 'none' });
+        if (p.skillId === 'fire5') zones.push({ kind: 'fire_sea', x: p.x, y: p.y, radius: 95 * player.areaMult, life: 3.0, tickTimer: 0.5, dmg: p.dmg * 0.35, lv: 1, sealChance: 0.3 });
+        if (p.skillId === 'ice5') zones.push({ kind: 'ice5_mist', x: p.x, y: p.y, radius: 130 * player.areaMult, life: 3.0, tickTimer: 0.5, dmg: 0, lv: 1 });
+        if (--p.pierce <= 0) return false;
+      }
+    }
+    return true;
+  });
   const msLv = ownedPassives.manaShield || 0;
   if (msLv > 0) {
     player.maxShield = Math.round(player.maxHp * (0.10 + msLv * 0.05));
-    const msCd = Math.max(5, 13 - msLv);
-    if ((player.shieldTimer -= dt) <= 0) {
-      player.shield = player.maxShield;
-      player.shieldTimer = msCd;
-    }
+    if ((player.shieldTimer -= dt) <= 0) { player.shield = player.maxShield; player.shieldTimer = Math.max(5, 13 - msLv); }
   }
-  if (player.thornsCd > 0) player.thornsCd -= dt;
-
-  const dmgRedMult = 1 - getEffectiveDmgReducePct(cs) / 100;
+  const physRedMult = 1 - getEffectivePhysReducePct(cs) / 100;
   for (let i = enemies.length - 1; i >= 0; i--) {
-    const e = enemies[i]; if (e.shockTimer > 0) e.shockTimer -= dt; if (e.slowTimer > 0) e.slowTimer -= dt; if (e.hitFlash > 0) e.hitFlash -= dt; if (e.thornsCd > 0) e.thornsCd -= dt;
-    if (e.burnTimer > 0 && (e.burnTick += dt) >= 0.5) { e.burnTimer -= 0.5; e.burnTick = 0; hitEnemy(i, 6 + player.lv * 2, 'burn'); if (!enemies[i]) continue; }
-    const ang = Math.atan2(player.y - e.y, player.x - e.x), spd = e.speed * (e.shockTimer > 0 ? 0.15 : (e.slowTimer > 0 ? 0.65 : 1));
+    const e = enemies[i];
+    if (e.freezeTimer > 0) e.freezeTimer -= dt; if (e.stunTimer > 0) e.stunTimer -= dt;
+    if (e.shockTimer > 0) e.shockTimer -= dt; if (e.slowTimer > 0) e.slowTimer -= dt;
+    if (e.armorBreakTimer > 0) e.armorBreakTimer -= dt; if (e.chainIcd > 0) e.chainIcd -= dt;
+    if (e.hitFlash > 0) e.hitFlash -= dt;
+    if (e.burnTimer > 0 && (e.burnTick += dt) >= 0.5) { e.burnTimer -= 0.5; e.burnTick = 0; hitEnemy(i, e.burnDps || spellBase * 0.45, { element: 'fire' }); if (!enemies[i]) continue; }
+
+    const spd = e.speed * (typeof getEnemySpeedFactor === 'function' ? getEnemySpeedFactor(e) : 1);
+    const ang = Math.atan2(player.y - e.y, player.x - e.x);
     e.x += Math.cos(ang) * spd * dt; e.y += Math.sin(ang) * spd * dt;
     if (Math.hypot(player.x - e.x, player.y - e.y) < player.size * 0.75 + e.radius) {
-      const rawHurt = e.isFinalBoss ? 38 : (e.isMegaBoss ? 28 : (e.isElite ? 20 : 12));
-      let taken = Math.max(1, rawHurt * dmgRedMult) * dt;
-      if (player.shield > 0) {
-        const absorbed = Math.min(player.shield, taken);
-        player.shield -= absorbed; taken -= absorbed;
-      }
+      const atkMult = typeof getEnemyAtkFactor === 'function' ? getEnemyAtkFactor(e) : 1.0;
+      const rawHurt = (e.isFinalBoss ? 38 : (e.isMegaBoss ? 28 : (e.isElite ? 20 : 12))) * atkMult;
+      let taken = Math.max(1, rawHurt * physRedMult) * dt;
+      if (player.shield > 0) { const abs = Math.min(player.shield, taken); player.shield -= abs; taken -= abs; }
       if (taken > 0) player.hp -= taken;
-      const thLv = ownedPassives.thorns || 0;
-      if (thLv > 0 && (e.thornsCd || 0) <= 0) {
-        e.thornsCd = 0.45;
-        const defVal = (cs.st && cs.st.DEF) ? cs.st.DEF : 2;
-        const thDmg = Math.max(8, defVal * (1.0 + thLv * 0.5));
-        const kb = e.isFinalBoss ? 4 : (e.isMegaBoss ? 8 : 26);
-        e.x -= Math.cos(ang) * kb; e.y -= Math.sin(ang) * kb;
-        hitEnemy(i, thDmg, 'physical');
+      if (player.hp <= 0) {
+        if (ownedPassives.angelWish && !player.angelUsed) {
+          player.angelUsed = true; player.hp = player.maxHp;
+          enemies = enemies.filter(m => { if (m.isElite || m.isMegaBoss || m.isFinalBoss) { m.stunTimer = 3.0; return true; } return false; });
+          showBanner('👼 【天使之願】發動！原地滿血復活並觸發全屏淨化爆炸！');
+          return;
+        }
+        endGame(false); return;
       }
-      if (player.hp <= 0) { endGame(false); return; }
     }
   }
-
   gems = gems.filter(g => { const d = Math.hypot(player.x - g.x, player.y - g.y); if (d < player.pickupRange) { const a = Math.atan2(player.y - g.y, player.x - g.x); g.x += Math.cos(a) * 420 * dt; g.y += Math.sin(a) * 420 * dt; } if (d < 24) { if ((player.exp += g.val * (player.expMult || 1)) >= player.nextExp) { player.exp -= player.nextExp; player.lv++; player.nextExp = Math.round(player.nextExp * 1.35 + 3); levelUp(); } return false; } return true; });
   chests = chests.filter(c => Math.hypot(player.x - c.x, player.y - c.y) < 36 ? (openChest(c.kind || 'gold'), false) : true);
-  lootBags = lootBags.filter(b => Math.hypot(player.x - b.x, player.y - b.y) < 36 ? (runLoot.push(b.item), showBanner(`📦 獲得 [未鑑定] ${b.rarName}裝備袋！（累計 ${runLoot.length} 件）`), false) : true);
+  lootBags = lootBags.filter(b => Math.hypot(player.x - b.x, player.y - b.y) < 36 ? (runLoot.push(b.item), showBanner(`📦 獲得 [未鑑定] ${b.rarName}裝備袋！`), false) : true);
   slashes = slashes.filter(s => (s.life -= dt) > 0); lightnings = lightnings.filter(l => (l.life -= dt) > 0); damageTexts = damageTexts.filter(t => { t.y -= 28 * dt; return (t.life -= dt) > 0; });
 }
+
 function draw() {
   ctx.fillStyle = '#1e293b'; ctx.fillRect(0, 0, canvas.width, canvas.height);
   const ox = canvas.width / 2 - player.x, oy = canvas.height / 2 - player.y;
@@ -465,52 +534,34 @@ function draw() {
   for (let x = ox % 80; x < canvas.width; x += 80) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke(); }
   for (let y = oy % 80; y < canvas.height; y += 80) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke(); }
   ctx.save(); ctx.translate(ox, oy);
+  zones.forEach(z => { ctx.fillStyle = z.kind.startsWith('ice') ? 'rgba(56,189,248,0.22)' : (z.kind.startsWith('fire') ? 'rgba(249,115,22,0.25)' : 'rgba(250,204,21,0.22)'); ctx.beginPath(); ctx.arc(z.x, z.y, z.radius, 0, Math.PI * 2); ctx.fill(); });
   gems.forEach(g => { ctx.fillStyle = '#38bdf8'; ctx.beginPath(); ctx.arc(g.x, g.y, 5, 0, Math.PI * 2); ctx.fill(); });
-  chests.forEach(c => {
-    const isSilver = c.kind === 'silver';
-    ctx.fillStyle = isSilver ? '#e2e8f0' : '#facc15';
-    ctx.fillRect(c.x - 14, c.y - 11, 28, 22);
-    ctx.strokeStyle = isSilver ? '#38bdf8' : '#fff'; ctx.lineWidth = 2.5;
-    ctx.strokeRect(c.x - 14, c.y - 11, 28, 22);
-  });
+  chests.forEach(c => { const isS = c.kind === 'silver'; ctx.fillStyle = isS ? '#e2e8f0' : '#facc15'; ctx.fillRect(c.x - 14, c.y - 11, 28, 22); ctx.strokeStyle = isS ? '#38bdf8' : '#fff'; ctx.lineWidth = 2; ctx.strokeRect(c.x - 14, c.y - 11, 28, 22); });
   lootBags.forEach(b => { ctx.fillStyle = b.color; ctx.fillRect(b.x - 11, b.y - 11, 22, 22); });
   enemies.forEach(e => {
-    if (e.isElite || e.isMegaBoss || e.isFinalBoss) {
-      ctx.strokeStyle = e.isFinalBoss ? 'rgba(168,85,247,0.55)' : (e.isMegaBoss ? 'rgba(239,68,68,0.45)' : 'rgba(250,204,21,0.45)');
-      ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(e.x, e.y, e.radius + 7, 0, Math.PI * 2); ctx.stroke();
-    }
-    ctx.fillStyle = e.hitFlash > 0 ? '#fff' : e.color; ctx.beginPath(); ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = e.hitFlash > 0 ? '#fff' : (e.freezeTimer > 0 ? '#7dd3fc' : e.color);
+    ctx.beginPath(); ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = e.shockTimer > 0 ? '#fde047' : (e.burnTimer > 0 ? '#fb923c' : '#0f172a'); ctx.lineWidth = 2.5; ctx.stroke();
-    if (e.isElite || e.isMegaBoss || e.isFinalBoss) {
-      const bw = e.radius * 2.2, bh = 5, bx = e.x - bw / 2, by = e.y - e.radius - 14;
-      ctx.fillStyle = '#0f172a'; ctx.fillRect(bx, by, bw, bh);
-      ctx.fillStyle = e.isFinalBoss ? '#c084fc' : (e.isMegaBoss ? '#ef4444' : '#facc15');
-      ctx.fillRect(bx, by, bw * Math.max(0, e.hp / e.maxHp), bh);
-      ctx.fillStyle = '#fef08a'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText(e.bossName || e.name || '精英魔物', e.x, by - 4); ctx.textAlign = 'left';
-    }
   });
-  slashes.forEach(s => { ctx.strokeStyle = s.type === 'fireboom' ? 'rgba(251,146,60,0.85)' : 'rgba(226,232,240,0.75)'; ctx.lineWidth = s.evolved ? 7 : 4; ctx.beginPath(); ctx.arc(player.x, player.y, s.range, s.angle - s.arc / 2, s.angle + s.arc / 2); ctx.stroke(); });
-  projectiles.forEach(p => { ctx.fillStyle = p.type === 'fire' ? '#f97316' : (p.type === 'wind' ? '#4ade80' : '#38bdf8'); ctx.beginPath(); ctx.arc(p.x, p.y, p.radius || 7, 0, Math.PI * 2); ctx.fill(); });
+  slashes.forEach(s => { ctx.strokeStyle = s.type === 'fireboom' ? 'rgba(251,146,60,0.85)' : 'rgba(226,232,240,0.8)'; ctx.lineWidth = s.evolved ? 7 : 4; ctx.beginPath(); ctx.arc(s.x || player.x, s.y || player.y, s.range, (s.angle || 0) - s.arc / 2, (s.angle || 0) + s.arc / 2); ctx.stroke(); });
+  projectiles.forEach(p => { ctx.fillStyle = p.elem === 'fire' ? '#f97316' : (p.elem === 'ice' ? '#38bdf8' : (p.elem === 'thunder' ? '#facc15' : '#fef08a')); ctx.beginPath(); ctx.arc(p.x, p.y, p.radius || 8, 0, Math.PI * 2); ctx.fill(); });
   lightnings.forEach(l => { ctx.strokeStyle = '#fef08a'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(l.x1, l.y1); ctx.lineTo(l.x2, l.y2); ctx.stroke(); });
+
+  const ch = typeof getCurrentCharData === 'function' ? getCurrentCharData() : { color: '#3b82f6' };
   ctx.save(); ctx.translate(player.x, player.y - Math.abs(Math.sin(player.walkCycle)) * 4);
-  ctx.fillStyle = '#3b82f6'; ctx.fillRect(-12, -16, 24, 30); ctx.fillStyle = '#fde047'; ctx.beginPath(); ctx.arc(0, -24, 11, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(10, 0); ctx.lineTo(28, -12); ctx.stroke();
+  ctx.fillStyle = ch.color || '#3b82f6'; ctx.fillRect(-12, -16, 24, 30);
+  ctx.fillStyle = '#fde047'; ctx.beginPath(); ctx.arc(0, -24, 11, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(10 * player.flipX, 0); ctx.lineTo(28 * player.flipX, -12); ctx.stroke();
   ctx.restore();
-  if (player.shield > 0) {
-    ctx.strokeStyle = 'rgba(56,189,248,0.85)'; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.arc(player.x, player.y - 6, 26, 0, Math.PI * 2); ctx.stroke();
-  }
+  if (player.shield > 0) { ctx.strokeStyle = 'rgba(56,189,248,0.85)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(player.x, player.y - 6, 26, 0, Math.PI * 2); ctx.stroke(); }
   damageTexts.forEach(t => { ctx.fillStyle = t.color; ctx.font = 'bold 14px sans-serif'; ctx.fillText(t.txt, t.x, t.y); });
   ctx.restore();
-  const lvEl = document.getElementById('lvText'); if (lvEl) lvEl.textContent = `LV.${player.lv}`;
-  const hpPct = Math.max(0, (player.hp / player.maxHp) * 100), expPct = Math.min(100, (player.exp / player.nextExp) * 100);
-  const hpBarEl = document.getElementById('hpBar'), expBarEl = document.getElementById('expBar');
-  if (hpBarEl) hpBarEl.style.width = `${hpPct}%`;
-  if (expBarEl) expBarEl.style.width = `${expPct}%`;
-  const hpNum = document.getElementById('hpNumText'), expNum = document.getElementById('expNumText');
-  if (hpNum) hpNum.textContent = `${Math.ceil(player.hp)} / ${player.maxHp}`;
-  if (expNum) expNum.textContent = `EXP ${Math.floor(expPct)}%`;
+  document.getElementById('lvText').textContent = `LV.${player.lv}`;
+  document.getElementById('hpBar').style.width = `${Math.max(0, (player.hp / player.maxHp) * 100)}%`;
+  document.getElementById('hpNumText').textContent = `${Math.ceil(player.hp)} / ${player.maxHp}`;
+  document.getElementById('expBar').style.width = `${Math.min(100, (player.exp / player.nextExp) * 100)}%`;
+  document.getElementById('expNumText').textContent = `EXP ${Math.floor((player.exp / player.nextExp) * 100)}%`;
+
   const shieldBox = document.getElementById('shieldBox');
   if (shieldBox) {
     if (player.maxShield > 0 || player.shield > 0) {
@@ -521,29 +572,208 @@ function draw() {
       if (shText) shText.textContent = player.shield > 0 ? `🛡️ 魔力護盾 ${Math.ceil(player.shield)} / ${player.maxShield}` : `⏳ 護盾充能中 (${Math.max(0, player.shieldTimer).toFixed(1)}s)`;
     } else { shieldBox.style.display = 'none'; }
   }
-  const timeEl = document.getElementById('timeText'), killEl = document.getElementById('killText'), comboEl = document.getElementById('comboText');
-  if (timeEl) timeEl.textContent = `${String(Math.floor(gameTime / 60)).padStart(2, '0')}:${String(Math.floor(gameTime % 60)).padStart(2, '0')}`;
-  if (killEl) killEl.textContent = kills;
-  if (comboEl) comboEl.textContent = combo;
-  const skillStateKey = Object.entries(ownedSkills).map(([k, v]) => `${k}:${v.lv}:${v.evolved}`).join('|');
+
+  document.getElementById('timeText').textContent = `${String(Math.floor(gameTime / 60)).padStart(2, '0')}:${String(Math.floor(gameTime % 60)).padStart(2, '0')}`;
+  document.getElementById('killText').textContent = kills; document.getElementById('comboText').textContent = combo;
+
+  const skillStateKey = Object.entries(ownedSkills).map(([k, v]) => `${k}:${v.lv}:${v.evolved}:${v.disabled}`).join('|');
   const skillListEl = document.getElementById('skillList');
   if (skillListEl && skillListEl.dataset.state !== skillStateKey) {
     skillListEl.dataset.state = skillStateKey;
-    const skPool = typeof getActiveSkillPool === 'function' ? getActiveSkillPool() : {};
-    skillListEl.innerHTML = Object.keys(ownedSkills).map(k => {
-      const sk = skPool[k] || { name: k }, st = ownedSkills[k];
-      const bg = st.evolved ? 'background:rgba(180,83,9,0.55);border-color:#facc15;color:#fef08a;' : 'background:rgba(30,41,59,0.85);border-color:#475569;color:#e2e8f0;';
-      return `<span style="cursor:help;border:1px solid;border-radius:5px;padding:1px 6px;${bg}" onmouseenter="showSkillTooltip(event,'${k}')" onmousemove="moveSkillTooltip(event)" onmouseleave="hideSkillTooltip()">${st.evolved ? (sk.evoName || sk.name) : sk.name} LV.${st.lv}</span>`;
+    skillListEl.onmouseleave = hideSkillTooltip;
+    skillListEl.innerHTML = Object.entries(ownedSkills).map(([k, st]) => {
+      const sk = ACTIVE_SKILLS[k] || { name: k };
+      const dispName = st.evolved ? (sk.evoName || sk.name) : sk.name;
+      const iconChar = (st.evolved && sk.evoIcon) ? sk.evoIcon : (sk.icon || dispName.slice(0, 1));
+      const borderCol = st.disabled ? '#475569' : (st.evolved ? '#facc15' : '#38bdf8');
+      const bgCol = st.evolved ? 'rgba(180,83,9,0.55)' : 'rgba(15,23,42,0.88)';
+      const dim = st.disabled ? 'opacity:0.4;filter:grayscale(1);' : '';
+      const isMax = st.lv >= (sk.maxLv || 10);
+      const lvLabel = isMax ? 'MAX' : st.lv;
+      const lvStyle = isMax ? 'font-size:8px;color:#4ade80;' : 'font-size:9px;color:#fde047;';
+      return `<div style="position:relative;width:32px;height:32px;border:1.5px solid ${borderCol};background:${bgCol};border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:help;${dim}" onmouseenter="showSkillTooltip(event,'skill','${k}')" onmousemove="moveSkillTooltip(event)" onmouseleave="hideSkillTooltip()">${iconChar}<span style="position:absolute;bottom:-1px;right:1px;${lvStyle}font-weight:bold;text-shadow:0 1px 2px #000;">${lvLabel}</span></div>`;
     }).join('');
   }
+}
+
+function spawnEnemy() {
+  if (bossSpawned) return;
+  const ang = Math.random() * Math.PI * 2, dist = Math.max(canvas.width, canvas.height) * 0.62, mins = gameTime / 60;
+  const hp = (20 + mins * 8) * player.curseMult;
+  enemies.push({ x: player.x + Math.cos(ang) * dist, y: player.y + Math.sin(ang) * dist, radius: 15, hp, maxHp: hp, speed: 95, color: mins >= 4 ? '#ef4444' : '#facc15', expValue: 1 + Math.floor(mins / 3), hitFlash: 0 });
+}
+
+function spawnEliteBoss(tier) {
+  const ang = Math.random() * Math.PI * 2, mins = Math.max(1, gameTime / 60);
+  const isFinal = tier === 'final', isMega = tier === 'mega';
+  const hpVal = (isFinal ? 5500 : (isMega ? 950 + mins * 180 : 320 + mins * 110)) * player.curseMult;
+  enemies.push({ x: player.x + Math.cos(ang) * 380, y: player.y + Math.sin(ang) * 380, radius: isFinal ? 50 : (isMega ? 38 : 28), hp: hpVal, maxHp: hpVal, speed: 82, color: isFinal ? '#9333ea' : (isMega ? '#dc2626' : '#f97316'), name: isFinal ? '暗黑魔王' : (isMega ? '狂暴首領' : '精英魔物'), expValue: isMega ? 25 : 12, isElite: tier === 'elite', isMegaBoss: isMega, isFinalBoss: isFinal, hitFlash: 0 });
+  showBanner(isFinal ? '⚠️ 20分鐘最終決戰！暗黑魔王降臨！' : (isMega ? '👑 狂暴大首領登場！擊敗掉落【金色超武寶箱】！' : '⚔️ 精英魔物出現！擊敗掉落【白銀幸運寶箱】！'));
+}
+function renderChoiceModal(subText) {
+  const box = document.getElementById('cardContainer'); box.innerHTML = '';
+  document.getElementById('modalSub').textContent = subText;
+  currentChoices.forEach((c, idx) => {
+    const div = document.createElement('div'); div.className = 'card'; div.onclick = () => selectUpgrade(idx);
+    div.innerHTML = `<div class="card-key">按鍵 ${idx + 1}</div><div class="card-title">${c.title}</div><div class="card-desc">${c.desc}</div><div class="card-tag">${c.tag}</div>`;
+    box.appendChild(div);
+  });
+  document.getElementById('levelModal').style.display = 'flex';
+}
+
+function getPassiveGainText(id, lv) {
+  const map = {
+    might:      `全技能最終傷害 +${8 * lv}%`,
+    cdr:        `全技能冷卻縮減 +${6 * lv}%`,
+    area:       `全技能攻擊範圍 +${10 * lv}%`,
+    crit:       `全技能暴擊率 +${4 * lv}%`,
+    resonance:  `元素異常與共鳴傷害 +${12 * lv}%`,
+    lucky:      `裝備袋與寶箱掉落率 +${20 * lv}%`,
+    windBoot:   `移動速度 +${9 * lv}%`,
+    heal:       `每秒自然回復 +${(1.2 * lv).toFixed(1)} 生命`,
+    manaShield: `每 ${Math.max(5, 13 - lv)} 秒生成 ${10 + 5 * lv}% 最大生命護盾`,
+    thorns:     `受碰撞反彈 DEF×${100 + 50 * lv}% 傷害並擊退`,
+    fastsword:  `全技能冷卻縮減 +${8 * lv}%、移動速度 +${4 * lv}%`,
+    guard:      `全技能攻擊範圍 +${10 * lv}%`,
+    haste:      `全技能冷卻縮減 +${8 * lv}%`,
+    blessing:   `全技能最終傷害 +${3 * lv}%`,
+    mageTalent: `無視怪物減傷抗性 +${3 * lv}%`,
+    lightWall:  `物理減傷率 +${3 * lv}%`,
+    magicShield:`魔法減傷率 +${3 * lv}%`,
+    angelWish:  `賦予 1 次原地滿血復活與全屏淨化（代價：傷害 -10%、移速 -10%）`
+  };
+  return map[id] || '';
+}
+
+function getSkillNextLvGain(id, sk, nextLv) {
+  const gains = [`基礎傷害 +${sk.perLv}`, '冷卻時間 -5%'];
+  if (nextLv === 4) {
+    if (id === 'renga') gains.push('解鎖雙重二連斬');
+    if (id === 'aurora') gains.push('突刺距離延長');
+    if (id === 'enbu') gains.push('劍氣殘留延長');
+    if (id === 'windblade') gains.push('風刃穿透力提升至 2 名敵人');
+    if (id === 'firearrow') gains.push('點燃基礎機率與持續傷害提升');
+    if (id === 'thunder') gains.push('落雷感電機率提升');
+  }
+  if (id === 'holylight' && nextLv % 2 === 0) gains.push('神聖光矢射彈 +1 發');
+  if (id === 'fire1' && nextLv % 2 === 0) gains.push('火焰箭矢射彈 +1 發');
+  if (id === 'fire3' && (nextLv === 2 || nextLv === 5 || nextLv === 8 || nextLv === 10)) gains.push('環繞火球數量 +1 顆');
+  if ((id === 'thunder1' || id === 'thunder4') && (nextLv === 3 || nextLv === 6 || nextLv === 9)) gains.push('落雷道數 +1 道');
+  if ((id === 'windblade' || id === 'firearrow' || id === 'thunder') && nextLv % 3 === 0) gains.push('投射／落雷數量 +1');
+  if (id === 'armorbreak' && (nextLv === 5 || nextLv === 8)) gains.push('最大命中目標 +1 名');
+  if (id === 'enbu' || id === 'radiance' || id === 'healLight' || id === 'ice2' || id === 'thunder2' || id === 'earthhammer') gains.push('攻擊範圍擴大');
+  return gains.join('、');
+}
+function levelUp() {
+  hideSkillTooltip();
+  isPaused = true; const pool = [], activePassives = getActivePassivePool();
+  const hasAngel = !!ownedPassives.angelWish;
+  const passiveToSkillMap = {};
+  for (const skObj of Object.values(ACTIVE_SKILLS)) {
+    if (skObj.canEvolve && skObj.reqPassive) passiveToSkillMap[skObj.reqPassive] = skObj.name;
+  }
+
+  for (const [k, sk] of Object.entries(ACTIVE_SKILLS)) {
+    if (sk.isSuperWeapon) continue;
+    if (hasAngel && (k === 'fire4' || k === 'ice4')) continue;
+    if (sk.reqSkill && (!ownedSkills[sk.reqSkill] || ownedSkills[sk.reqSkill].lv < (sk.reqSkillLv || 2))) continue;
+    const o = ownedSkills[k], maxL = sk.maxLv || 10;
+    if (o && !o.disabled && o.lv < maxL) {
+      const nextLv = o.lv + 1;
+      const gainStr = getSkillNextLvGain(k, sk, nextLv);
+      pool.push({ kind: 'skill', id: k, weight: 2.5, title: `${sk.name} LV.${o.lv} → LV.${nextLv}`, desc: `<strong style="color:#4ade80;">▲ 本次升級獲得：${gainStr}</strong>`, tag: '主動技能強化' });
+    } else if (!o && Object.keys(ownedSkills).length < MAX_ACTIVE_SKILLS) {
+      pool.push({ kind: 'skill', id: k, weight: 1.0, title: `【新技能】${sk.name}（LV.1）`, desc: sk.desc, tag: '習得新主動技' });
+    }
+  }
+  for (const [k, p] of Object.entries(activePassives)) {
+    if (k === 'angelWish' && (ownedSkills.fire4 || ownedSkills.fire5 || ownedSkills.ice4 || ownedSkills.ice5)) continue;
+    const lv = ownedPassives[k] || 0, maxP = p.maxLv || 5;
+    if (lv < maxP && (lv > 0 || Object.keys(ownedPassives).length < MAX_PASSIVE_SKILLS)) {
+      const targetSkName = passiveToSkillMap[k];
+      const pTag = targetSkName ? `可使【${targetSkName}】技能昇華` : '被動輔助強化';
+      const stepText = getPassiveGainText(k, 1) || p.desc;
+      const pDesc = lv > 0 ? `<strong style="color:#4ade80;">▲ ${stepText}</strong>` : stepText;
+      pool.push({ kind: 'passive', id: k, weight: lv > 0 ? 2.5 : 1.0, title: lv > 0 ? `${p.name} LV.${lv} → LV.${lv + 1}` : `【新輔助】${p.name}`, desc: pDesc, tag: pTag });
+    }
+  }
+  if (!pool.length) {
+    currentChoices = [
+      { kind: 'heal', title: '💚 女神聖光祝福（回復 40% 生命）', desc: '<strong style="color:#4ade80;">▲ 立即恢復 40% 最大生命值</strong>', tag: '生存補給' },
+      { kind: 'seed', title: '💰 黃金種子袋（獲得 +50 Seed）', desc: '<strong style="color:#fde047;">▲ 局外錢包 Seed +50</strong>', tag: '資源農裝' }
+    ];
+    renderChoiceModal(`目前等級 LV.${player.lv}（全技能滿級突破獎勵）｜ 按 1 / 2 選擇`);
+    return;
+  }
+  currentChoices = []; const tempPool = [...pool];
+  while (currentChoices.length < 3 && tempPool.length > 0) {
+    const pick = Math.floor(Math.random() * tempPool.length);
+    currentChoices.push(tempPool[pick]); tempPool.splice(pick, 1);
+  }
+  renderChoiceModal(`目前等級 LV.${player.lv} ｜ 技能欄 ${Object.keys(ownedSkills).length}/${MAX_ACTIVE_SKILLS} 主動・${Object.keys(ownedPassives).length}/${MAX_PASSIVE_SKILLS} 被動`);
+}
+
+function selectUpgrade(idx) {
+  const c = currentChoices[idx]; if (!c) return;
+  if (c.kind === 'evolve') {
+    const sk = ACTIVE_SKILLS[c.id];
+    if (ownedSkills[c.id] && sk) {
+      if (sk.disableWhenEvo && sk.evoSkillId) {
+        ownedSkills[c.id].disabled = true; ownedSkills[c.id].evolved = true;
+        ownedSkills[sk.evoSkillId] = { lv: 1, evolved: true, disabled: false };
+      } else { ownedSkills[c.id].evolved = true; }
+      showBanner(`🌟 技能昇華！【${sk.name}】昇華為【${sk.evoName}】！`);
+    }
+  } else if (c.kind === 'skill') {
+    ownedSkills[c.id] ? ownedSkills[c.id].lv++ : (ownedSkills[c.id] = { lv: 1, evolved: false, disabled: false });
+  } else if (c.kind === 'passive') {
+    ownedPassives[c.id] = (ownedPassives[c.id] || 0) + 1;
+    if (c.id === 'fastsword' || c.id === 'haste') player.cdMult *= 0.92;
+    if (c.id === 'cdr') player.cdMult *= 0.94;
+    if (c.id === 'guard' || c.id === 'area') player.areaMult += 0.10;
+    if (c.id === 'might') player.dmgMult += 0.08;
+    if (c.id === 'crit') player.bonusCritRate += 0.04;
+    if (c.id === 'windBoot') player.speedMult += 0.09;
+    if (c.id === 'angelWish') player.speedMult -= 0.10;
+    if (c.id === 'heal') player.regen += 1.2;
+  } else if (c.kind === 'seed') {
+    if (typeof saveData !== 'undefined') { saveData.seed = (saveData.seed || 0) + 50; writeSave(); }
+    showBanner('💰 獲得黃金種子袋！局外錢包 Seed +50！');
+  } else { player.hp = Math.min(player.maxHp, player.hp + player.maxHp * 0.4); }
+  document.getElementById('levelModal').style.display = 'none'; isPaused = false;
+}
+
+function openChest(kind) {
+  if (kind === 'silver') {
+    const upgradable = Object.entries(ownedSkills).filter(([k, o]) => !o.disabled && o.lv < (ACTIVE_SKILLS[k]?.maxLv || 10));
+    if (upgradable.length > 0) {
+      const [id] = upgradable[Math.floor(Math.random() * upgradable.length)];
+      ownedSkills[id].lv++; showBanner(`🎁 白銀寶箱！【${ACTIVE_SKILLS[id].name}】提升至 LV.${ownedSkills[id].lv}！`);
+    } else { saveData.seed += 50; writeSave(); showBanner('🎁 白銀寶箱！全技能已滿，轉換為 Seed +50！'); }
+    return;
+  }
+  const ready = Object.entries(ownedSkills).filter(([k, st]) => {
+    const sk = ACTIVE_SKILLS[k];
+    return sk && sk.canEvolve && !st.evolved && st.lv >= sk.maxLv && sk.reqPassive && ownedPassives[sk.reqPassive];
+  });
+  if (ready.length > 0) {
+    hideSkillTooltip(); isPaused = true;
+    currentChoices = ready.slice(0, 3).map(([id]) => {
+      const sk = ACTIVE_SKILLS[id];
+      return { kind: 'evolve', id, title: `🌟 技能昇華【${sk.evoName}】`, desc: `由【${sk.name}】突破昇華！<br>${sk.evoDesc || sk.desc}`, tag: '技能昇華' };
+    });
+    renderChoiceModal('📦 開啟金色昇華寶箱！請選擇要昇華的技能（按 1 / 2 / 3）');
+    return;
+  }
+  player.hp = Math.min(player.maxHp, player.hp + 50);
+  showBanner('📦 開啟金色寶箱！生命回復 +50');
 }
 
 function getSkillTooltipEl() {
   let tip = document.getElementById('skillTooltip');
   if (!tip) {
-    tip = document.createElement('div');
-    tip.id = 'skillTooltip';
-    tip.style.cssText = 'position:fixed;z-index:9999;pointer-events:none;background:rgba(15,23,42,0.96);border:1px solid #facc15;border-radius:8px;padding:10px 12px;color:#f8fafc;font-size:12px;line-height:1.55;max-width:290px;box-shadow:0 8px 24px rgba(0,0,0,0.65);display:none;';
+    tip = document.createElement('div'); tip.id = 'skillTooltip';
+    tip.style.cssText = 'position:fixed;z-index:9999;pointer-events:none;background:rgba(15,23,42,0.96);border:1.5px solid #facc15;border-radius:8px;padding:10px 12px;color:#f8fafc;font-size:12px;line-height:1.55;max-width:295px;box-shadow:0 8px 24px rgba(0,0,0,0.75);display:none;';
     document.body.appendChild(tip);
   }
   return tip;
@@ -552,43 +782,56 @@ function getSkillTooltipEl() {
 function showSkillTooltip(e, kind, id) {
   const tip = getSkillTooltipEl();
   if (kind === 'skill') {
-    const sk = LUCIEN_SKILLS[id], st = ownedSkills[id];
+    const sk = ACTIVE_SKILLS[id], st = ownedSkills[id];
     if (!sk || !st) return;
     const rawDmg = Math.round(getSkillRawDmg(id, st.lv, st.evolved));
-    const cdFactor = getEffectiveCdMult(Math.pow(0.92, st.lv - 1));
-    const realCd = (sk.baseCd * cdFactor * (st.evolved ? 0.6 : 1)).toFixed(2);
-    const hasRes = st.evolved && sk.resonanceSkill && ownedSkills[sk.resonanceSkill];
-    const resLine = sk.resonanceDesc ? `<div style="margin-top:4px;color:${hasRes ? '#4ade80' : '#94a3b8'};">${hasRes ? '✨【共鳴已啟動】' : '🔒【共鳴條件】'}${sk.resonanceDesc}</div>` : '';
-    const noteLine = (sk.lvNotes && st.lv >= 4 && sk.lvNotes) ? `<div style="color:#fde047;margin-top:3px;">${sk.lvNotes}</div>` : '';
-    tip.innerHTML = `<div style="font-weight:bold;color:#fde047;font-size:13px;margin-bottom:4px;">${st.evolved ? sk.evoName : sk.name}（LV.${st.lv}/${sk.maxLv || 8}）</div><div>基礎預估傷害：<strong>${rawDmg}</strong> ｜ 實際冷卻：<strong>${realCd} 秒</strong></div><div style="color:#cbd5e1;margin-top:3px;">${sk.desc}</div>${noteLine}${resLine}`;
+    const realCd = (sk.baseCd * getEffectiveCdMult(Math.pow(0.95, st.lv - 1))).toFixed(2);
+    const isEvo = !!(st.evolved || sk.isSuperWeapon);
+    const partnerId = sk.resonancePartner || sk.resonanceSkill;
+    const isResActive = !partnerId || !!ownedSkills[partnerId];
+    const resLine = (isEvo && sk.resonanceDesc)
+      ? `<div style="margin-top:5px;padding-top:4px;border-top:1px dashed #334155;color:${isResActive ? '#4ade80' : '#64748b'};">${isResActive ? '✨【元素共鳴・已啟動】' : '🔒【元素共鳴・未啟動】'}${sk.resonanceDesc}</div>`
+      : '';
+    const descText = (isEvo && sk.evoDesc) ? sk.evoDesc : sk.desc;
+    tip.innerHTML = `<div style="font-weight:bold;color:#fde047;font-size:13px;margin-bottom:4px;">${isEvo ? (sk.evoName || sk.name) : sk.name}（LV.${st.lv}）</div><div>預估基傷：<strong>${rawDmg}</strong> ｜ 實際冷卻：<strong>${realCd} 秒</strong></div><div style="color:#cbd5e1;margin-top:3px;">${descText}</div>${resLine}`;
   } else if (kind === 'passive') {
-    const activePassives = getActivePassivePool();
-    const p = activePassives[id], lv = ownedPassives[id] || 0;
+    const p = getActivePassivePool()[id], lv = ownedPassives[id] || 0;
     if (!p) return;
-    tip.innerHTML = `<div style="font-weight:bold;color:#38bdf8;font-size:13px;margin-bottom:4px;">${p.name}（LV.${lv}/${p.maxLv || 5}）</div><div style="color:#e2e8f0;">${p.desc}</div>`;
+    const curTotalText = getPassiveGainText(id, Math.max(1, lv)) || p.desc;
+    tip.innerHTML = `<div style="font-weight:bold;color:#38bdf8;font-size:13px;margin-bottom:4px;">${p.name}（LV.${lv}）</div><div style="color:#4ade80;font-weight:bold;">目前效果：${curTotalText}</div>`;
+  } else if (kind === 'baseStat') {
+    const statDesc = {
+      S: '【STAB 刺擊】提升刺擊系技能（STAB×1.0 + HACK×0.3）與物理武器基礎傷害。',
+      H: '【HACK 劈砍】提升劈砍系技能（HACK×1.0 + STAB×0.3）與物理武器基礎傷害。',
+      I: '【INT 元素法術】提升元素法術（INT×1.0 + MR×0.3）與魔劍複合技能基礎傷害。',
+      DEF: '【DEF 物理防禦】提升最大生命值（每點 +6 HP）與物理（碰撞）減傷率。',
+      MR: '【MR 白魔／精神】提升白魔術技能基數、元素法術副係數（MR×0.3）與魔法減傷率。',
+      DEX: '【DEX 技巧】提升暴擊率（每 10 點 +1%）與局內經驗獲取。',
+      AGI: '【AGI 敏捷】提升暴擊傷害倍率（每 1 點 +0.6%）與拾取範圍。'
+    }[id];
+    if (!statDesc) return;
+    tip.innerHTML = `<div style="color:#e2e8f0;">${statDesc}</div>`;
   } else if (kind === 'stat') {
-    const sPct = Math.round((player.superCritMult || 1.5) * 100);
     const statTips = {
-      cdr: { title: '⏳ 冷卻縮減（上限 65%）', desc: '縮短技能間隔（跨系統乘算）。<br>• 來源：STAB、裝備、迅捷詠唱。' },
-      dmgReduce: { title: '🛡️ 減傷率（上限 70%）', desc: '降低碰撞與首領傷害（乘算）。<br>• 來源：DEF/MR、裝備、萊格藍治之護。' },
-      regen: { title: '💚 生命回復', desc: '每秒自動恢復的生命值。<br>• 來源：體質、裝備、治癒之光。' },
-      dmg: { title: '⚔️ 傷害倍率', desc: '放大全技能最終基礎傷害。<br>• 來源：裝備、鬥志增幅、超武覺醒。' },
-      area: { title: '🌐 範圍擴大', desc: '放大揮砍、投射與爆破範圍。<br>• 來源：裝備、領域擴張、萊格藍治之護。' },
-      speed: { title: '👟 移動速度', desc: '提升角色走位閃避移動速度。<br>• 來源：AGI、裝備、疾風之祝福。' },
-      critRate: { title: '🎯 暴擊率（上限 100% ＋ 紅爆）', desc: `溢暴轉紅爆 💢（黃爆再乘 ${sPct}%）。<br>• 來源：DEX、裝備、弱點洞察。` },
-      critDmg: { title: '💥 暴擊傷害', desc: '黃字暴擊傷害倍率（紅爆在此基礎再乘）。<br>• 來源：基礎 150%、AGI、裝備。' },
-      resonance: { title: '🔮 異常共鳴倍率', desc: '放大元素異常與共鳴連鎖傷害。<br>• 來源：INT/MR、裝備、元素共鳴增幅。' },
-      proj: { title: '✨ 額外彈幕', desc: '增加法術投射物與落雷數量。<br>• 來源：傳說水晶與裝備詞綴。' },
-      drop: { title: '🍀 掉寶倍率', desc: '提升未鑑定裝備袋掉落機率。<br>• 來源：裝備、幸運女神微笑。' },
-      exp: { title: '📖 經驗獲取', desc: '放大經驗寶石獲取倍率。<br>• 來源：裝備、賢者之書。' },
-      curse: { title: '💀 混沌詛咒（上限 160%）', desc: '提高怪物血量、移速與刷新密度。<br>• 來源：裝備、混沌契約。' }
+      phys: '🛡️ 物理減傷：抵擋怪物碰撞與近戰物理傷害（來自 DEF、光之壁障術與裝備）。',
+      mag: '💠 魔法減傷：抵擋怪物魔法射彈與投射物傷害（來自 MR、魔法盾牌與裝備）。',
+      cdr: '⏳ 冷卻縮減：降低所有主動技能的冷卻時間。',
+      regen: '💚 生命回復：每秒自動恢復的生命值。',
+      dmg: '⚔️ 傷害倍率：放大全技能最終基礎傷害。',
+      area: '🌐 範圍擴大：放大揮砍、投射與領域半徑。',
+      speed: '👟 移動速度：基礎移速（含鞋子詞綴）× 疾風移速倍率。',
+      critRate: '🎯 暴擊率：純加算，超過 100% 溢出轉為紅字超暴擊 💢（黃爆再乘 1.5x）。',
+      critDmg: '💥 暴擊傷害：黃字暴擊傷害倍率（來自基礎 150%、AGI 與裝備）。',
+      doubleHit: '⚔️ 連擊機率：攻擊時有機率額外打出 75% 傷害連擊。',
+      dur: '🔥 異常時長：延長點燃、凍結、感電、聖印與破甲持續時間。',
+      chance: '✨ 異常機率：提升各系技能掛載異常狀態的觸發機率。',
+      exp: '📖 經驗獲取：放大經驗寶石獲取倍率。',
+      pickup: '🧲 拾取範圍：擴大經驗寶石與掉落物磁吸半徑。'
     };
-    const info = statTips[id];
-    if (!info) return;
-    tip.innerHTML = `<div style="font-weight:bold;color:#fde047;font-size:13px;margin-bottom:4px;">${info.title}</div><div style="color:#e2e8f0;">${info.desc}</div>`;
+    if (!statTips[id]) return;
+    tip.innerHTML = `<div style="color:#e2e8f0;">${statTips[id]}</div>`;
   }
-  tip.style.display = 'block';
-  moveSkillTooltip(e);
+  tip.style.display = 'block'; moveSkillTooltip(e);
 }
 
 function moveSkillTooltip(e) {
@@ -597,124 +840,74 @@ function moveSkillTooltip(e) {
   tip.style.left = `${Math.max(10, Math.min(window.innerWidth - tip.offsetWidth - 14, e.clientX + 14))}px`;
   tip.style.top = `${Math.max(10, Math.min(window.innerHeight - tip.offsetHeight - 14, e.clientY + 14))}px`;
 }
-
-function hideSkillTooltip() {
-  const tip = document.getElementById('skillTooltip');
-  if (tip) tip.style.display = 'none';
-}
-
-
-function hideSkillTooltip() {
-  const tip = document.getElementById('skillTooltip');
-  if (tip) tip.style.display = 'none';
-}
-// 跨系統乘算減傷率（硬上限 70%，與冷卻縮減共用防崩壞乘算公式）
-function getEffectiveDmgReducePct(cs) {
-  const defVal = (cs && cs.defReduce) ? cs.defReduce : 0;
-  const defFactor = Math.max(0.45, 1 - defVal * 0.008);
-  const guardLv = (typeof ownedPassives !== 'undefined' && ownedPassives.guard) ? ownedPassives.guard : 0;
-  const guardFactor = Math.pow(0.95, guardLv);
-  const barrierLv = (typeof ownedPassives !== 'undefined' && ownedPassives.barrier) ? ownedPassives.barrier : 0;
-  const barrierFactor = Math.pow(0.94, barrierLv);
-  const eqReduce = (cs && cs.st && cs.st.dmgReduce) ? Math.min(0.4, cs.st.dmgReduce / 100) : 0;
-  const rawMult = defFactor * guardFactor * barrierFactor * (1 - eqReduce);
-  return Math.min(70, Math.round((1 - rawMult) * 100));
-}
+function hideSkillTooltip() { const tip = document.getElementById('skillTooltip'); if (tip) tip.style.display = 'none'; }
 
 function togglePause() {
   hideSkillTooltip();
   const modal = document.getElementById('pauseModal');
   if (!isPaused) {
     isPaused = true;
-    const s = getTotalStats();
-    const charBase = (typeof getCurrentCharData === 'function' ? getCurrentCharData().baseStats : {}) || {};
-    const alloc = (typeof saveData !== 'undefined' && saveData.allocated) ? saveData.allocated : {};
-    const baseS = {};
-    ['S', 'H', 'I', 'DEF', 'MR', 'DEX', 'AGI'].forEach(k => baseS[k] = (charBase[k] || 0) + (alloc[k] || 0));
+    const s = typeof getTotalStats === 'function' ? getTotalStats() : {};
     const cs = typeof getDerivedCombatStats === 'function' ? getDerivedCombatStats() : {};
     const activePassives = getActivePassivePool();
-
-    const curCdrPct = Math.round((1 - getEffectiveCdMult(1.0)) * 100);
-    const totalDmgReducePct = getEffectiveDmgReducePct(cs);
-    const rawCritVal = ((cs.critRate || 0.05) + (player.bonusCritRate || 0)) * 100;
-    const totalCritPct = rawCritVal > 100
-      ? `100% <span style="color:#ff4d4f;">(紅爆${(rawCritVal - 100).toFixed(0)}%)</span>`
-      : `${rawCritVal.toFixed(1)}%`;
-    const totalCritDmgPct = Math.round((cs.critDmg || 1.5) * 100);
-    const totalAreaPct = Math.round((player.areaMult - 1) * 100);
-    const totalRegen = ((cs.regen || 0) + (player.regen || 0)).toFixed(1);
-    const resMultPct = Math.round((cs.statusCritMult || 1.5) * (player.resonanceDmgMult || 1) * 100);
-    const hpPct = Math.max(0, Math.round((player.hp / player.maxHp) * 100));
-
-    const twStatMeta = [
-      { key: 'S', label: 'STAB', color: '#fb923c' }, { key: 'H', label: 'HACK', color: '#f87171' },
-      { key: 'I', label: 'INT', color: '#38bdf8' }, { key: 'DEF', label: 'DEF', color: '#4ade80' },
-      { key: 'MR', label: 'MR', color: '#c084fc' }, { key: 'DEX', label: 'DEX', color: '#facc15' },
-      { key: 'AGI', label: 'AGI', color: '#2dd4bf' }
-    ];
-    const statGridHtml = twStatMeta.map(m => {
-      const tot = s[m.key] || 0, bas = baseS[m.key] || 0, bonus = tot - bas;
-      const detailStr = bonus > 0 ? `<span style="font-size:11px;color:#94a3b8;margin-right:6px;">(${bas} <span style="color:#4ade80;">+${bonus}</span>)</span>` : '';
-      return `<div style="display:flex;justify-content:space-between;align-items:center;background:rgba(15,23,42,0.75);border:1px solid #334155;border-radius:5px;padding:4px 10px;"><span style="font-size:12px;font-weight:bold;color:${m.color};letter-spacing:0.8px;">${m.label}</span><div>${detailStr}<span style="font-size:13px;font-weight:bold;color:#f8fafc;">${tot}</span></div></div>`;
+    const twMeta = [{ key: 'S', label: 'STAB', color: '#fb923c' }, { key: 'H', label: 'HACK', color: '#f87171' }, { key: 'I', label: 'INT', color: '#38bdf8' }, { key: 'DEF', label: 'DEF', color: '#4ade80' }, { key: 'MR', label: 'MR', color: '#c084fc' }, { key: 'DEX', label: 'DEX', color: '#facc15' }, { key: 'AGI', label: 'AGI', color: '#2dd4bf' }];
+    const statGridHtml = twMeta.map(m => {
+      const tot = s[m.key] || 0, bas = typeof getNakedStat === 'function' ? getNakedStat(m.key) : tot, bonus = tot - bas;
+      const dStr = bonus > 0 ? `<span style="font-size:11px;color:#94a3b8;margin-right:6px;">(${bas} <span style="color:#4ade80;">+${bonus}</span>)</span>` : '';
+      return `<div style="cursor:help;display:flex;justify-content:space-between;align-items:center;background:rgba(15,23,42,0.75);border:1px solid #334155;border-radius:5px;padding:4px 10px;" onmouseenter="showSkillTooltip(event,'baseStat','${m.key}')" onmousemove="moveSkillTooltip(event)" onmouseleave="hideSkillTooltip()"><span style="font-size:12px;font-weight:bold;color:${m.color};">${m.label}</span><div>${dStr}<strong style="font-size:13px;color:#f8fafc;">${tot}</strong></div></div>`;
     }).join('');
-    const combatRows = [
-      { id: 'cdr', label: '冷卻縮減', val: `${curCdrPct}%`, color: '#38bdf8' },
-      { id: 'dmgReduce', label: '減傷率', val: `${totalDmgReducePct}%`, color: '#4ade80' },
-      { id: 'regen', label: '生命回復', val: `+${totalRegen}/秒`, color: '#4ade80' },
-      { id: 'dmg', label: '傷害倍率', val: `${Math.round(player.dmgMult * 100)}%`, color: '#fde047' },
-      { id: 'area', label: '範圍擴大', val: `+${totalAreaPct}%`, color: '#f8fafc' },
-      { id: 'speed', label: '移動速度', val: `${Math.round(player.baseSpeed * player.speedMult)}`, color: '#f8fafc' },
-      { id: 'critRate', label: '暴擊率', val: totalCritPct, color: rawCritVal > 100 ? '#ff4d4f' : '#f8fafc' },
-      { id: 'critDmg', label: '暴擊傷害', val: `${totalCritDmgPct}%`, color: '#f8fafc' },
-      { id: 'resonance', label: '異常共鳴', val: `${resMultPct}%`, color: '#4ade80' },
-      { id: 'proj', label: '額外彈幕', val: `+${cs.extraProj || 0}`, color: '#f8fafc' },
-      { id: 'drop', label: '掉寶倍率', val: `${Math.round(player.dropRateMult * 100)}%`, color: '#f8fafc' },
-      { id: 'exp', label: '經驗獲取', val: `${Math.round(player.expMult * 100)}%`, color: '#38bdf8' },
-      { id: 'curse', label: '混沌詛咒', val: `${Math.round(player.curseMult * 100)}%`, color: '#f87171' }
+
+    const physPct = getEffectivePhysReducePct(cs), magPct = getEffectiveMagReducePct(cs);
+    const curCdrPct = Math.round((1 - getEffectiveCdMult(1.0)) * 100);
+    const rawCritVal = ((cs.critRate || 0.05) + (player.bonusCritRate || 0)) * 100;
+    const critStr = rawCritVal > 100 ? `100% <span style="color:#ff4d4f;">(紅爆${(rawCritVal - 100).toFixed(0)}%)</span>` : `${rawCritVal.toFixed(1)}%`;
+    const cRows = [
+      { id: 'phys', l: '物理減傷', v: `${physPct}%`, c: '#4ade80' }, { id: 'mag', l: '魔法減傷', v: `${magPct}%`, c: '#38bdf8' },
+      { id: 'cdr', l: '冷卻縮減', v: `${curCdrPct}%`, c: '#38bdf8' }, { id: 'regen', l: '生命回復', v: `+${player.regen.toFixed(1)}/秒`, c: '#4ade80' },
+      { id: 'dmg', l: '傷害倍率', v: `${Math.round(player.dmgMult * 100)}%`, c: '#fde047' }, { id: 'area', l: '範圍擴大', v: `+${Math.round((player.areaMult - 1) * 100)}%`, c: '#f8fafc' },
+      { id: 'speed', l: '移動速度', v: `${Math.round(player.baseSpeed * player.speedMult)}`, c: '#f8fafc' }, { id: 'critRate', l: '暴擊率', v: critStr, c: rawCritVal > 100 ? '#ff4d4f' : '#f8fafc' },
+      { id: 'critDmg', l: '暴擊傷害', v: `${Math.round((cs.critDmg || 1.5) * 100)}%`, c: '#f8fafc' }, { id: 'doubleHit', l: '連擊機率', v: `${((cs.doubleHitChance || 0) * 100).toFixed(1)}%`, c: '#fb923c' },
+      { id: 'dur', l: '異常時長', v: `+${Math.round(((cs.statusDurMult || 1) - 1) * 100)}%`, c: '#38bdf8' }, { id: 'chance', l: '異常機率', v: `+${((cs.statusChanceBonus || 0) * 100).toFixed(1)}%`, c: '#c084fc' },
+      { id: 'exp', l: '經驗獲取', v: `${Math.round(player.expMult * 100)}%`, c: '#38bdf8' }, { id: 'pickup', l: '拾取範圍', v: `${cs.pickupRange || 115}`, c: '#2dd4bf' }
     ];
-    const combatGridHtml = combatRows.map(r =>
-      `<div style="cursor:help;display:flex;justify-content:space-between;align-items:center;background:rgba(15,23,42,0.75);border:1px solid #334155;border-radius:5px;padding:4px 8px;" onmouseenter="showSkillTooltip(event, 'stat', '${r.id}')" onmousemove="moveSkillTooltip(event)" onmouseleave="hideSkillTooltip()"><span style="font-size:11px;color:#94a3b8;">${r.label}</span><strong style="font-size:12px;color:${r.color};">${r.val}</strong></div>`
-    ).join('');
+    const combatGridHtml = cRows.map(r => `<div style="cursor:help;display:flex;justify-content:space-between;align-items:center;background:rgba(15,23,42,0.75);border:1px solid #334155;border-radius:5px;padding:4px 8px;" onmouseenter="showSkillTooltip(event,'stat','${r.id}')" onmousemove="moveSkillTooltip(event)" onmouseleave="hideSkillTooltip()"><span style="font-size:11px;color:#94a3b8;">${r.l}</span><strong style="font-size:12px;color:${r.c};">${r.v}</strong></div>`).join('');
 
-    const activeResonances = [];
-    for (const [k, st] of Object.entries(ownedSkills)) {
-      const sk = LUCIEN_SKILLS[k];
-      if (st.evolved && sk && sk.resonanceSkill && ownedSkills[sk.resonanceSkill]) {
-        activeResonances.push(`<div style="color:#4ade80;font-size:12px;margin-top:3px;">✨ <strong>${sk.evoName} ＋ ${LUCIEN_SKILLS[sk.resonanceSkill].name}</strong>：${sk.resonanceDesc}</div>`);
-      }
-    }
-    const resSection = activeResonances.length > 0 ? `<div class="status-sec" style="grid-column:1 / -1;border-color:#4ade80;background:rgba(20,83,45,0.25);"><h3>🌟 已啟動元素共鳴</h3>${activeResonances.join('')}</div>` : '';
+    const skillBadges = Object.entries(ownedSkills).map(([k, v]) => {
+      const sk = ACTIVE_SKILLS[k] || { name: k };
+      const dispName = v.evolved ? (sk.evoName || sk.name) : sk.name;
+      const iconChar = (v.evolved && sk.evoIcon) ? sk.evoIcon : (sk.icon || dispName.slice(0, 1));
+      const isMax = v.lv >= (sk.maxLv || 10);
+      const lvText = v.disabled ? '已進化停用' : (isMax ? 'MAX' : `LV.${v.lv}/${sk.maxLv || 10}`);
+      const dim = v.disabled ? 'opacity:0.4;filter:grayscale(1);border-color:#475569;' : (v.evolved ? 'border-color:#facc15;background:rgba(180,83,9,0.35);' : 'border-color:#38bdf8;background:rgba(15,23,42,0.85);');
+      return `<div style="cursor:help;display:flex;align-items:center;gap:10px;border:1.5px solid;${dim}border-radius:8px;padding:6px 10px;" onmouseenter="showSkillTooltip(event,'skill','${k}')" onmousemove="moveSkillTooltip(event)" onmouseleave="hideSkillTooltip()">
+        <div style="width:36px;height:36px;border-radius:6px;background:rgba(30,41,59,0.95);border:1px solid #475569;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">${iconChar}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;justify-content:space-between;align-items:center;"><strong style="font-size:13px;color:#fef08a;">${dispName}</strong><span style="font-size:11px;font-weight:bold;color:${isMax ? '#4ade80' : '#38bdf8'};">${lvText}</span></div>
+          <div style="font-size:11px;color:#cbd5e1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;">${sk.desc || ''}</div>
+        </div>
+      </div>`;
+    }).join('');
 
-    const skillIconsHtml = Object.entries(ownedSkills).map(([k, v]) => {
-      const sk = LUCIEN_SKILLS[k];
-      const border = v.evolved ? '#facc15' : (sk.element === 'fire' ? '#f97316' : (sk.element === 'thunder' ? '#eab308' : (sk.element === 'wind' ? '#34d399' : '#64748b')));
-      const bg = v.evolved ? 'linear-gradient(135deg,rgba(180,83,9,0.55),rgba(120,53,15,0.8))' : 'rgba(15,23,42,0.85)';
-      return `<div style="cursor:help;border:1.5px solid ${border};background:${bg};border-radius:8px;padding:6px 8px;min-width:86px;text-align:center;" onmouseenter="showSkillTooltip(event, 'skill', '${k}')" onmousemove="moveSkillTooltip(event)" onmouseleave="hideSkillTooltip()"><div style="font-size:12px;font-weight:bold;color:${v.evolved ? '#fef08a' : '#f8fafc'};">${v.evolved ? sk.evoName : sk.name}</div><div style="font-size:10px;color:${v.evolved ? '#fde047' : '#38bdf8'};margin-top:2px;">${v.evolved ? '★超武' : 'LV.' + v.lv + '/' + (sk.maxLv || 8)}</div></div>`;
-    }).join('') || '<span style="color:#64748b;font-size:12px;">尚未習得技能</span>';
-
-    const passiveIconsHtml = Object.entries(ownedPassives).map(([k, lv]) => {
-      const p = activePassives[k], isMax = lv >= (p?.maxLv || 5);
-      return `<div style="cursor:help;border:1px solid ${isMax ? '#38bdf8' : '#475569'};background:rgba(15,23,42,0.85);border-radius:8px;padding:5px 8px;min-width:84px;text-align:center;" onmouseenter="showSkillTooltip(event, 'passive', '${k}')" onmousemove="moveSkillTooltip(event)" onmouseleave="hideSkillTooltip()"><div style="font-size:11px;font-weight:bold;color:#e2e8f0;">${p?.name || k}</div><div style="font-size:10px;color:${isMax ? '#38bdf8' : '#94a3b8'};margin-top:2px;">LV.${lv}/${p?.maxLv || 5}</div></div>`;
+    const passiveBadges = Object.entries(ownedPassives).map(([k, lv]) => {
+      const p = activePassives[k] || { name: k, maxLv: 5 };
+      const iconChar = p.name.trim().split(' ')[0];
+      const cleanName = p.name.replace(iconChar, '').trim() || p.name;
+      const isMax = lv >= (p.maxLv || 5);
+      const curEffect = getPassiveGainText(k, lv) || p.desc;
+      return `<div style="cursor:help;display:flex;align-items:center;gap:10px;border:1px solid #475569;background:rgba(15,23,42,0.85);border-radius:8px;padding:6px 10px;" onmouseenter="showSkillTooltip(event,'passive','${k}')" onmousemove="moveSkillTooltip(event)" onmouseleave="hideSkillTooltip()">
+        <div style="width:36px;height:36px;border-radius:6px;background:rgba(30,41,59,0.95);border:1px solid #475569;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">${iconChar}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;justify-content:space-between;align-items:center;"><strong style="font-size:13px;color:#e2e8f0;">${cleanName}</strong><span style="font-size:11px;font-weight:bold;color:${isMax ? '#4ade80' : '#94a3b8'};">${isMax ? 'MAX' : 'LV.' + lv + '/' + (p.maxLv || 5)}</span></div>
+          <div style="font-size:11px;color:#4ade80;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;">${curEffect}</div>
+        </div>
+      </div>`;
     }).join('') || '<span style="color:#64748b;font-size:12px;">尚未習得輔助</span>';
 
     document.getElementById('pauseContent').innerHTML = `
-      <div class="status-sec" style="border-color:#eab308;">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:7px;">
-          <div style="position:relative;width:40px;height:40px;border-radius:9px;background:radial-gradient(circle at 30% 30%,#38bdf8,#1e3a8a);border:2px solid #facc15;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-            <div style="width:17px;height:17px;border-radius:50%;background:#fde047;margin-top:-7px;"></div>
-            <div style="position:absolute;bottom:3px;width:21px;height:11px;border-radius:5px 5px 0 0;background:#3b82f6;"></div>
-          </div>
-          <div style="flex:1;">
-            <div style="display:flex;justify-content:space-between;align-items:center;"><strong style="color:#fef08a;font-size:14px;">${getCurrentCharData().name}</strong><strong style="color:#fde047;font-size:13px;">LV.${player.lv}</strong></div>
-            <div style="position:relative;height:9px;background:#450a0a;border:1px solid #7f1d1d;border-radius:5px;overflow:hidden;margin-top:3px;"><div style="height:100%;width:${hpPct}%;background:linear-gradient(90deg,#dc2626,#f87171);"></div><span style="position:absolute;inset:0;font-size:8px;line-height:8px;text-align:center;color:#fff;font-weight:bold;">HP ${Math.ceil(player.hp)} / ${player.maxHp}</span></div>
-          </div>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:3px;">${statGridHtml}</div>
-      </div>
-      <div class="status-sec"><h3>⚔️ 即時戰鬥面板總覽 <span style="font-size:11px;color:#94a3b8;font-weight:normal;">(移上查看來源與上限)</span></h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:6px;">${combatGridHtml}</div></div>
-      ${resSection}
-      <div class="status-sec"><h3>🔥 主動技能徽章（${Object.keys(ownedSkills).length}/${MAX_ACTIVE_SKILLS}，移上查看詳情）</h3><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;">${skillIconsHtml}</div></div>
-      <div class="status-sec"><h3>🔮 被動強化徽章（${Object.keys(ownedPassives).length}/${MAX_PASSIVE_SKILLS}，移上查看詳情）</h3><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;">${passiveIconsHtml}</div></div>`;
+      <div class="status-sec" style="border-color:#eab308;"><div style="display:flex;justify-content:space-between;margin-bottom:6px;"><strong style="color:#fef08a;font-size:14px;">${getCurrentCharData().name}</strong><strong style="color:#fde047;">LV.${player.lv} ｜ HP ${Math.ceil(player.hp)}/${player.maxHp}</strong></div><div style="display:flex;flex-direction:column;gap:3px;">${statGridHtml}</div></div>
+      <div class="status-sec"><h3>⚔️ 即時戰鬥面板總覽 <span style="font-size:11px;color:#94a3b8;font-weight:normal;">(移上查看說明)</span></h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:6px;">${combatGridHtml}</div></div>
+      <div class="status-sec"><h3>🔥 主動技能欄（${Object.keys(ownedSkills).length}/${MAX_ACTIVE_SKILLS}）</h3><div style="display:flex;flex-direction:column;gap:6px;margin-top:6px;">${skillBadges}</div></div>
+      <div class="status-sec"><h3>🔮 被動輔助欄（${Object.keys(ownedPassives).length}/${MAX_PASSIVE_SKILLS}）</h3><div style="display:flex;flex-direction:column;gap:6px;margin-top:6px;">${passiveBadges}</div></div>`;
     modal.style.display = 'flex';
   } else { modal.style.display = 'none'; isPaused = false; }
 }
@@ -723,14 +916,9 @@ function endGame(win) {
   gameOver = true;
   const expGain = kills * 2 + Math.floor(gameTime / 5) + (win ? 250 : 0), seedGain = kills * 3 + (win ? 400 : 0);
   if (typeof addOutExpAndSeed === 'function') addOutExpAndSeed(expGain, seedGain);
-  let lootMsg = '';
-  if (runLoot.length > 0 && typeof saveData !== 'undefined') {
-    const kept = runLoot.sort(() => Math.random() - 0.5).slice(0, win ? runLoot.length : Math.max(1, Math.ceil(runLoot.length * 0.5)));
-    saveData.bag.push(...kept); writeSave();
-    lootMsg = `<br><span style="color:#4ade80;">🎒 帶回戰利品：${kept.length} 件未鑑定裝備（返回大廳即可一鍵鑑定！）</span>`;
-  }
+  if (runLoot.length > 0 && typeof saveData !== 'undefined') { saveData.bag.push(...runLoot); writeSave(); }
   document.getElementById('endTitle').textContent = win ? '🎉 20分鐘天翼覺醒・討伐成功！' : '💀 天翼斷裂';
-  document.getElementById('endSummary').innerHTML = `存活時間：${document.getElementById('timeText').textContent} ｜ 總擊殺：${kills} ｜ 最高等級：LV.${player.lv}<br><span style="color:#fde047;">💰 結算獲得：局外經驗 +${expGain} ｜ Seed +${seedGain}（已自動存檔）</span>${lootMsg}`;
+  document.getElementById('endSummary').innerHTML = `存活時間：${document.getElementById('timeText').textContent} ｜ 總擊殺：${kills} ｜ 最高等級：LV.${player.lv}<br><span style="color:#fde047;">💰 結算獲得：局外經驗 +${expGain} ｜ Seed +${seedGain}（已自動存檔）</span>`;
   document.getElementById('endModal').style.display = 'flex';
 }
 

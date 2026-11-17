@@ -1,10 +1,13 @@
-const SAVE_KEY = 'tw_survivor_save_v2';
+const SAVE_KEY = 'tw_survivor_save_v2_4';
+const MAX_OUT_LV = 255;
 
 const DEFAULT_SAVE = {
   charId: 'lucien',
+  variantId: 'longsword',
   charName: '路西安．卡爾茲',
   outLv: 1, outExp: 0, seed: 500, freePts: 0,
-  baseStats: { S: 4, H: 3, I: 1, DEF: 2, MR: 1, DEX: 2, AGI: 2 },
+  baseStats: { S: 4, H: 3, I: 1, DEF: 2, MR: 1, DEX: 2, AGI: 1 },
+  autoStats: { S: 0, H: 0, I: 0, DEF: 0, MR: 0, DEX: 0, AGI: 0 },
   allocated: { S: 0, H: 0, I: 0, DEF: 0, MR: 0, DEX: 0, AGI: 0 },
   equip: {
     weapon: { tplId: 'w_long_1', slot: 'weapon', type: 'longsword', name: '學徒長劍', rarity: 'white', reqLv: 1, reqStats: {}, startSkill: 'enbu', H: 4, S: 4, identified: true, affixes: [] },
@@ -23,25 +26,83 @@ function loadSave() {
     const raw = localStorage.getItem(SAVE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      return { ...DEFAULT_SAVE, ...parsed, equip: { ...DEFAULT_SAVE.equip, ...(parsed.equip || {}) }, bag: parsed.bag || [] };
+      return {
+        ...DEFAULT_SAVE, ...parsed,
+        autoStats: { ...DEFAULT_SAVE.autoStats, ...(parsed.autoStats || {}) },
+        allocated: { ...DEFAULT_SAVE.allocated, ...(parsed.allocated || {}) },
+        equip: { ...DEFAULT_SAVE.equip, ...(parsed.equip || {}) },
+        bag: parsed.bag || []
+      };
     }
   } catch (e) {}
   return JSON.parse(JSON.stringify(DEFAULT_SAVE));
 }
 
 function writeSave() { localStorage.setItem(SAVE_KEY, JSON.stringify(saveData)); }
-function getNextOutExp(lv) { return Math.round(100 * Math.pow(1.12, lv - 1)); }
-function getLevelPts(lv) { return lv <= 20 ? 4 : (lv <= 40 ? 5 : 7); }
-function getStatCost(curVal) { return curVal < 50 ? 1 : 2; }
+function getNextOutExp(lv) { return Math.round(100 * Math.pow(1.065, Math.min(180, lv - 1))); }
+// V2.4 收斂配點：配合自動升級+凹點(約350點)，每級給 1 pt（逢10級額外+1 pt），255滿級總自由點數約 279 pt，專精約可練滿 2 項 255
+function getLevelPts(lv) { return (lv % 10 === 0) ? 2 : 1; }
+function getStatCost(key) { return typeof getStatPointCost === 'function' ? getStatPointCost(key) : 1; }
+// 升級時執行：100% 必升 autoStat +1，並以 40% 機率凹點 bonusStat +1（絕不含第二輸出核心）
+function applyAutoLevelGrowth() {
+  if (typeof getCurrentArchetypeRule !== 'function') return;
+  const rule = getCurrentArchetypeRule();
+  if (rule.autoStat && (saveData.baseStats[rule.autoStat] + saveData.autoStats[rule.autoStat] + saveData.allocated[rule.autoStat]) < 255) {
+    saveData.autoStats[rule.autoStat] = (saveData.autoStats[rule.autoStat] || 0) + 1;
+  }
+  if (rule.bonusStat && Math.random() < 0.40 && (saveData.baseStats[rule.bonusStat] + saveData.autoStats[rule.bonusStat] + saveData.allocated[rule.bonusStat]) < 255) {
+    saveData.autoStats[rule.bonusStat] = (saveData.autoStats[rule.bonusStat] || 0) + 1;
+  }
+}
+
 function addOutExpAndSeed(expGain, seedGain) {
   saveData.seed += seedGain;
   saveData.outExp += expGain;
-  while (saveData.outLv < 62 && saveData.outExp >= getNextOutExp(saveData.outLv)) {
+  while (saveData.outLv < MAX_OUT_LV && saveData.outExp >= getNextOutExp(saveData.outLv)) {
     saveData.outExp -= getNextOutExp(saveData.outLv);
     saveData.outLv++;
+    applyAutoLevelGrowth();
     saveData.freePts += getLevelPts(saveData.outLv);
   }
   writeSave();
+}
+
+// 切換角色與初始武器型態（路西安 3 型 / 蒂琪愛兒 5 型，不重複塞入同名基礎武器）
+function switchCharacterVariant(charId, variantId) {
+  if (pendingAlloc) { alert('請先按下「✅ 確認配點」或「↩️ 取消微調」後再切換角色！'); return; }
+  const ch = CHARACTERS[charId];
+  if (!ch || !ch.playable) return;
+  const vid = (variantId && ch.variants[variantId]) ? variantId : ch.defaultVariant;
+  const vData = ch.variants[vid];
+  const oldW = saveData.equip.weapon;
+  if (oldW) {
+    const dupBase = oldW.reqLv === 1 && oldW.rarity === 'white' && !(oldW.affixes && oldW.affixes.length) && saveData.bag.some(b => b.tplId === oldW.tplId && b.rarity === 'white');
+    if (!dupBase) saveData.bag.push(oldW);
+    saveData.equip.weapon = null;
+  }
+  for (const sk of ['sub', 'head', 'armor', 'gloves', 'shoes', 'back', 'relic']) {
+    const eq = saveData.equip[sk];
+    if (eq && eq.allowChars && !eq.allowChars.includes('all') && !eq.allowChars.includes(charId)) {
+      saveData.bag.push(eq); saveData.equip[sk] = null;
+    }
+  }
+  saveData.charId = charId; saveData.variantId = vid; saveData.charName = ch.name;
+  saveData.baseStats = { ...vData.baseStats };
+  saveData.autoStats = { S: 0, H: 0, I: 0, DEF: 0, MR: 0, DEX: 0, AGI: 0 };
+  saveData.allocated = { S: 0, H: 0, I: 0, DEF: 0, MR: 0, DEX: 0, AGI: 0 };
+  let totalRefund = 0;
+  for (let lv = 2; lv <= saveData.outLv; lv++) { applyAutoLevelGrowth(); totalRefund += getLevelPts(lv); }
+  saveData.freePts = totalRefund;
+  const tpl = (typeof WEAPON_TEMPLATES !== 'undefined') ? WEAPON_TEMPLATES.find(w => w.tplId === vData.defaultTpl) : null;
+  if (tpl) {
+    saveData.equip.weapon = {
+      uid: Date.now(), tplId: tpl.tplId, slot: 'weapon', type: tpl.type, wandElem: tpl.wandElem || null,
+      name: tpl.name, rarity: 'white', reqLv: 1, reqStats: {}, allowChars: [...tpl.allowChars],
+      startSkill: tpl.startSkill, S: tpl.S || 0, H: tpl.H || 0, I: tpl.I || 0, DEF: tpl.DEF || 0, MR: tpl.MR || 0,
+      identified: true, affixes: []
+    };
+  }
+  writeSave(); renderLobby();
 }
 const ID_COST = { white: 10, green: 25, blue: 60, purple: 150, gold: 400 };
 
@@ -73,6 +134,13 @@ function identifyAllItems() {
   if (count === 0) alert('Seed 不足，無法鑑定任何裝備！');
 }
 
+function clearBag() {
+  if (!saveData.bag || saveData.bag.length === 0) return;
+  if (!confirm(`確定要清空背包內全部 ${saveData.bag.length} 件物品嗎？（已穿戴在身上的裝備不會受影響）`)) return;
+  saveData.bag = [];
+  writeSave(); renderLobby();
+}
+
 function equipFromBag(uid) {
   if (pendingAlloc) { alert('請先按下「✅ 確認配點」或「↩️ 取消微調」後再更換裝備！'); return; }
   const idx = saveData.bag.findIndex(i => i.uid === uid);
@@ -80,11 +148,7 @@ function equipFromBag(uid) {
   const item = saveData.bag[idx];
   if (!item.identified) { identifySingle(uid); return; }
   const check = canEquipItem(item);
-  if (!check.ok) {
-    if (typeof showBanner === 'function') showBanner(`❌ 無法穿戴：${check.reason}`);
-    alert(`無法穿戴：${check.reason}`);
-    return;
-  }
+  if (!check.ok) { alert(`無法穿戴：${check.reason}`); return; }
   const oldEquip = saveData.equip[item.slot];
   saveData.equip[item.slot] = item;
   saveData.bag.splice(idx, 1);
@@ -100,10 +164,7 @@ function unequipSlot(slotKey) {
   writeSave(); renderLobby();
 }
 
-function setBagSort(mode) {
-  bagSortMode = (bagSortMode === mode) ? 'char' : mode;
-  renderLobby();
-}
+function setBagSort(mode) { bagSortMode = (bagSortMode === mode) ? 'char' : mode; renderLobby(); }
 
 function debugDropLoot() {
   const pool = ['white', 'white', 'green', 'blue', 'purple', 'gold'];
@@ -119,12 +180,14 @@ function getWorkingAlloc() { return pendingAlloc || saveData.allocated; }
 function getWorkingFreePts() { return pendingFreePts !== null ? pendingFreePts : saveData.freePts; }
 function ensurePendingStats() { if (!pendingAlloc) { pendingAlloc = { ...saveData.allocated }; pendingFreePts = saveData.freePts; } }
 
-function getTotalStats() {
-  const total = { S: 0, H: 0, I: 0, DEF: 0, MR: 0, DEX: 0, AGI: 0, hp: 0, spd: 0, critRate: 0, critDmg: 0, dmgReduce: 0 };
+function getNakedStat(key) {
   const alloc = getWorkingAlloc();
-  for (const k of ['S', 'H', 'I', 'DEF', 'MR', 'DEX', 'AGI']) {
-    total[k] = (saveData.baseStats[k] || 0) + (alloc[k] || 0);
-  }
+  return (saveData.baseStats[key] || 0) + ((saveData.autoStats && saveData.autoStats[key]) || 0) + (alloc[key] || 0);
+}
+
+function getTotalStats() {
+  const total = { S: 0, H: 0, I: 0, DEF: 0, MR: 0, DEX: 0, AGI: 0, hp: 0, spd: 0, critRate: 0, critDmg: 0, dmgReduce: 0, magReduce: 0, physDmgPct: 0, magDmgPct: 0, extraProj: 0 };
+  for (const k of ['S', 'H', 'I', 'DEF', 'MR', 'DEX', 'AGI']) total[k] = getNakedStat(k);
   for (const slot of Object.values(saveData.equip)) {
     if (!slot) continue;
     for (const k of Object.keys(total)) { if (slot[k]) total[k] += slot[k]; }
@@ -134,43 +197,55 @@ function getTotalStats() {
 
 function getDerivedCombatStats() {
   const st = getTotalStats();
-  const sCol = Math.min(99, st.S), hCol = Math.min(99, st.H), mrCol = Math.min(99, st.MR), agiCol = Math.min(99, st.AGI);
+  const variant = typeof getCurrentCharVariant === 'function' ? getCurrentCharVariant() : { initHp: 200 };
+  const sCap = Math.min(255, st.S), hCap = Math.min(255, st.H), iCap = Math.min(255, st.I);
+  const mrCap = Math.min(255, st.MR), defCap = Math.min(255, st.DEF), dexCap = Math.min(255, st.DEX), agiCap = Math.min(255, st.AGI);
+
+  const eqPhysRed = Math.min(0.40, (st.dmgReduce || 0) / 100);
+  const eqMagRed = Math.min(0.40, (st.magReduce || 0) / 100);
+  const physReducePct = Math.min(70, Math.round((1 - (1 - 0.50 * (defCap / 255)) * (1 - eqPhysRed)) * 100));
+  const magReducePct = Math.min(70, Math.round((1 - (1 - 0.50 * (mrCap / 255)) * (1 - eqMagRed)) * 100));
+
   return {
-    st, cdReduce: 0.30 * (sCol / (sCol + 60)), areaBonus: 0.25 * (hCol / (hCol + 60)),
-    extraProj: st.I >= 60 ? 3 : (st.I >= 35 ? 2 : (st.I >= 15 ? 1 : 0)),
-    defReduce: Math.floor(st.DEF / 2), maxHp: 120 + st.DEF * 5 + st.hp,
-    regen: Math.floor(st.MR / 5) * 0.2, statusDurMult: 1 + st.MR * 0.015, statusCritMult: 1.5 + 0.5 * (mrCol / 99),
-    critRate: 0.05 + Math.min(0.35, st.DEX * 0.0025) + st.critRate / 100,
-    critDmg: 1.50 + 0.70 * (agiCol / 99) + st.critDmg / 100,
-    moveSpeed: 235 + Math.min(150, st.AGI * 2) + st.spd, pickupRange: 115 + st.DEX * 1.5
+    st,
+    doubleHitChance: Math.min(0.45, sCap * 0.0015),
+    knockbackMult: 1 + hCap * 0.004,
+    statusDurMult: 1 + iCap * 0.003,
+    statusChanceBonus: Math.min(0.35, mrCap * 0.0012),
+    maxHp: (variant.initHp || 200) + st.DEF * 6 + st.hp,
+    physReducePct, magReducePct,
+    defThornsDmg: Math.round(st.DEF * 0.8),
+    critRate: 0.05 + dexCap * 0.001 + (st.critRate || 0) / 100,
+    expBonusMult: 1 + dexCap * 0.001,
+    critDmg: 1.50 + agiCap * 0.006 + (st.critDmg || 0) / 100,
+    pickupRange: Math.round(115 * (1 + agiCap * 0.0015)),
+    moveSpeed: 235 + (st.spd || 0),
+    physDmgMult: 1 + (st.physDmgPct || 0) / 100,
+    magDmgMult: 1 + (st.magDmgPct || 0) / 100,
+    extraProj: st.extraProj || 0,
+    cdReduce: 0, areaBonus: 0, regen: 0
   };
 }
-function getLobbyDmgReducePct(d) {
-  const defFactor = Math.max(0.45, 1 - (d.defReduce || 0) * 0.008);
-  const eqReduce = (d.st && d.st.dmgReduce) ? Math.min(0.4, d.st.dmgReduce / 100) : 0;
-  return Math.min(70, Math.round((1 - defFactor * (1 - eqReduce)) * 100));
-}
+
 
 function addStat(key) {
   ensurePendingStats();
-  const nakedCur = saveData.baseStats[key] + pendingAlloc[key], cost = getStatCost(nakedCur);
-  if (nakedCur >= 99 || pendingFreePts < cost) return;
+  const nakedCur = getNakedStat(key), cost = getStatCost(key);
+  if (nakedCur >= 255 || pendingFreePts < cost) return;
   pendingFreePts -= cost; pendingAlloc[key]++; renderLobby();
 }
 
 function subStat(key) {
   ensurePendingStats();
   if (pendingAlloc[key] <= 0) return;
-  pendingAlloc[key]--;
-  pendingFreePts += getStatCost(saveData.baseStats[key] + pendingAlloc[key]);
-  renderLobby();
+  pendingAlloc[key]--; pendingFreePts += getStatCost(key); renderLobby();
 }
 
 function maxOutStat(key) {
   ensurePendingStats();
   while (true) {
-    const nakedCur = saveData.baseStats[key] + pendingAlloc[key], cost = getStatCost(nakedCur);
-    if (nakedCur >= 99 || pendingFreePts < cost) break;
+    const nakedCur = getNakedStat(key), cost = getStatCost(key);
+    if (nakedCur >= 255 || pendingFreePts < cost) break;
     pendingFreePts -= cost; pendingAlloc[key]++;
   }
   renderLobby();
@@ -184,12 +259,11 @@ function confirmStats() {
 }
 
 function cancelStats() { pendingAlloc = null; pendingFreePts = null; renderLobby(); }
-
 function resetStats() {
   ensurePendingStats();
   let refund = 0;
   for (const k of Object.keys(pendingAlloc)) {
-    while (pendingAlloc[k] > 0) { pendingAlloc[k]--; refund += getStatCost(saveData.baseStats[k] + pendingAlloc[k]); }
+    while (pendingAlloc[k] > 0) { pendingAlloc[k]--; refund += getStatCost(k); }
   }
   pendingFreePts += refund; renderLobby();
 }
@@ -197,43 +271,42 @@ function resetStats() {
 function debugAddExp() { addOutExpAndSeed(getNextOutExp(saveData.outLv), 500); renderLobby(); }
 
 function debugMaxLv60() {
-  while (saveData.outLv < 62) { saveData.outLv++; saveData.freePts += getLevelPts(saveData.outLv); }
-  saveData.seed += 80000; writeSave(); renderLobby();
+  while (saveData.outLv < MAX_OUT_LV) {
+    saveData.outLv++;
+    applyAutoLevelGrowth();
+    saveData.freePts += getLevelPts(saveData.outLv);
+  }
+  saveData.seed += 250000; writeSave(); renderLobby();
 }
+
 function getLobbyTooltipEl() {
   let tip = document.getElementById('lobbyTooltip');
   if (!tip) {
-    tip = document.createElement('div');
-    tip.id = 'lobbyTooltip';
-    tip.style.cssText = 'position:fixed;z-index:9999;pointer-events:none;background:rgba(15,23,42,0.97);border:1.5px solid #facc15;border-radius:8px;padding:10px 12px;color:#f8fafc;font-size:12px;line-height:1.55;max-width:290px;box-shadow:0 8px 24px rgba(0,0,0,0.75);display:none;';
+    tip = document.createElement('div'); tip.id = 'lobbyTooltip';
+    tip.style.cssText = 'position:fixed;z-index:9999;pointer-events:none;background:rgba(15,23,42,0.97);border:1.5px solid #facc15;border-radius:8px;padding:10px 12px;color:#f8fafc;font-size:12px;line-height:1.55;max-width:295px;box-shadow:0 8px 24px rgba(0,0,0,0.75);display:none;';
     document.body.appendChild(tip);
   }
   return tip;
 }
 
 function showLobbyStatTooltip(e, key) {
-  const tip = getLobbyTooltipEl();
-  const st = getTotalStats(), alloc = getWorkingAlloc();
-  const nakedVal = (saveData.baseStats[key] || 0) + (alloc[key] || 0);
-  const eqVal = (st[key] || 0) - nakedVal;
+  const tip = getLobbyTooltipEl(), st = getTotalStats(), nakedVal = getNakedStat(key), eqVal = (st[key] || 0) - nakedVal;
   const eqStr = eqVal > 0 ? ` ＋ 裝備 <strong style="color:#4ade80;">+${eqVal}</strong>` : '';
   const sourceHtml = `<div style="background:rgba(30,41,59,0.9);border:1px solid #475569;border-radius:5px;padding:4px 8px;margin-bottom:6px;font-size:11px;color:#cbd5e1;">📊 總計 <strong style="color:#fde047;">${st[key]}</strong> ＝ 本體 <strong style="color:#f8fafc;">${nakedVal}</strong>${eqStr}</div>`;
   const meta = {
-    S:   { title: '⚔️ STAB（突刺 / 冷卻）', desc: '• 提升細劍系（極光刺）與突刺招式主屬性傷害。<br>• 提供全技能冷卻縮減（基礎最高 -30%）。' },
-    H:   { title: '🗡️ HACK（砍劈 / 範圍）', desc: '• 提升彎刀（連犽斬）與長劍（圓月斬）主屬性傷害。<br>• 擴大所有物理招式的攻擊半徑（基礎最高 +25%）。' },
-    I:   { title: '🔮 INT（魔法 / 彈幕）', desc: '• 提升所有元素魔法技能的主屬性傷害。<br>• 達 15 / 35 / 60 點時，元素魔法額外彈幕 +1 / +2 / +3 發。' },
-    DEF: { title: '🛡️ DEF（防禦 / 生命）', desc: '• 每 1 點提升最大生命值 +5 HP。<br>• 提供物理與碰撞減傷比例（上限 70%）。' },
-    MR:  { title: '✨ MR（精神 / 異常）', desc: '• 每 5 點提升每秒自然回血 +0.2。<br>• 延長元素異常持續時間，並放大異常狀態暴擊倍率。' },
-    DEX: { title: '🎯 DEX（靈巧 / 暴擊）', desc: '• 每 1 點提升暴擊率 +0.25%（DEX 來源上限 35%）。<br>• 每 1 點擴大經驗寶石與掉落物磁吸拾取半徑 +1.5。' },
-    AGI: { title: '👟 AGI（敏捷 / 暴傷）', desc: '• 提升基礎移動速度（上限 +150）。<br>• 大幅提升黃字暴擊傷害倍率（基礎最高 +70%）。' }
+    S:   { title: '⚔️ STAB（刺擊 / 連擊）', desc: '• 主能力：刺擊系技能基數（STAB×1.0 + HACK×0.3）與跨系武器物理底力。<br>• 副能力：連擊觸發機率（攻擊時有機率打出兩次傷害）。' },
+    H:   { title: '🗡️ HACK（劈砍 / 擊退）', desc: '• 主能力：劈砍系技能基數（HACK×1.0 + STAB×0.3）與跨系武器物理底力。<br>• 副能力：技能擊退力道（強化揮砍震退怪群壓制力）。' },
+    I:   { title: '🔮 INT（元素 / 異常時長）', desc: '• 主能力：元素法術基數（INT×1.0 + MR×0.3）與魔劍複合基數。<br>• 副能力：異常狀態持續時間延長（點燃、凍結、感電、聖印留存更久）。' },
+    MR:  { title: '✨ MR（白魔 / 異常率＆魔減）', desc: '• 主能力：白魔術技能基數 ＋ 元素法術副係數（MR×0.3）。<br>• 副能力：異常狀態觸發機率提升 ＋ 魔法（投射物）減傷率（上限 70%）。' },
+    DEF: { title: '🛡️ DEF（防禦 / 生命＆物減）', desc: '• 主能力：最大 HP（每點 +6）＋ 物理（碰撞）減傷率（上限 70%）。<br>• 副能力：防禦轉傷（護甲按比例轉為近戰附加輸出）。' },
+    DEX: { title: '🎯 DEX（技巧 / 暴率＆經驗）', desc: '• 主能力：暴擊率（每 10 點 +1%，255 點滿值 +25.5%）。<br>• 副能力：局內經驗獲取加成（每 10 點 +1%，255 點滿值 +25.5%）。' },
+    AGI: { title: '👟 AGI（敏捷 / 暴傷＆拾取）', desc: '• 主能力：暴擊傷害（每 1 點 +0.6%，255 點滿值 +153%）。<br>• 副能力：拾取磁鐵範圍（每 10 點 +1.5%，255 點滿值 +38.25%）。' }
   }[key];
   if (!meta) return;
   tip.style.borderColor = '#facc15';
   tip.innerHTML = `<div style="font-weight:bold;color:#fde047;font-size:13px;margin-bottom:4px;">${meta.title}</div>${sourceHtml}<div style="color:#e2e8f0;">${meta.desc}</div>`;
-  tip.style.display = 'block';
-  moveLobbyTooltip(e);
+  tip.style.display = 'block'; moveLobbyTooltip(e);
 }
-
 function showLobbyEquipTooltip(e, source, keyOrUid) {
   const tip = getLobbyTooltipEl();
   const it = source === 'equip' ? saveData.equip[keyOrUid] : saveData.bag.find(i => i.uid === Number(keyOrUid));
@@ -248,81 +321,85 @@ function showLobbyEquipTooltip(e, source, keyOrUid) {
   const legLine = it.legendEffect ? `<div style="margin-top:5px;padding-top:4px;border-top:1px dashed #ca8a04;color:#fde047;font-weight:bold;">${it.legendEffect.desc}</div>` : '';
   tip.style.borderColor = r.color;
   tip.innerHTML = `<div style="font-weight:bold;color:${r.color};font-size:13px;">[${r.name}・${SLOT_NAMES[it.slot]}] ${it.name}${enhStr}</div>${reqLine}${baseLines ? `<div style="margin-top:4px;font-weight:bold;">${baseLines}</div>` : ''}${affixLines}${legLine}`;
-  tip.style.display = 'block';
-  moveLobbyTooltip(e);
+  tip.style.display = 'block'; moveLobbyTooltip(e);
 }
+
 function moveLobbyTooltip(e) {
   const tip = document.getElementById('lobbyTooltip');
   if (!tip || tip.style.display === 'none') return;
   tip.style.left = `${Math.max(10, Math.min(window.innerWidth - tip.offsetWidth - 14, e.clientX + 14))}px`;
   tip.style.top = `${Math.max(10, Math.min(window.innerHeight - tip.offsetHeight - 14, e.clientY + 14))}px`;
 }
-
-function hideLobbyTooltip() {
-  const tip = document.getElementById('lobbyTooltip');
-  if (tip) tip.style.display = 'none';
-}
+function hideLobbyTooltip() { const tip = document.getElementById('lobbyTooltip'); if (tip) tip.style.display = 'none'; }
 
 function toggleCharDetailModal(show) {
   const modal = document.getElementById('charDetailModal');
   if (!modal) return;
   if (!show) { modal.style.display = 'none'; return; }
-  const d = getDerivedCombatStats(), st = d.st, charInfo = getCurrentCharData(), alloc = getWorkingAlloc();
+  const d = getDerivedCombatStats(), st = d.st, charInfo = getCurrentCharData(), vInfo = getCurrentCharVariant(), rule = getCurrentArchetypeRule();
   const fullNames = { S: 'STAB', H: 'HACK', I: 'INT', DEF: 'DEF', MR: 'MR', DEX: 'DEX', AGI: 'AGI' };
   const statLines = Object.keys(fullNames).map(k => {
-    const naked = (saveData.baseStats[k] || 0) + (alloc[k] || 0), eq = st[k] - naked;
+    const naked = getNakedStat(k), eq = st[k] - naked;
     return `<div>• <strong>${fullNames[k]}</strong>：總計 <strong style="color:#fde047;">${st[k]}</strong>（本體 <strong>${naked}</strong> + 裝備 <strong style="color:#4ade80;">+${eq}</strong>）</div>`;
   }).join('');
   document.getElementById('charDetailContent').innerHTML = `
-    <div class="status-sec"><h3 style="color:#38bdf8;margin-bottom:6px;">👤 基本與七大素質明細</h3><div>角色：<strong>${charInfo.name}</strong>（${charInfo.title}）</div><div>局外等級：<strong>LV.${saveData.outLv} / 62</strong> ｜ 剩餘配點：<strong>${getWorkingFreePts()}</strong></div><hr style="border-color:#334155;margin:6px 0;">${statLines}</div>
-    <div class="status-sec"><h3 style="color:#4ade80;margin-bottom:6px;">⚔️ 衍生戰鬥數值面板</h3><div>❤️ 最大生命：<strong>${d.maxHp}</strong> ｜ 🛡️ 減傷率：<strong>${getLobbyDmgReducePct(d)}%</strong></div><div>💚 每秒回血：<strong>+${d.regen.toFixed(1)}/秒</strong></div><div>⚡ 冷卻縮減：<strong>-${(d.cdReduce * 100).toFixed(1)}%</strong> ｜ 範圍擴大：<strong>+${(d.areaBonus * 100).toFixed(1)}%</strong></div><div>💥 基礎暴擊率：<strong>${(d.critRate * 100).toFixed(1)}%</strong> ｜ 暴擊傷害：<strong>${Math.round(d.critDmg * 100)}%</strong></div><div>✨ 魔法額外彈幕：<strong>+${d.extraProj} 發</strong> ｜ 🔮 異常倍率：<strong>${d.statusCritMult.toFixed(2)}x</strong></div><div>👟 移動速度：<strong>${Math.round(d.moveSpeed)}</strong> ｜ 拾取範圍：<strong>${Math.round(d.pickupRange)}</strong></div></div>`;
+    <div class="status-sec"><h3 style="color:#38bdf8;margin-bottom:6px;">👤 基本與七大素質明細</h3><div>角色：<strong>${charInfo.name}</strong>（${vInfo.wName}・${rule.name} [${vInfo.archetype}]）</div><div>局外等級：<strong>LV.${saveData.outLv} / ${MAX_OUT_LV}</strong> ｜ 剩餘配點：<strong>${getWorkingFreePts()}</strong></div><hr style="border-color:#334155;margin:6px 0;">${statLines}</div>
+    <div class="status-sec"><h3 style="color:#4ade80;margin-bottom:6px;">⚔️ V2.4 衍生戰鬥數值面板</h3><div>❤️ 最大生命：<strong>${d.maxHp}</strong> ｜ 👟 移動速度：<strong>${Math.round(d.moveSpeed)}</strong></div><div>🛡️ 物理減傷：<strong>${d.physReducePct}%</strong> ｜ 💠 魔法減傷：<strong>${d.magReducePct}%</strong>（上限70%）</div><div>⚔️ 連擊機率：<strong>${(d.doubleHitChance * 100).toFixed(1)}%</strong> ｜ 🔨 擊退倍率：<strong>${Math.round(d.knockbackMult * 100)}%</strong></div><div>🔥 異常時長：<strong>+${Math.round((d.statusDurMult - 1) * 100)}%</strong> ｜ ✨ 異常機率：<strong>+${(d.statusChanceBonus * 100).toFixed(1)}%</strong></div><div>💥 基礎暴擊率：<strong>${(d.critRate * 100).toFixed(1)}%</strong> ｜ 暴擊傷害：<strong>${Math.round(d.critDmg * 100)}%</strong></div><div>📖 經驗加成：<strong>+${Math.round((d.expBonusMult - 1) * 100)}%</strong> ｜ 🧲 拾取範圍：<strong>${d.pickupRange}</strong></div></div>`;
   modal.style.display = 'flex';
 }
-
 function renderPaperDoll() {
   const cv = document.getElementById('paperDollCanvas');
   if (!cv) return;
   const c = cv.getContext('2d'); c.clearRect(0, 0, cv.width, cv.height);
-  const cx = cv.width / 2, cy = cv.height / 2 + 12;
+  const cx = cv.width / 2, cy = cv.height / 2 + 12, ch = getCurrentCharData();
   if (saveData.equip.back) {
     c.fillStyle = RARITIES[saveData.equip.back.rarity].color;
     c.beginPath(); c.moveTo(cx, cy - 10); c.lineTo(cx - 38, cy - 34); c.lineTo(cx - 24, cy + 8); c.fill();
     c.beginPath(); c.moveTo(cx, cy - 10); c.lineTo(cx + 38, cy - 34); c.lineTo(cx + 24, cy + 8); c.fill();
   }
-  c.fillStyle = saveData.equip.armor ? RARITIES[saveData.equip.armor.rarity].color : '#3b82f6';
+  c.fillStyle = saveData.equip.armor ? RARITIES[saveData.equip.armor.rarity].color : (ch.color || '#3b82f6');
   c.fillRect(cx - 12, cy - 16, 24, 30);
   c.fillStyle = '#fde047'; c.beginPath(); c.arc(cx, cy - 24, 11, 0, Math.PI * 2); c.fill();
   if (saveData.equip.head) { c.fillStyle = RARITIES[saveData.equip.head.rarity].color; c.fillRect(cx - 12, cy - 36, 24, 6); }
   if (saveData.equip.weapon) { c.strokeStyle = RARITIES[saveData.equip.weapon.rarity].color; c.lineWidth = 4; c.beginPath(); c.moveTo(cx + 12, cy); c.lineTo(cx + 32, cy - 16); c.stroke(); }
 }
+
 function renderLobby() {
   hideLobbyTooltip();
-  document.querySelectorAll('#lobbyModal button').forEach(b => {
-    if (b.textContent.includes('開始出征')) b.innerHTML = '🔥 出發冒險';
-    if (b.textContent.includes('一鍵60等')) b.innerHTML = '⚡ [測試]一鍵62等';
-  });
-  const d = getDerivedCombatStats(), st = d.st;
-  const curFree = getWorkingFreePts(), alloc = getWorkingAlloc();
+  const d = getDerivedCombatStats(), st = d.st, curFree = getWorkingFreePts(), alloc = getWorkingAlloc();
+  const ch = getCurrentCharData(), vInfo = getCurrentCharVariant(), rule = getCurrentArchetypeRule();
   const pendingTag = pendingAlloc ? ' <span style="color:#fde047;">(預覽微調中)</span>' : '';
-  document.getElementById('lobbyHeader').innerHTML = `${saveData.charName} ｜ 局外等級：LV.${saveData.outLv}/62 ｜ 剩餘配點：<strong>${curFree}</strong>${pendingTag} ｜ 持有 Seed：${saveData.seed}`;
+
+  const charBtns = ['lucien', 'tichiel'].map(cid => {
+    const cObj = CHARACTERS[cid], active = saveData.charId === cid;
+    return `<button class="stat-btn" style="width:auto;padding:2px 8px;background:${active ? '#eab308' : '#334155'};color:${active ? '#0f172a' : '#f8fafc'};font-weight:bold;" onclick="switchCharacterVariant('${cid}')">${cObj.name.split('．')}</button>`;
+  }).join('');
+  const varBtns = Object.entries(ch.variants).map(([vid, v]) => {
+    const active = saveData.variantId === vid;
+    return `<button class="stat-btn" style="width:auto;padding:2px 6px;font-size:11px;background:${active ? '#38bdf8' : '#1e293b'};color:${active ? '#0f172a' : '#cbd5e1'};border:1px solid #475569;" onclick="switchCharacterVariant('${ch.id}','${vid}')">${v.wName}(${v.archetype})</button>`;
+  }).join('');
+
+  document.getElementById('lobbyHeader').innerHTML = `
+    <div style="display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:6px;margin-bottom:4px;">
+      <span>角色切換：${charBtns}</span> ｜ <span>型態：${varBtns}</span>
+    </div>
+    <div>${ch.name} [${rule.name}・${vInfo.wName}] ｜ 局外等級：LV.${saveData.outLv}/${MAX_OUT_LV} ｜ 剩餘配點：<strong>${curFree}</strong>${pendingTag} ｜ Seed：${saveData.seed}</div>`;
 
   const fullLabels = { S: 'STAB', H: 'HACK', I: 'INT', DEF: 'DEF', MR: 'MR', DEX: 'DEX', AGI: 'AGI' };
   const rowsHtml = Object.keys(fullLabels).map(k => {
-    const nakedVal = (saveData.baseStats[k] || 0) + (alloc[k] || 0);
-    const totalVal = st[k], cost = getStatCost(nakedVal);
-    const disPlus = (nakedVal >= 99 || curFree < cost) ? 'disabled' : '';
+    const nakedVal = getNakedStat(k), totalVal = st[k], cost = getStatCost(k);
+    const disPlus = (nakedVal >= 255 || curFree < cost) ? 'disabled' : '';
     const disMinus = (alloc[k] || 0) <= 0 ? 'disabled' : '';
     return `<div class="stat-row">
       <span style="cursor:help;border-bottom:1px dashed #64748b;" onmouseenter="showLobbyStatTooltip(event,'${k}')" onmousemove="moveLobbyTooltip(event)" onmouseleave="hideLobbyTooltip()"><strong>${fullLabels[k]}</strong>：<strong>${totalVal}</strong></span>
       <span style="display:flex;align-items:center;gap:3px;">
-        <span style="font-size:11px;color:#94a3b8;">(${cost}點)</span>
+        <span style="font-size:11px;color:${cost === 1 ? '#4ade80' : '#f87171'};">(${cost}pt)</span>
         <button class="stat-btn" style="background:#64748b;color:#fff;" ${disMinus} onclick="subStat('${k}')">-</button>
         <button class="stat-btn" ${disPlus} onclick="addStat('${k}')">+</button>
         <button class="stat-btn" style="width:auto;padding:0 5px;background:#facc15;font-size:11px;" ${disPlus} onclick="maxOutStat('${k}')">MAX</button>
       </span>
     </div>`;
   }).join('');
-
   const confirmBarHtml = pendingAlloc
     ? `<div style="display:flex;gap:6px;margin-top:8px;padding-top:8px;border-top:1px dashed #ca8a04;">
         <button class="stat-btn" style="flex:1;padding:6px;background:#22c55e;color:#052e16;font-weight:bold;font-size:12px;" onclick="confirmStats()">✅ 確認配點</button>
@@ -340,20 +417,19 @@ function renderLobby() {
     </div>`;
   }).join('');
 
-  const dmgRedPct = getLobbyDmgReducePct(d);
   const miniBox = 'background:rgba(15,23,42,0.75);border:1px solid #334155;border-radius:4px;padding:3px 6px;display:flex;justify-content:space-between;align-items:center;white-space:nowrap;';
   document.getElementById('lobbyPreview').innerHTML = `
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
       <canvas id="paperDollCanvas" width="76" height="92" style="background:#0f172a;border:1px solid #475569;border-radius:8px;flex-shrink:0;"></canvas>
       <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:11px;">
         <div style="${miniBox}"><span style="color:#94a3b8;">❤️ 生命</span><strong>${d.maxHp}</strong></div>
-        <div style="${miniBox}"><span style="color:#94a3b8;">🛡️ 減傷</span><strong style="color:#4ade80;">${dmgRedPct}%</strong></div>
-        <div style="${miniBox}"><span style="color:#94a3b8;">⚡ 冷卻</span><strong style="color:#38bdf8;">-${(d.cdReduce * 100).toFixed(1)}%</strong></div>
-        <div style="${miniBox}"><span style="color:#94a3b8;">🌐 範圍</span><strong>+${(d.areaBonus * 100).toFixed(1)}%</strong></div>
+        <div style="${miniBox}"><span style="color:#94a3b8;">👟 移速</span><strong>${Math.round(d.moveSpeed)}</strong></div>
+        <div style="${miniBox}"><span style="color:#94a3b8;">🛡️ 物減</span><strong style="color:#4ade80;">${d.physReducePct}%</strong></div>
+        <div style="${miniBox}"><span style="color:#94a3b8;">💠 魔減</span><strong style="color:#38bdf8;">${d.magReducePct}%</strong></div>
         <div style="${miniBox}"><span style="color:#94a3b8;">💥 暴率</span><strong>${(d.critRate * 100).toFixed(1)}%</strong></div>
         <div style="${miniBox}"><span style="color:#94a3b8;">🔥 暴傷</span><strong>${Math.round(d.critDmg * 100)}%</strong></div>
-        <div style="${miniBox}"><span style="color:#94a3b8;">✨ 彈幕</span><strong>+${d.extraProj}</strong></div>
-        <div style="${miniBox}"><span style="color:#94a3b8;">🔮 異常</span><strong style="color:#4ade80;">${d.statusCritMult.toFixed(2)}x</strong></div>
+        <div style="${miniBox}"><span style="color:#94a3b8;">⚔️ 連擊</span><strong>${(d.doubleHitChance * 100).toFixed(1)}%</strong></div>
+        <div style="${miniBox}"><span style="color:#94a3b8;">✨ 異常率</span><strong style="color:#4ade80;">+${(d.statusChanceBonus * 100).toFixed(1)}%</strong></div>
       </div>
     </div>
     <div>${slotsHtml}</div>`;
@@ -364,12 +440,12 @@ function renderLobby() {
     const sortBtns = [
       { id: 'rarity', label: '⭐ 品級' }, { id: 'lv', label: '📊 等級' }, { id: 'slot', label: '📦 部位' }
     ].map(b => `<button class="stat-btn" style="flex:1;padding:4px 6px;font-size:11px;white-space:nowrap;background:${bagSortMode === b.id ? '#eab308' : '#334155'};color:${bagSortMode === b.id ? '#0f172a' : '#e2e8f0'};font-weight:${bagSortMode === b.id ? 'bold' : 'normal'};" onclick="setBagSort('${b.id}')">${b.label}</button>`).join('');
-    const sortBarHtml = `<div style="display:flex;gap:5px;margin-bottom:6px;">${sortBtns}</div>`;
+    const clearBtn = `<button class="stat-btn" style="padding:4px 8px;font-size:11px;white-space:nowrap;background:#dc2626;color:#fff;width:auto;" onclick="clearBag()">🧹 清空背包</button>`;
+    const sortBarHtml = `<div style="display:flex;gap:5px;margin-bottom:6px;">${sortBtns}${clearBtn}</div>`;
 
     const rarOrder = { gold: 5, purple: 4, blue: 3, green: 2, white: 1 };
     const slotOrder = { weapon: 1, sub: 2, head: 3, armor: 4, gloves: 5, shoes: 6, back: 7, relic: 8 };
     const isCharFit = (it) => !it.allowChars || it.allowChars.includes('all') || it.allowChars.includes(saveData.charId);
-
     const sortedBag = [...saveData.bag].sort((a, b) => {
       if (!a.identified !== !b.identified) return a.identified ? 1 : -1;
       if (bagSortMode === 'rarity') return ((rarOrder[b.rarity] || 0) - (rarOrder[a.rarity] || 0)) || ((b.reqLv || 1) - (a.reqLv || 1));
@@ -398,18 +474,25 @@ function renderLobby() {
 
 function startBattle() {
   if (pendingAlloc) { alert('請先按下「✅ 確認配點」或「↩️ 取消微調」後再出發冒險！'); return; }
-  const d = getDerivedCombatStats(), w = saveData.equip.weapon || { name: '徒手', startSkill: 'renga' };
+  const d = getDerivedCombatStats(), w = saveData.equip.weapon || { name: '徒手', startSkill: 'enbu' }, ch = getCurrentCharData();
   if (typeof EQUIPPED_WEAPON !== 'undefined') { EQUIPPED_WEAPON.name = w.name; EQUIPPED_WEAPON.startSkill = w.startSkill; }
+  if (typeof ACTIVE_SKILLS !== 'undefined' && typeof getActiveSkillPool === 'function') {
+    for (const k of Object.keys(ACTIVE_SKILLS)) delete ACTIVE_SKILLS[k];
+    Object.assign(ACTIVE_SKILLS, getActiveSkillPool());
+  }
+  const hudName = document.getElementById('hudCharName'), hudWep = document.getElementById('weaponText');
+  if (hudName) hudName.textContent = ch.name; if (hudWep) hudWep.textContent = w.name;
   if (typeof player !== 'undefined') {
-    player.maxHp = d.maxHp; player.hp = player.maxHp; player.regen = d.regen;
-    player.baseSpeed = d.moveSpeed; player.pickupRange = d.pickupRange;
-    player.cdMult = 1 - d.cdReduce; player.areaMult = 1 + d.areaBonus;
+    player.maxHp = d.maxHp; player.hp = player.maxHp; player.regen = d.regen; player.baseSpeed = d.moveSpeed; player.pickupRange = d.pickupRange;
+    player.cdMult = 1.0; player.areaMult = 1.0; player.speedMult = 1.0; player.dmgMult = 1.0;
+    player.bonusCritRate = 0; player.superCritMult = 1.5; player.expMult = d.expBonusMult; player.angelUsed = false;
   }
   if (typeof ownedSkills !== 'undefined') {
     for (const k of Object.keys(ownedSkills)) delete ownedSkills[k];
     const startLv = (w.legendEffect && w.legendEffect.id === 'startLv2') ? 2 : 1;
-    ownedSkills[w.startSkill] = { lv: startLv, evolved: false };
+    ownedSkills[w.startSkill] = { lv: startLv, evolved: false, disabled: false };
   }
+  if (typeof ownedPassives !== 'undefined') { for (const k of Object.keys(ownedPassives)) delete ownedPassives[k]; }
   document.getElementById('lobbyModal').style.display = 'none';
   if (typeof isPaused !== 'undefined') isPaused = false;
 }
