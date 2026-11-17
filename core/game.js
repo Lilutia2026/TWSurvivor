@@ -534,7 +534,27 @@ function draw() {
   for (let x = ox % 80; x < canvas.width; x += 80) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke(); }
   for (let y = oy % 80; y < canvas.height; y += 80) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke(); }
   ctx.save(); ctx.translate(ox, oy);
-  zones.forEach(z => { ctx.fillStyle = z.kind.startsWith('ice') ? 'rgba(56,189,248,0.22)' : (z.kind.startsWith('fire') ? 'rgba(249,115,22,0.25)' : 'rgba(250,204,21,0.22)'); ctx.beginPath(); ctx.arc(z.x, z.y, z.radius, 0, Math.PI * 2); ctx.fill(); });
+  zones.forEach(z => {
+    ctx.save();
+    if (z.kind === 'fire_sea') {
+      ctx.fillStyle = 'rgba(234,88,12,0.28)'; ctx.strokeStyle = 'rgba(251,146,60,0.75)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(z.x, z.y, z.radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    } else if (z.kind.startsWith('ice')) {
+      ctx.fillStyle = 'rgba(56,189,248,0.20)'; ctx.strokeStyle = 'rgba(125,211,252,0.65)'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(z.x, z.y, z.radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    } else if (z.kind === 'thunder2') {
+      ctx.strokeStyle = 'rgba(250,204,21,0.85)'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(z.x, z.y, z.radius, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(z.x, z.y, z.radius * 0.65, 0, Math.PI * 2); ctx.stroke();
+    } else {
+      const isHeal = z.kind === 'healLight';
+      ctx.fillStyle = isHeal ? 'rgba(74,222,128,0.18)' : 'rgba(250,204,21,0.20)';
+      ctx.strokeStyle = isHeal ? 'rgba(74,222,128,0.75)' : 'rgba(253,224,71,0.8)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(z.x, z.y, z.radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.arc(z.x, z.y, z.radius * 0.72, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.restore();
+  });
   gems.forEach(g => { ctx.fillStyle = '#38bdf8'; ctx.beginPath(); ctx.arc(g.x, g.y, 5, 0, Math.PI * 2); ctx.fill(); });
   chests.forEach(c => { const isS = c.kind === 'silver'; ctx.fillStyle = isS ? '#e2e8f0' : '#facc15'; ctx.fillRect(c.x - 14, c.y - 11, 28, 22); ctx.strokeStyle = isS ? '#38bdf8' : '#fff'; ctx.lineWidth = 2; ctx.strokeRect(c.x - 14, c.y - 11, 28, 22); });
   lootBags.forEach(b => { ctx.fillStyle = b.color; ctx.fillRect(b.x - 11, b.y - 11, 22, 22); });
@@ -543,7 +563,23 @@ function draw() {
     ctx.beginPath(); ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = e.shockTimer > 0 ? '#fde047' : (e.burnTimer > 0 ? '#fb923c' : '#0f172a'); ctx.lineWidth = 2.5; ctx.stroke();
   });
-  slashes.forEach(s => { ctx.strokeStyle = s.type === 'fireboom' ? 'rgba(251,146,60,0.85)' : 'rgba(226,232,240,0.8)'; ctx.lineWidth = s.evolved ? 7 : 4; ctx.beginPath(); ctx.arc(s.x || player.x, s.y || player.y, s.range, (s.angle || 0) - s.arc / 2, (s.angle || 0) + s.arc / 2); ctx.stroke(); });
+  slashes.forEach(s => {
+    ctx.save();
+    const sx = s.x || player.x, sy = s.y || player.y, ang = s.angle || 0;
+    if (s.type === 'aurora' || (s.arc && s.arc <= 0.65)) {
+      const ex = sx + Math.cos(ang) * s.range, ey = sy + Math.sin(ang) * s.range;
+      ctx.strokeStyle = s.evolved ? 'rgba(250,204,21,0.9)' : 'rgba(125,211,252,0.85)';
+      ctx.lineWidth = s.evolved ? 12 : 8; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = s.evolved ? 4 : 2.5;
+      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+    } else {
+      ctx.strokeStyle = s.type === 'fireboom' ? 'rgba(251,146,60,0.85)' : (s.type === 'holywave' ? 'rgba(253,224,71,0.85)' : 'rgba(226,232,240,0.8)');
+      ctx.lineWidth = s.evolved ? 7 : 4;
+      ctx.beginPath(); ctx.arc(sx, sy, s.range, ang - s.arc / 2, ang + s.arc / 2); ctx.stroke();
+    }
+    ctx.restore();
+  });
   projectiles.forEach(p => { ctx.fillStyle = p.elem === 'fire' ? '#f97316' : (p.elem === 'ice' ? '#38bdf8' : (p.elem === 'thunder' ? '#facc15' : '#fef08a')); ctx.beginPath(); ctx.arc(p.x, p.y, p.radius || 8, 0, Math.PI * 2); ctx.fill(); });
   lightnings.forEach(l => { ctx.strokeStyle = '#fef08a'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(l.x1, l.y1); ctx.lineTo(l.x2, l.y2); ctx.stroke(); });
 
@@ -655,15 +691,20 @@ function getSkillNextLvGain(id, sk, nextLv) {
     if (id === 'firearrow') gains.push('點燃基礎機率與持續傷害提升');
     if (id === 'thunder') gains.push('落雷感電機率提升');
   }
-  if (id === 'holylight' && nextLv % 2 === 0) gains.push('神聖光矢射彈 +1 發');
-  if (id === 'fire1' && nextLv % 2 === 0) gains.push('火焰箭矢射彈 +1 發');
-  if (id === 'fire3' && (nextLv === 2 || nextLv === 5 || nextLv === 8 || nextLv === 10)) gains.push('環繞火球數量 +1 顆');
-  if ((id === 'thunder1' || id === 'thunder4') && (nextLv === 3 || nextLv === 6 || nextLv === 9)) gains.push('落雷道數 +1 道');
+  if ((id === 'holylight' || id === 'fire1') && nextLv % 2 === 0) gains.push('射彈數量 +1 發');
+  if (id === 'fire3' && (nextLv === 2 || nextLv === 5 || nextLv === 8 || nextLv === 10)) gains.push('環繞火球 +1 顆');
+  if ((id === 'fire2' || id === 'ice1' || id === 'ice3' || id === 'thunder3') && nextLv % 3 === 0) gains.push('投射數量 +1 發');
+  if ((id === 'fire4' || id === 'ice4') && nextLv % 3 === 0) gains.push('隕石數量 +1 顆');
+  if ((id === 'thunder1' || id === 'thunder4') && nextLv % 3 === 0) gains.push('落雷道數 +1 道');
   if ((id === 'windblade' || id === 'firearrow' || id === 'thunder') && nextLv % 3 === 0) gains.push('投射／落雷數量 +1');
   if (id === 'armorbreak' && (nextLv === 5 || nextLv === 8)) gains.push('最大命中目標 +1 名');
-  if (id === 'enbu' || id === 'radiance' || id === 'healLight' || id === 'ice2' || id === 'thunder2' || id === 'earthhammer') gains.push('攻擊範圍擴大');
+  if (id === 'healLight' && (nextLv === 5 || nextLv === 10)) gains.push('光陣回血比例提升');
+  if (['enbu', 'radiance', 'healLight', 'ice2', 'thunder2', 'earthhammer', 'fire2', 'fire4', 'ice4', 'thunder4'].includes(id)) {
+    gains.push('攻擊範圍擴大');
+  }
   return gains.join('、');
 }
+
 function levelUp() {
   hideSkillTooltip();
   isPaused = true; const pool = [], activePassives = getActivePassivePool();
@@ -752,15 +793,21 @@ function openChest(kind) {
     } else { saveData.seed += 50; writeSave(); showBanner('🎁 白銀寶箱！全技能已滿，轉換為 Seed +50！'); }
     return;
   }
+  const curWType = (typeof saveData !== 'undefined' && saveData.equip && saveData.equip.weapon) ? saveData.equip.weapon.type : null;
   const ready = Object.entries(ownedSkills).filter(([k, st]) => {
     const sk = ACTIVE_SKILLS[k];
-    return sk && sk.canEvolve && !st.evolved && st.lv >= sk.maxLv && sk.reqPassive && ownedPassives[sk.reqPassive];
+    if (!sk || !sk.canEvolve || st.evolved || st.lv < sk.maxLv) return false;
+    if (!sk.reqPassive || !ownedPassives[sk.reqPassive]) return false;
+    if (sk.reqWeaponType && curWType !== sk.reqWeaponType) return false;
+    return true;
   });
   if (ready.length > 0) {
     hideSkillTooltip(); isPaused = true;
     currentChoices = ready.slice(0, 3).map(([id]) => {
       const sk = ACTIVE_SKILLS[id];
-      return { kind: 'evolve', id, title: `🌟 技能昇華【${sk.evoName}】`, desc: `由【${sk.name}】突破昇華！<br>${sk.evoDesc || sk.desc}`, tag: '技能昇華' };
+      const evoSk = sk.evoSkillId ? ACTIVE_SKILLS[sk.evoSkillId] : null;
+      const cleanDesc = (evoSk && evoSk.desc) ? evoSk.desc : (sk.evoDesc || sk.desc);
+      return { kind: 'evolve', id, title: `🌟 技能昇華【${sk.evoName}】`, desc: cleanDesc, tag: '技能昇華' };
     });
     renderChoiceModal('📦 開啟金色昇華寶箱！請選擇要昇華的技能（按 1 / 2 / 3）');
     return;

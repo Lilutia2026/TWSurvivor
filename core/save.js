@@ -55,6 +55,15 @@ function applyAutoLevelGrowth() {
   }
 }
 
+function checkLv15WingQuest() {
+  if (saveData.outLv < 15 || saveData.wingQuestDone) return;
+  saveData.wingQuestDone = true;
+  if (typeof identifyEquipItem === 'function') {
+    const wingItem = identifyEquipItem({ uid: Date.now(), tplId: 'bk_15', slot: 'back', rarity: 'green' });
+    if (wingItem) saveData.bag.push(wingItem);
+  }
+}
+
 function addOutExpAndSeed(expGain, seedGain) {
   saveData.seed += seedGain;
   saveData.outExp += expGain;
@@ -64,6 +73,7 @@ function addOutExpAndSeed(expGain, seedGain) {
     applyAutoLevelGrowth();
     saveData.freePts += getLevelPts(saveData.outLv);
   }
+  checkLv15WingQuest();
   writeSave();
 }
 
@@ -80,9 +90,10 @@ function switchCharacterVariant(charId, variantId) {
     if (!dupBase) saveData.bag.push(oldW);
     saveData.equip.weapon = null;
   }
+  const nextTags = ch.equipTags || ['all'];
   for (const sk of ['sub', 'head', 'armor', 'gloves', 'shoes', 'back', 'relic']) {
     const eq = saveData.equip[sk];
-    if (eq && eq.allowChars && !eq.allowChars.includes('all') && !eq.allowChars.includes(charId)) {
+    if (eq && eq.equipTag && eq.equipTag !== 'all' && !nextTags.includes(eq.equipTag)) {
       saveData.bag.push(eq); saveData.equip[sk] = null;
     }
   }
@@ -96,12 +107,12 @@ function switchCharacterVariant(charId, variantId) {
   const tpl = (typeof WEAPON_TEMPLATES !== 'undefined') ? WEAPON_TEMPLATES.find(w => w.tplId === vData.defaultTpl) : null;
   if (tpl) {
     saveData.equip.weapon = {
-      uid: Date.now(), tplId: tpl.tplId, slot: 'weapon', type: tpl.type, wandElem: tpl.wandElem || null,
-      name: tpl.name, rarity: 'white', reqLv: 1, reqStats: {}, allowChars: [...tpl.allowChars],
+      uid: Date.now(), tplId: tpl.tplId, slot: 'weapon', type: tpl.type, equipTag: tpl.equipTag || tpl.type,
+      wandElem: tpl.wandElem || null, name: tpl.name, rarity: 'white', reqLv: 1, reqStats: {},
       startSkill: tpl.startSkill, S: tpl.S || 0, H: tpl.H || 0, I: tpl.I || 0, DEF: tpl.DEF || 0, MR: tpl.MR || 0,
       identified: true, affixes: []
     };
-  }
+  }  
   writeSave(); renderLobby();
 }
 const ID_COST = { white: 10, green: 25, blue: 60, purple: 150, gold: 400 };
@@ -186,7 +197,7 @@ function getNakedStat(key) {
 }
 
 function getTotalStats() {
-  const total = { S: 0, H: 0, I: 0, DEF: 0, MR: 0, DEX: 0, AGI: 0, hp: 0, spd: 0, critRate: 0, critDmg: 0, dmgReduce: 0, magReduce: 0, physDmgPct: 0, magDmgPct: 0, extraProj: 0 };
+  const total = { S: 0, H: 0, I: 0, DEF: 0, MR: 0, DEX: 0, AGI: 0, hp: 0, spd: 0, moveSpd: 0, cdr: 0, statusChance: 0, critRate: 0, critDmg: 0, dmgReduce: 0, magReduce: 0, physDmgPct: 0, magDmgPct: 0, extraProj: 0 };
   for (const k of ['S', 'H', 'I', 'DEF', 'MR', 'DEX', 'AGI']) total[k] = getNakedStat(k);
   for (const slot of Object.values(saveData.equip)) {
     if (!slot) continue;
@@ -211,7 +222,7 @@ function getDerivedCombatStats() {
     doubleHitChance: Math.min(0.45, sCap * 0.0015),
     knockbackMult: 1 + hCap * 0.004,
     statusDurMult: 1 + iCap * 0.003,
-    statusChanceBonus: Math.min(0.35, mrCap * 0.0012),
+    statusChanceBonus: Math.min(0.45, mrCap * 0.0012 + (st.statusChance || 0) / 100),
     maxHp: (variant.initHp || 200) + st.DEF * 6 + st.hp,
     physReducePct, magReducePct,
     defThornsDmg: Math.round(st.DEF * 0.8),
@@ -219,14 +230,13 @@ function getDerivedCombatStats() {
     expBonusMult: 1 + dexCap * 0.001,
     critDmg: 1.50 + agiCap * 0.006 + (st.critDmg || 0) / 100,
     pickupRange: Math.round(115 * (1 + agiCap * 0.0015)),
-    moveSpeed: 235 + (st.spd || 0),
+    moveSpeed: Math.round((235 + (st.spd || 0)) * (1 + (st.moveSpd || 0) / 100)),
     physDmgMult: 1 + (st.physDmgPct || 0) / 100,
     magDmgMult: 1 + (st.magDmgPct || 0) / 100,
     extraProj: st.extraProj || 0,
-    cdReduce: 0, areaBonus: 0, regen: 0
+    cdReduce: Math.min(0.40, (st.cdr || 0) / 100), areaBonus: 0, regen: 0
   };
 }
-
 
 function addStat(key) {
   ensurePendingStats();
@@ -276,6 +286,7 @@ function debugMaxLv60() {
     applyAutoLevelGrowth();
     saveData.freePts += getLevelPts(saveData.outLv);
   }
+  checkLv15WingQuest();
   saveData.seed += 250000; writeSave(); renderLobby();
 }
 
@@ -307,46 +318,44 @@ function showLobbyStatTooltip(e, key) {
   tip.innerHTML = `<div style="font-weight:bold;color:#fde047;font-size:13px;margin-bottom:4px;">${meta.title}</div>${sourceHtml}<div style="color:#e2e8f0;">${meta.desc}</div>`;
   tip.style.display = 'block'; moveLobbyTooltip(e);
 }
+function getSkillDisplayName(skillId) {
+  if (!skillId) return '';
+  if (typeof COMMON_SKILLS !== 'undefined' && COMMON_SKILLS[skillId]) return COMMON_SKILLS[skillId].name;
+  if (typeof CHAR_SKILL_REGISTRY !== 'undefined') {
+    for (const ch of Object.values(CHAR_SKILL_REGISTRY)) {
+      if (ch.skills && ch.skills[skillId]) return ch.skills[skillId].name;
+    }
+  }
+  return skillId;
+}
+
 function showLobbyEquipTooltip(e, source, keyOrUid) {
   const tip = getLobbyTooltipEl();
   const it = source === 'equip' ? saveData.equip[keyOrUid] : saveData.bag.find(i => i.uid === Number(keyOrUid));
   if (!it || !it.identified) return;
-  const r = RARITIES[it.rarity] || RARITIES.white, enhStr = it.enhanceLv ? ` +${it.enhanceLv}` : '';
+  const r = RARITIES[it.rarity] || RARITIES.white;
+  const wTypeMap = { longsword: '長劍', blade: '彎刀', rapier: '細劍', wand: '魔杖', staff: '法杖', mace: '釘錘' };
+  const tagMap = { heavy: '重鎧', robe: '法袍', ninja: '忍服', shield: '盾牌', knuckle: '指虎', crystal: '魔導手鐲' };
+  const typeLabel = it.slot === 'weapon' ? (wTypeMap[it.type] || '武器') : (tagMap[it.equipTag] || SLOT_NAMES[it.slot]);
   const statMap = { S: 'STAB', H: 'HACK', I: 'INT', DEF: 'DEF', MR: 'MR', DEX: 'DEX', AGI: 'AGI' };
   const baseLines = Object.entries(it.baseRolled || {}).map(([k, v]) => `<span style="color:#93c5fd;">${statMap[k] || k} +${it[k] || v}</span>`).join(' ｜ ');
   const reqStatsStr = Object.entries(it.reqStats || {}).map(([k, v]) => `${statMap[k] || k}≥${v}`).join('、');
-  const charTag = (it.allowChars && !it.allowChars.includes('all')) ? ` ｜ 限定：${it.allowChars.join('/')}` : '';
-  const reqLine = `<div style="color:#94a3b8;font-size:11px;margin-top:2px;">需求：LV.${it.reqLv || 1}${reqStatsStr ? ' ｜ ' + reqStatsStr : ''}${charTag}</div>`;
-  const affixLines = (it.affixes && it.affixes.length > 0) ? `<div style="margin-top:5px;padding-top:4px;border-top:1px solid #334155;color:#4ade80;">${it.affixes.map(a => `• ${a}`).join('<br>')}</div>` : `<div style="margin-top:4px;color:#64748b;font-size:11px;">無額外魔法詞綴</div>`;
+  const maxS = it.maxSynth ?? 3, remS = Math.max(0, maxS - (it.synthCount ?? 0));
+  const elemMap = { fire: '🔥 火系元素', ice: '❄️ 冰系元素', thunder: '⚡ 雷系元素' };
+  const startSkTag = (it.slot === 'weapon' && it.startSkill) ? `<div style="color:#38bdf8;font-size:11px;margin-top:2px;">⚔️ 起始技能：【${getSkillDisplayName(it.startSkill)}】</div>` : '';
+  const elemTag = it.wandElem ? `<div style="color:#fde047;font-size:11px;margin-top:2px;">🔮 屬性詞條：${elemMap[it.wandElem] || it.wandElem}</div>` : '';
+  const reqLine = `<div style="color:#94a3b8;font-size:11px;margin-top:2px;">需求：LV.${it.reqLv || 1}${reqStatsStr ? ' ｜ ' + reqStatsStr : ''} ｜ 🔨 剩餘合成：${remS}/${maxS}</div>`;
+  const affixLines = (it.affixes && it.affixes.length > 0)
+    ? `<div style="margin-top:5px;padding-top:4px;border-top:1px solid #334155;">${it.affixes.map(a => typeof a === 'object' ? `<span style="color:${a.color || '#4ade80'};">• ${a.label} +${a.val}${a.unit || ''}</span>` : `<span style="color:#4ade80;">• ${a}</span>`).join('<br>')}</div>`
+    : `<div style="margin-top:4px;color:#64748b;font-size:11px;">無額外魔法詞綴</div>`;
   const legLine = it.legendEffect ? `<div style="margin-top:5px;padding-top:4px;border-top:1px dashed #ca8a04;color:#fde047;font-weight:bold;">${it.legendEffect.desc}</div>` : '';
   tip.style.borderColor = r.color;
-  tip.innerHTML = `<div style="font-weight:bold;color:${r.color};font-size:13px;">[${r.name}・${SLOT_NAMES[it.slot]}] ${it.name}${enhStr}</div>${reqLine}${baseLines ? `<div style="margin-top:4px;font-weight:bold;">${baseLines}</div>` : ''}${affixLines}${legLine}`;
+  tip.innerHTML = `<div style="font-weight:bold;color:${r.color};font-size:13px;">[${r.name}・${typeLabel}] ${it.name}</div>${reqLine}${startSkTag}${elemTag}${baseLines ? `<div style="margin-top:4px;font-weight:bold;">${baseLines}</div>` : ''}${affixLines}${legLine}`;
   tip.style.display = 'block'; moveLobbyTooltip(e);
 }
-
-function moveLobbyTooltip(e) {
-  const tip = document.getElementById('lobbyTooltip');
-  if (!tip || tip.style.display === 'none') return;
-  tip.style.left = `${Math.max(10, Math.min(window.innerWidth - tip.offsetWidth - 14, e.clientX + 14))}px`;
-  tip.style.top = `${Math.max(10, Math.min(window.innerHeight - tip.offsetHeight - 14, e.clientY + 14))}px`;
-}
+function moveLobbyTooltip(e) { const tip = getLobbyTooltipEl(); tip.style.left = Math.min(window.innerWidth - 310, e.clientX + 14) + 'px'; tip.style.top = Math.min(window.innerHeight - 160, e.clientY + 14) + 'px'; }
 function hideLobbyTooltip() { const tip = document.getElementById('lobbyTooltip'); if (tip) tip.style.display = 'none'; }
 
-function toggleCharDetailModal(show) {
-  const modal = document.getElementById('charDetailModal');
-  if (!modal) return;
-  if (!show) { modal.style.display = 'none'; return; }
-  const d = getDerivedCombatStats(), st = d.st, charInfo = getCurrentCharData(), vInfo = getCurrentCharVariant(), rule = getCurrentArchetypeRule();
-  const fullNames = { S: 'STAB', H: 'HACK', I: 'INT', DEF: 'DEF', MR: 'MR', DEX: 'DEX', AGI: 'AGI' };
-  const statLines = Object.keys(fullNames).map(k => {
-    const naked = getNakedStat(k), eq = st[k] - naked;
-    return `<div>• <strong>${fullNames[k]}</strong>：總計 <strong style="color:#fde047;">${st[k]}</strong>（本體 <strong>${naked}</strong> + 裝備 <strong style="color:#4ade80;">+${eq}</strong>）</div>`;
-  }).join('');
-  document.getElementById('charDetailContent').innerHTML = `
-    <div class="status-sec"><h3 style="color:#38bdf8;margin-bottom:6px;">👤 基本與七大素質明細</h3><div>角色：<strong>${charInfo.name}</strong>（${vInfo.wName}・${rule.name} [${vInfo.archetype}]）</div><div>局外等級：<strong>LV.${saveData.outLv} / ${MAX_OUT_LV}</strong> ｜ 剩餘配點：<strong>${getWorkingFreePts()}</strong></div><hr style="border-color:#334155;margin:6px 0;">${statLines}</div>
-    <div class="status-sec"><h3 style="color:#4ade80;margin-bottom:6px;">⚔️ V2.4 衍生戰鬥數值面板</h3><div>❤️ 最大生命：<strong>${d.maxHp}</strong> ｜ 👟 移動速度：<strong>${Math.round(d.moveSpeed)}</strong></div><div>🛡️ 物理減傷：<strong>${d.physReducePct}%</strong> ｜ 💠 魔法減傷：<strong>${d.magReducePct}%</strong>（上限70%）</div><div>⚔️ 連擊機率：<strong>${(d.doubleHitChance * 100).toFixed(1)}%</strong> ｜ 🔨 擊退倍率：<strong>${Math.round(d.knockbackMult * 100)}%</strong></div><div>🔥 異常時長：<strong>+${Math.round((d.statusDurMult - 1) * 100)}%</strong> ｜ ✨ 異常機率：<strong>+${(d.statusChanceBonus * 100).toFixed(1)}%</strong></div><div>💥 基礎暴擊率：<strong>${(d.critRate * 100).toFixed(1)}%</strong> ｜ 暴擊傷害：<strong>${Math.round(d.critDmg * 100)}%</strong></div><div>📖 經驗加成：<strong>+${Math.round((d.expBonusMult - 1) * 100)}%</strong> ｜ 🧲 拾取範圍：<strong>${d.pickupRange}</strong></div></div>`;
-  modal.style.display = 'flex';
-}
 function renderPaperDoll() {
   const cv = document.getElementById('paperDollCanvas');
   if (!cv) return;
@@ -437,26 +446,40 @@ function renderLobby() {
 
   const bagEl = document.getElementById('bagList');
   if (bagEl) {
+    const bagWrap = bagEl.parentElement;
+    if (bagWrap) {
+      bagWrap.style.cssText = 'max-height:365px;overflow-y:auto;overflow-x:hidden;padding-right:4px;box-sizing:border-box;';
+    }
+    let bagBar = document.getElementById('bagToolbarFixed');
+    if (!bagBar && bagWrap) {
+      bagBar = document.createElement('div');
+      bagBar.id = 'bagToolbarFixed';
+      bagWrap.insertBefore(bagBar, bagEl);
+    }
     const sortBtns = [
       { id: 'rarity', label: '⭐ 品級' }, { id: 'lv', label: '📊 等級' }, { id: 'slot', label: '📦 部位' }
-    ].map(b => `<button class="stat-btn" style="flex:1;padding:4px 6px;font-size:11px;white-space:nowrap;background:${bagSortMode === b.id ? '#eab308' : '#334155'};color:${bagSortMode === b.id ? '#0f172a' : '#e2e8f0'};font-weight:${bagSortMode === b.id ? 'bold' : 'normal'};" onclick="setBagSort('${b.id}')">${b.label}</button>`).join('');
-    const clearBtn = `<button class="stat-btn" style="padding:4px 8px;font-size:11px;white-space:nowrap;background:#dc2626;color:#fff;width:auto;" onclick="clearBag()">🧹 清空背包</button>`;
-    const sortBarHtml = `<div style="display:flex;gap:5px;margin-bottom:6px;">${sortBtns}${clearBtn}</div>`;
+    ].map(b => `<button class="stat-btn" style="flex:1;padding:4px 3px;font-size:11px;white-space:nowrap;background:${bagSortMode === b.id ? '#eab308' : '#334155'};color:${bagSortMode === b.id ? '#0f172a' : '#e2e8f0'};font-weight:${bagSortMode === b.id ? 'bold' : 'normal'};" onclick="setBagSort('${b.id}')">${b.label}</button>`).join('');
+    const clearBtn = `<button class="stat-btn" style="padding:4px 6px;font-size:11px;white-space:nowrap;background:#dc2626;color:#fff;width:auto;" onclick="clearBag()">🧹 清空</button>`;
+    if (bagBar) {
+      bagBar.style.cssText = 'position:sticky;top:0;z-index:10;background:#0f172a;padding:2px 0 6px 0;margin-bottom:6px;border-bottom:1px solid #334155;box-sizing:border-box;width:100%;';
+      bagBar.innerHTML = `<div style="display:flex;gap:4px;width:100%;box-sizing:border-box;">${sortBtns}${clearBtn}</div>`;
+    }
 
     const rarOrder = { gold: 5, purple: 4, blue: 3, green: 2, white: 1 };
     const slotOrder = { weapon: 1, sub: 2, head: 3, armor: 4, gloves: 5, shoes: 6, back: 7, relic: 8 };
-    const isCharFit = (it) => !it.allowChars || it.allowChars.includes('all') || it.allowChars.includes(saveData.charId);
+    const charTags = ch.equipTags || ['all'];
+    const isCharFit = (it) => (!it.allowChars || it.allowChars.includes('all') || it.allowChars.includes(saveData.charId)) && (!it.equipTag || it.equipTag === 'all' || charTags.includes(it.equipTag));
     const sortedBag = [...saveData.bag].sort((a, b) => {
       if (!a.identified !== !b.identified) return a.identified ? 1 : -1;
+      const fitA = isCharFit(a) ? 1 : 0, fitB = isCharFit(b) ? 1 : 0;
+      if (fitA !== fitB) return fitB - fitA; // 永遠優先顯示本職可穿戴裝備
       if (bagSortMode === 'rarity') return ((rarOrder[b.rarity] || 0) - (rarOrder[a.rarity] || 0)) || ((b.reqLv || 1) - (a.reqLv || 1));
       if (bagSortMode === 'lv') return ((b.reqLv || 1) - (a.reqLv || 1)) || ((rarOrder[b.rarity] || 0) - (rarOrder[a.rarity] || 0));
       if (bagSortMode === 'slot') return ((slotOrder[a.slot] || 9) - (slotOrder[b.slot] || 9)) || ((rarOrder[b.rarity] || 0) - (rarOrder[a.rarity] || 0));
-      const fitA = isCharFit(a) ? 1 : 0, fitB = isCharFit(b) ? 1 : 0;
-      if (fitA !== fitB) return fitB - fitA;
       return (rarOrder[b.rarity] || 0) - (rarOrder[a.rarity] || 0);
     });
 
-    const itemsHtml = sortedBag.length === 0
+    bagEl.innerHTML = sortedBag.length === 0
       ? '<div style="color:#64748b;font-size:13px;">背包空空如也（可按上方測試掉落裝備）</div>'
       : sortedBag.map(it => {
           const r = RARITIES[it.rarity] || RARITIES.white;
@@ -464,11 +487,10 @@ function renderLobby() {
             const cost = ID_COST[it.rarity] || 10;
             return `<div class="bag-item" style="border-left:3px solid ${r.color};"><span style="color:${r.color};">❓ [未鑑定] ${r.name}${SLOT_NAMES[it.slot]}袋</span><button class="stat-btn" style="width:auto;padding:2px 8px;" onclick="identifySingle(${it.uid})">🔍 鑑定 (${cost} Seed)</button></div>`;
           }
-          const enhTag = it.enhanceLv ? ` +${it.enhanceLv}` : '', fit = isCharFit(it);
+          const fit = isCharFit(it);
           const opacityStyle = fit ? '' : 'opacity:0.55;', unfitTag = fit ? '' : '<span style="font-size:10px;color:#f87171;margin-left:4px;">[他職]</span>';
-          return `<div class="bag-item" style="border-left:3px solid ${r.color};cursor:help;${opacityStyle}" onmouseenter="showLobbyEquipTooltip(event,'bag','${it.uid}')" onmousemove="moveLobbyTooltip(event)" onmouseleave="hideLobbyTooltip()"><div><strong style="color:${r.color};">${it.name}${enhTag}</strong> <span style="font-size:11px;color:#94a3b8;">(LV.${it.reqLv || 1})</span>${unfitTag}</div><button class="stat-btn" style="width:auto;padding:2px 10px;background:${fit ? '#22c55e' : '#475569'};color:${fit ? '#052e16' : '#cbd5e1'};" onclick="event.stopPropagation();equipFromBag(${it.uid})">穿戴</button></div>`;
+          return `<div class="bag-item" style="border-left:3px solid ${r.color};cursor:help;${opacityStyle}" onmouseenter="showLobbyEquipTooltip(event,'bag','${it.uid}')" onmousemove="moveLobbyTooltip(event)" onmouseleave="hideLobbyTooltip()"><div><strong style="color:${r.color};">${it.name}</strong> <span style="font-size:11px;color:#94a3b8;">(LV.${it.reqLv || 1})</span>${unfitTag}</div><button class="stat-btn" style="width:auto;padding:2px 10px;background:${fit ? '#22c55e' : '#475569'};color:${fit ? '#052e16' : '#cbd5e1'};" onclick="event.stopPropagation();equipFromBag(${it.uid})">穿戴</button></div>`;
         }).join('');
-    bagEl.innerHTML = sortBarHtml + itemsHtml;
   }
 }
 
@@ -484,7 +506,7 @@ function startBattle() {
   if (hudName) hudName.textContent = ch.name; if (hudWep) hudWep.textContent = w.name;
   if (typeof player !== 'undefined') {
     player.maxHp = d.maxHp; player.hp = player.maxHp; player.regen = d.regen; player.baseSpeed = d.moveSpeed; player.pickupRange = d.pickupRange;
-    player.cdMult = 1.0; player.areaMult = 1.0; player.speedMult = 1.0; player.dmgMult = 1.0;
+    player.cdMult = Math.max(0.35, 1 - (d.cdReduce || 0)); player.areaMult = 1.0; player.speedMult = 1.0; player.dmgMult = 1.0;
     player.bonusCritRate = 0; player.superCritMult = 1.5; player.expMult = d.expBonusMult; player.angelUsed = false;
   }
   if (typeof ownedSkills !== 'undefined') {

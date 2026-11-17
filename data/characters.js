@@ -14,6 +14,7 @@ const CHARACTERS = {
   lucien: {
     id: 'lucien', name: '路西安．卡爾茲', title: '卡雷德的貴公子', color: '#3b82f6', playable: true,
     defaultVariant: 'longsword',
+    equipTags: ['all', 'heavy', 'shield', 'longsword', 'blade', 'rapier'],
     variants: {
       longsword: { wName: '長劍', archetype: 'S+H', initHp: 220, defaultTpl: 'w_long_1', baseStats: { S: 4, H: 3, I: 1, DEF: 2, MR: 1, DEX: 2, AGI: 1 } },
       blade:     { wName: '彎刀', archetype: 'H',   initHp: 240, defaultTpl: 'w_bld_1',  baseStats: { S: 3, H: 4, I: 1, DEF: 2, MR: 1, DEX: 2, AGI: 1 } },
@@ -23,17 +24,19 @@ const CHARACTERS = {
   tichiel: {
     id: 'tichiel', name: '蒂琪愛兒．朱斯彼昂', title: '天真爛漫的聖女', color: '#f472b6', playable: true,
     defaultVariant: 'wand_fire',
+    equipTags: ['all', 'robe', 'crystal', 'wand', 'staff', 'mace'],
     variants: {
       wand_fire:    { wName: '火魔杖', archetype: 'I',     initHp: 160, defaultTpl: 'w_wnd_f_1', baseStats: { S: 1, H: 2, I: 4, DEF: 1, MR: 3, DEX: 2, AGI: 1 } },
       wand_ice:     { wName: '冰魔杖', archetype: 'I',     initHp: 160, defaultTpl: 'w_wnd_i_1', baseStats: { S: 1, H: 2, I: 4, DEF: 1, MR: 3, DEX: 2, AGI: 1 } },
       wand_thunder: { wName: '雷魔杖', archetype: 'I',     initHp: 160, defaultTpl: 'w_wnd_t_1', baseStats: { S: 1, H: 2, I: 4, DEF: 1, MR: 3, DEX: 2, AGI: 1 } },
       staff:        { wName: '法杖',   archetype: 'MR',    initHp: 170, defaultTpl: 'w_stf_1',   baseStats: { S: 2, H: 2, I: 2, DEF: 2, MR: 3, DEX: 2, AGI: 1 } },
-      mace:         { wName: '權杖',   archetype: 'DEF+H', initHp: 180, defaultTpl: 'w_mac_1',   baseStats: { S: 2, H: 3, I: 1, DEF: 3, MR: 2, DEX: 2, AGI: 1 } }
+      mace:         { wName: '釘錘',   archetype: 'DEF+H', initHp: 180, defaultTpl: 'w_mac_1',   baseStats: { S: 2, H: 3, I: 1, DEF: 3, MR: 2, DEX: 2, AGI: 1 } }
     }
   },
   boris: {
     id: 'boris', name: '波里斯．貞奈曼', title: '冷徹的冬霜劍士', color: '#60a5fa', playable: false,
     defaultVariant: 'tachi',
+    equipTags: ['all', 'heavy', 'knuckle', 'tachi', 'greatsword', 'longsword'],
     variants: {
       tachi:      { wName: '太刀',   archetype: 'S+H', initHp: 200, defaultTpl: 'w_long_1', baseStats: { S: 3, H: 4, I: 1, DEF: 2, MR: 2, DEX: 1, AGI: 1 } },
       greatsword: { wName: '雙手劍', archetype: 'H+I', initHp: 185, defaultTpl: 'w_bld_1',  baseStats: { S: 2, H: 4, I: 2, DEF: 2, MR: 2, DEX: 1, AGI: 1 } },
@@ -43,6 +46,7 @@ const CHARACTERS = {
   maximin: {
     id: 'maximin', name: '麥克斯明．里伯克列', title: '叛逆的疾風劍士', color: '#a855f7', playable: false,
     defaultVariant: 'tachi',
+    equipTags: ['all', 'heavy', 'shield', 'knuckle', 'tachi', 'blade'],
     variants: {
       tachi:      { wName: '太刀',   archetype: 'S+H', initHp: 190, defaultTpl: 'w_long_1', baseStats: { S: 4, H: 4, I: 1, DEF: 1, MR: 1, DEX: 2, AGI: 1 } },
       greatsword: { wName: '雙手劍', archetype: 'H+I', initHp: 175, defaultTpl: 'w_bld_1',  baseStats: { S: 2, H: 4, I: 2, DEF: 1, MR: 2, DEX: 2, AGI: 1 } },
@@ -52,6 +56,7 @@ const CHARACTERS = {
   naya: {
     id: 'naya', name: '娜雅特蕾依', title: '沉默的暗影忍姬', color: '#ef4444', playable: false,
     defaultVariant: 'dagger',
+    equipTags: ['all', 'heavy', 'ninja', 'dagger', 'dual_blade', 'axe'],
     variants: {
       dagger: { wName: '短劍', archetype: 'S',   initHp: 185, defaultTpl: 'w_rap_1', baseStats: { S: 4, H: 2, I: 1, DEF: 1, MR: 1, DEX: 4, AGI: 1 } },
       knife:  { wName: '短刀', archetype: 'S+H', initHp: 205, defaultTpl: 'w_rap_1', baseStats: { S: 4, H: 3, I: 1, DEF: 1, MR: 1, DEX: 3, AGI: 1 } },
@@ -61,6 +66,7 @@ const CHARACTERS = {
   sivelin: {
     id: 'sivelin', name: '希培林．武', title: '失憶的紅蓮槍豪', color: '#f97316', playable: false,
     defaultVariant: 'spear',
+    equipTags: ['all', 'heavy', 'knuckle', 'spear', 'polearm'],
     variants: {
       spear: { wName: '槍', archetype: 'S',   initHp: 220, defaultTpl: 'w_rap_1',  baseStats: { S: 5, H: 2, I: 1, DEF: 2, MR: 1, DEX: 2, AGI: 1 } },
       rod:   { wName: '棍', archetype: 'S+H', initHp: 240, defaultTpl: 'w_long_1', baseStats: { S: 4, H: 4, I: 1, DEF: 2, MR: 1, DEX: 1, AGI: 1 } }
@@ -69,6 +75,7 @@ const CHARACTERS = {
   mila: {
     id: 'mila', name: '美菈．奈伯拉斯卡', title: '紅海的狂野女船長', color: '#ec4899', playable: false,
     defaultVariant: 'whip',
+    equipTags: ['all', 'heavy', 'ninja', 'whip', 'flail'],
     variants: {
       whip:  { wName: '鞭',   archetype: 'H',   initHp: 210, defaultTpl: 'w_bld_1',  baseStats: { S: 2, H: 4, I: 1, DEF: 1, MR: 2, DEX: 3, AGI: 1 } },
       flail: { wName: '鏈錘', archetype: 'S+H', initHp: 190, defaultTpl: 'w_long_1', baseStats: { S: 4, H: 4, I: 1, DEF: 1, MR: 1, DEX: 2, AGI: 1 } }
@@ -77,6 +84,7 @@ const CHARACTERS = {
   ispin: {
     id: 'ispin', name: '伊絲萍．查爾斯', title: '男裝的王國公主', color: '#eab308', playable: false,
     defaultVariant: 'longsword',
+    equipTags: ['all', 'heavy', 'shield', 'longsword', 'blade', 'rapier'],
     variants: {
       longsword: { wName: '長劍', archetype: 'S+H', initHp: 200, defaultTpl: 'w_long_1', baseStats: { S: 4, H: 3, I: 1, DEF: 2, MR: 1, DEX: 2, AGI: 1 } },
       blade:     { wName: '彎刀', archetype: 'H',   initHp: 220, defaultTpl: 'w_bld_1',  baseStats: { S: 3, H: 4, I: 1, DEF: 2, MR: 1, DEX: 2, AGI: 1 } },
