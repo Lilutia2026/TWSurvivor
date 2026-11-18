@@ -5,6 +5,7 @@ const WEAPON_TEMPLATES = [
 ];
 
 WEAPON_TEMPLATES.forEach(w => {
+  if (!w.allowChars) w.allowChars = ['all'];
   if (!w.equipTag) w.equipTag = w.type || 'all';
   if (!w.type) w.type = w.equipTag;
   w.subType = w.type;

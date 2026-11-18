@@ -1,17 +1,7 @@
 // 全角色技能註冊總表
 const CHAR_SKILL_REGISTRY = {};
 
-// 武器類型對物理/魔法屬性的動態發揮倍率（含 V2.4 路西安與蒂琪愛兒全武器）
-const WEAPON_MOD = {
-  blade:     { H: 1.15, S: 0.75, I: 1.0,  MR: 1.0 },
-  rapier:    { H: 0.75, S: 1.15, I: 1.0,  MR: 1.0 },
-  longsword: { H: 1.00, S: 1.00, I: 1.0,  MR: 1.0 },
-  wand:      { H: 0.85, S: 0.85, I: 1.15, MR: 1.0 },
-  staff:     { H: 0.85, S: 0.85, I: 1.0,  MR: 1.15 },
-  mace:      { H: 1.10, S: 1.00, I: 0.9,  MR: 1.0 }
-};
-
-// 全角色共通輔助技能池（V2.4 更新：拔除純物理/純魔法減傷被動，僅保留共通魔力護盾）
+// 全角色共通輔助技能池（V2.5 擴充至 12 張：新增貪婪祝福與暗黑詛咒）
 const COMMON_PASSIVES = {
   might:      { name: '⚔️ 鬥志增幅',     maxLv: 5, desc: '每級全技能最終傷害 +8%（滿級 +40%）' },
   cdr:        { name: '⏳ 迅捷詠唱',     maxLv: 5, desc: '每級全技能冷卻縮減 +6%（總冷卻縮減上限 65%）' },
@@ -22,16 +12,20 @@ const COMMON_PASSIVES = {
   windBoot:   { name: '👟 疾風之祝福',   maxLv: 5, desc: '每級移動速度 +9%（滿級 +45%）' },
   heal:       { name: '💚 治癒之光',     maxLv: 5, desc: '每級每秒自然回復 +1.2 生命（滿級 +6.0/秒）' },
   manaShield: { name: '💠 魔力護盾',     maxLv: 5, desc: '每 12 秒生成 15% 最大生命護盾（每級護盾 +5%、冷卻 -1 秒）' },
-  thorns:     { name: '🌵 荊棘反甲',     maxLv: 5, desc: '受碰撞時對該敵人反彈 DEF×150% 傷害並擊退（每級 +50%）' }
+  thorns:     { name: '🌵 荊棘反甲',     maxLv: 5, desc: '受碰撞時對該敵人反彈 DEF×150% 傷害並擊退（每級 +50%）' },
+  greed:      { name: '💰 貪婪祝福',     maxLv: 5, desc: '每級結算獲得 Seed 貨幣 +15%（滿級 +75%）' },
+  curse:      { name: '💀 暗黑詛咒',     maxLv: 5, desc: '每級怪物生命、移速與刷怪頻率 +10%（滿級 +50%）' }
 };
 
 function getActiveSkillPool() {
   const cid = (typeof saveData !== 'undefined' && saveData.charId) ? saveData.charId : 'lucien';
+  const curJobTier = (typeof saveData !== 'undefined' && saveData.jobTier) ? saveData.jobTier : 1;
   const entry = CHAR_SKILL_REGISTRY[cid] || CHAR_SKILL_REGISTRY.lucien;
   const pool = {};
   if (!entry || !entry.skills) return pool;
   const w = (typeof saveData !== 'undefined' && saveData.equip) ? saveData.equip.weapon : null;
   for (const [id, sk] of Object.entries(entry.skills)) {
+    if (sk.reqJobTier && curJobTier < sk.reqJobTier) continue;
     if (sk.weaponGroup) {
       const wType = w ? w.type : 'longsword';
       if (sk.weaponGroup === 'wand' && wType !== 'wand') continue;
@@ -45,6 +39,14 @@ function getActiveSkillPool() {
 
 function getActivePassivePool() {
   const cid = (typeof saveData !== 'undefined' && saveData.charId) ? saveData.charId : 'lucien';
+  const curJobTier = (typeof saveData !== 'undefined' && saveData.jobTier) ? saveData.jobTier : 1;
   const entry = CHAR_SKILL_REGISTRY[cid] || CHAR_SKILL_REGISTRY.lucien;
-  return { ...(entry ? entry.passives : {}), ...COMMON_PASSIVES };
+  const charPassives = {};
+  if (entry && entry.passives) {
+    for (const [id, p] of Object.entries(entry.passives)) {
+      if (p.reqJobTier && curJobTier < p.reqJobTier) continue;
+      charPassives[id] = p;
+    }
+  }
+  return { ...charPassives, ...COMMON_PASSIVES };
 }

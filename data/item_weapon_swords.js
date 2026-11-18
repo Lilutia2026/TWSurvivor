@@ -16,11 +16,10 @@ const WEAPON_SWORD_ITEMS = [
     { tplId: 'w_bld_52',  slot: 'weapon', equipTag: 'blade',     name: '咒血劍',     reqLv: 52, reqStats: { H: 62 },        startSkill: 'enbu',   H: 92, S: 24 },
     { tplId: 'w_bld_62',  slot: 'weapon', equipTag: 'blade',     name: '聖靈彎刀',   reqLv: 62, reqStats: { H: 76 },        startSkill: 'enbu',   H: 118, S: 30 },
   
-    // === 細劍（equipTag: 'rapier'，STAB 刺擊主導型） ===
-    { tplId: 'w_rap_1',   slot: 'weapon', equipTag: 'rapier',    name: '學徒細劍',   reqLv: 1,  reqStats: {},             startSkill: 'renga',  S: 7,  H: 2 },
-    { tplId: 'w_rap_16',  slot: 'weapon', equipTag: 'rapier',    name: '決鬥細劍',   reqLv: 16, reqStats: { S: 18 },        startSkill: 'renga',  S: 28, H: 8 },
-    { tplId: 'w_rap_35',  slot: 'weapon', equipTag: 'rapier',    name: '流水劍',     reqLv: 35, reqStats: { S: 40 },        startSkill: 'aurora', S: 60, H: 16 },
-    { tplId: 'w_rap_52',  slot: 'weapon', equipTag: 'rapier',    name: '白銀刺劍',   reqLv: 52, reqStats: { S: 62 },        startSkill: 'aurora', S: 92, H: 24 },
-    { tplId: 'w_rap_62',  slot: 'weapon', equipTag: 'rapier',    name: '聖靈細劍',   reqLv: 62, reqStats: { S: 76 },        startSkill: 'aurora', S: 118, S: 30 }
-  ];
-  
+        // === 細劍（equipTag: 'rapier'，STAB 刺擊主導型） ===
+        { tplId: 'w_rap_1',   slot: 'weapon', equipTag: 'rapier',    name: '學徒細劍',   reqLv: 1,  reqStats: {},             startSkill: 'renga',  S: 7,  H: 2 },
+        { tplId: 'w_rap_16',  slot: 'weapon', equipTag: 'rapier',    name: '決鬥細劍',   reqLv: 16, reqStats: { S: 18 },        startSkill: 'renga',  S: 28, H: 8 },
+        { tplId: 'w_rap_35',  slot: 'weapon', equipTag: 'rapier',    name: '流水劍',     reqLv: 35, reqStats: { S: 40 },        startSkill: 'aurora', S: 60, H: 16 },
+        { tplId: 'w_rap_52',  slot: 'weapon', equipTag: 'rapier',    name: '白銀刺劍',   reqLv: 52, reqStats: { S: 62 },        startSkill: 'aurora', S: 92, H: 24 },
+        { tplId: 'w_rap_62',  slot: 'weapon', equipTag: 'rapier',    name: '聖靈細劍',   reqLv: 62, reqStats: { S: 76 },        startSkill: 'aurora', S: 118, H: 30 }
+      ];    

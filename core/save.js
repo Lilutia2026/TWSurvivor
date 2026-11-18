@@ -5,6 +5,7 @@ const DEFAULT_SAVE = {
   charId: 'lucien',
   variantId: 'longsword',
   charName: '路西安．卡爾茲',
+  jobTier: 1,
   outLv: 1, outExp: 0, seed: 500, freePts: 0,
   baseStats: { S: 4, H: 3, I: 1, DEF: 2, MR: 1, DEX: 2, AGI: 1 },
   autoStats: { S: 0, H: 0, I: 0, DEF: 0, MR: 0, DEX: 0, AGI: 0 },
@@ -216,14 +217,15 @@ function getDerivedCombatStats() {
   const eqMagRed = Math.min(0.40, (st.magReduce || 0) / 100);
   const physReducePct = Math.min(70, Math.round((1 - (1 - 0.50 * (defCap / 255)) * (1 - eqPhysRed)) * 100));
   const magReducePct = Math.min(70, Math.round((1 - (1 - 0.50 * (mrCap / 255)) * (1 - eqMagRed)) * 100));
+  const passiveDoubleHit = (typeof player !== 'undefined' && player.bonusDoubleHit) ? player.bonusDoubleHit : 0;
 
   return {
     st,
-    doubleHitChance: Math.min(0.45, sCap * 0.0015),
+    doubleHitChance: Math.min(0.45, sCap * 0.0015 + passiveDoubleHit),
     knockbackMult: 1 + hCap * 0.004,
     statusDurMult: 1 + iCap * 0.003,
     statusChanceBonus: Math.min(0.45, mrCap * 0.0012 + (st.statusChance || 0) / 100),
-    maxHp: (variant.initHp || 200) + st.DEF * 6 + st.hp,
+    maxHp: (variant.initHp || 200) + st.DEF * 3 + st.hp,
     physReducePct, magReducePct,
     defThornsDmg: Math.round(st.DEF * 0.8),
     critRate: 0.05 + dexCap * 0.001 + (st.critRate || 0) / 100,
@@ -309,7 +311,7 @@ function showLobbyStatTooltip(e, key) {
     H:   { title: '🗡️ HACK（劈砍 / 擊退）', desc: '• 主能力：劈砍系技能基數（HACK×1.0 + STAB×0.3）與跨系武器物理底力。<br>• 副能力：技能擊退力道（強化揮砍震退怪群壓制力）。' },
     I:   { title: '🔮 INT（元素 / 異常時長）', desc: '• 主能力：元素法術基數（INT×1.0 + MR×0.3）與魔劍複合基數。<br>• 副能力：異常狀態持續時間延長（點燃、凍結、感電、聖印留存更久）。' },
     MR:  { title: '✨ MR（白魔 / 異常率＆魔減）', desc: '• 主能力：白魔術技能基數 ＋ 元素法術副係數（MR×0.3）。<br>• 副能力：異常狀態觸發機率提升 ＋ 魔法（投射物）減傷率（上限 70%）。' },
-    DEF: { title: '🛡️ DEF（防禦 / 生命＆物減）', desc: '• 主能力：最大 HP（每點 +6）＋ 物理（碰撞）減傷率（上限 70%）。<br>• 副能力：防禦轉傷（護甲按比例轉為近戰附加輸出）。' },
+    DEF: { title: '🛡️ DEF（防禦 / 生命＆物減）', desc: '• 主能力：最大 HP（每點 +3）＋ 物理（碰撞）減傷率（上限 70%）。<br>• 副能力：防禦轉傷（護甲按比例轉為近戰附加輸出）。' },
     DEX: { title: '🎯 DEX（技巧 / 暴率＆經驗）', desc: '• 主能力：暴擊率（每 10 點 +1%，255 點滿值 +25.5%）。<br>• 副能力：局內經驗獲取加成（每 10 點 +1%，255 點滿值 +25.5%）。' },
     AGI: { title: '👟 AGI（敏捷 / 暴傷＆拾取）', desc: '• 主能力：暴擊傷害（每 1 點 +0.6%，255 點滿值 +153%）。<br>• 副能力：拾取磁鐵範圍（每 10 點 +1.5%，255 點滿值 +38.25%）。' }
   }[key];
@@ -507,7 +509,8 @@ function startBattle() {
   if (typeof player !== 'undefined') {
     player.maxHp = d.maxHp; player.hp = player.maxHp; player.regen = d.regen; player.baseSpeed = d.moveSpeed; player.pickupRange = d.pickupRange;
     player.cdMult = Math.max(0.35, 1 - (d.cdReduce || 0)); player.areaMult = 1.0; player.speedMult = 1.0; player.dmgMult = 1.0;
-    player.bonusCritRate = 0; player.superCritMult = 1.5; player.expMult = d.expBonusMult; player.angelUsed = false;
+    player.bonusCritRate = 0; player.bonusDoubleHit = 0; player.superCritMult = 1.5; player.resonanceDmgMult = 1.0;
+    player.dropRateMult = 1.0; player.expMult = d.expBonusMult; player.curseMult = 1.0; player.seedMult = 1.0; player.angelUsed = false;
   }
   if (typeof ownedSkills !== 'undefined') {
     for (const k of Object.keys(ownedSkills)) delete ownedSkills[k];
