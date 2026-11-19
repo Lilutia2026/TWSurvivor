@@ -1,6 +1,7 @@
 const SAVE_KEY = 'tw_survivor_save_v2_4';
 const MAX_OUT_LV = 255;
 
+// 片段 A：DEFAULT_SAVE 初始長劍本命技能對齊 senku
 const DEFAULT_SAVE = {
   charId: 'lucien',
   variantId: 'longsword',
@@ -11,7 +12,7 @@ const DEFAULT_SAVE = {
   autoStats: { S: 0, H: 0, I: 0, DEF: 0, MR: 0, DEX: 0, AGI: 0 },
   allocated: { S: 0, H: 0, I: 0, DEF: 0, MR: 0, DEX: 0, AGI: 0 },
   equip: {
-    weapon: { tplId: 'w_long_1', slot: 'weapon', type: 'longsword', name: '學徒長劍', rarity: 'white', reqLv: 1, reqStats: {}, startSkill: 'enbu', H: 4, S: 4, identified: true, affixes: [] },
+    weapon: { tplId: 'w_long_1', slot: 'weapon', type: 'longsword', name: '學徒長劍', rarity: 'white', reqLv: 1, reqStats: {}, startSkill: 'senku', H: 4, S: 4, identified: true, affixes: [] },
     sub: null, head: null, armor: null, gloves: null, shoes: null, back: null, relic: null
   },
   bag: []
@@ -344,7 +345,9 @@ function showLobbyEquipTooltip(e, source, keyOrUid) {
   const reqStatsStr = Object.entries(it.reqStats || {}).map(([k, v]) => `${statMap[k] || k}≥${v}`).join('、');
   const maxS = it.maxSynth ?? 3, remS = Math.max(0, maxS - (it.synthCount ?? 0));
   const elemMap = { fire: '🔥 火系元素', ice: '❄️ 冰系元素', thunder: '⚡ 雷系元素' };
-  const startSkTag = (it.slot === 'weapon' && it.startSkill) ? `<div style="color:#38bdf8;font-size:11px;margin-top:2px;">⚔️ 起始技能：【${getSkillDisplayName(it.startSkill)}】</div>` : '';
+  const sigSkillId = (it.slot === 'weapon' && typeof getWeaponSignatureSkill === 'function') ? getWeaponSignatureSkill(it) : it.startSkill;
+  const sigBadge = it.customStartSkill ? '（已改造）' : '';
+  const startSkTag = (it.slot === 'weapon' && sigSkillId) ? `<div style="color:#38bdf8;font-size:11px;margin-top:2px;">⚔️ 本命技能：【${getSkillDisplayName(sigSkillId)}】${sigBadge}</div>` : '';
   const elemTag = it.wandElem ? `<div style="color:#fde047;font-size:11px;margin-top:2px;">🔮 屬性詞條：${elemMap[it.wandElem] || it.wandElem}</div>` : '';
   const reqLine = `<div style="color:#94a3b8;font-size:11px;margin-top:2px;">需求：LV.${it.reqLv || 1}${reqStatsStr ? ' ｜ ' + reqStatsStr : ''} ｜ 🔨 剩餘合成：${remS}/${maxS}</div>`;
   const affixLines = (it.affixes && it.affixes.length > 0)
@@ -496,10 +499,12 @@ function renderLobby() {
   }
 }
 
+// 片段 C：startBattle() 內讀取武器本命技能改用 getWeaponSignatureSkill
 function startBattle() {
   if (pendingAlloc) { alert('請先按下「✅ 確認配點」或「↩️ 取消微調」後再出發冒險！'); return; }
-  const d = getDerivedCombatStats(), w = saveData.equip.weapon || { name: '徒手', startSkill: 'enbu' }, ch = getCurrentCharData();
-  if (typeof EQUIPPED_WEAPON !== 'undefined') { EQUIPPED_WEAPON.name = w.name; EQUIPPED_WEAPON.startSkill = w.startSkill; }
+  const d = getDerivedCombatStats(), w = saveData.equip.weapon || { name: '徒手', type: 'longsword', startSkill: 'senku' }, ch = getCurrentCharData();
+  const sigSkill = typeof getWeaponSignatureSkill === 'function' ? getWeaponSignatureSkill(w) : (w.startSkill || 'senku');
+  if (typeof EQUIPPED_WEAPON !== 'undefined') { EQUIPPED_WEAPON.name = w.name; EQUIPPED_WEAPON.startSkill = sigSkill; }
   if (typeof ACTIVE_SKILLS !== 'undefined' && typeof getActiveSkillPool === 'function') {
     for (const k of Object.keys(ACTIVE_SKILLS)) delete ACTIVE_SKILLS[k];
     Object.assign(ACTIVE_SKILLS, getActiveSkillPool());
@@ -515,7 +520,7 @@ function startBattle() {
   if (typeof ownedSkills !== 'undefined') {
     for (const k of Object.keys(ownedSkills)) delete ownedSkills[k];
     const startLv = (w.legendEffect && w.legendEffect.id === 'startLv2') ? 2 : 1;
-    ownedSkills[w.startSkill] = { lv: startLv, evolved: false, disabled: false };
+    ownedSkills[sigSkill] = { lv: startLv, evolved: false, disabled: false };
   }
   if (typeof ownedPassives !== 'undefined') { for (const k of Object.keys(ownedPassives)) delete ownedPassives[k]; }
   document.getElementById('lobbyModal').style.display = 'none';

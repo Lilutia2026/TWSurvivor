@@ -186,7 +186,17 @@ function recastEquipAffixes(item) {
   return { ok: true, msg: `✨ 洗煉完成！${item.name} 的魔法副詞條已重新賦予！` };
 }
 
-// 4. 消耗【技能刻印石】自選覆寫劍類武器起始技能（限 LV.15 以上劍類 1 次；法杖/釘錘/魔杖禁用）
+// 三層優先級讀取武器本命技能（1. customStartSkill 轉換石改造 ➔ 2. startSkill 武器預設 ➔ 3. 型態預設映射）
+function getWeaponSignatureSkill(weapon) {
+  if (!weapon) return 'senku';
+  if (weapon.customStartSkill) return weapon.customStartSkill;
+  if (weapon.startSkill) return weapon.startSkill;
+  if (weapon.wandElem) return `${weapon.wandElem}1`;
+  const map = typeof DEFAULT_START_SKILL_MAP !== 'undefined' ? DEFAULT_START_SKILL_MAP : {};
+  return map[weapon.type] || 'senku';
+}
+
+// 4. 消耗【技能刻印石】自選覆寫劍類武器本命技能（限 LV.15 以上劍類 1 次；法杖/釘錘/魔杖禁用）
 function engraveWeaponSkill(weaponItem, newSkillId) {
   if (!weaponItem || weaponItem.slot !== 'weapon' || !weaponItem.identified) return { ok: false, msg: '請選擇一把已鑑定的武器！' };
   if (!['longsword', 'blade', 'rapier'].includes(weaponItem.type)) return { ok: false, msg: '僅限物理劍類武器可使用技能刻印石（法杖、釘錘與魔杖不可使用）！' };
@@ -195,9 +205,10 @@ function engraveWeaponSkill(weaponItem, newSkillId) {
   const skillPool = typeof getActiveSkillPool === 'function' ? getActiveSkillPool() : {};
   const targetSk = skillPool[newSkillId];
   if (!targetSk) return { ok: false, msg: '無效的目標技能 ID！' };
+  weaponItem.customStartSkill = newSkillId;
   weaponItem.startSkill = newSkillId;
   weaponItem.engraved = true;
-  return { ok: true, msg: `🔮 刻印成功！${weaponItem.name} 的起始招式已覆寫為【${targetSk.name}】！` };
+  return { ok: true, msg: `🔮 刻印成功！${weaponItem.name} 的本命技能已改造為【${targetSk.name}】！` };
 }
 
 // 5. 消耗【元素魔晶石】改寫元素魔杖的屬性詞條與對應卡池（限 LV.15 以上魔杖 1 次，不扣合成次數）

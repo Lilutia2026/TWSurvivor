@@ -1,8 +1,8 @@
-```javascript
 /**
- * ------------------------------------------------------------------
- * 《TW倖存者》V2.5 核心共鳴與狀態引擎 (core/resonance.js)
- * ------------------------------------------------------------------
+ * ==================================================================
+ * 《TW倖存者》V2.7 核心異常狀態與客製共鳴引擎 (core/resonance.js)
+ * 職責：管理七大異常生命週期、聖印滿層雙條件引爆與動態共鳴介面
+ * ==================================================================
  */
 
 const STATUS_DB = {
@@ -15,7 +15,7 @@ const STATUS_DB = {
   dark:        { id: 'dark',        name: '🌑 暗蝕' }
 };
 
-const BASE_STATUS_DUR = 3.0; // 所有基礎異常預設持續 3.0 秒（受 INT 異常時長加成）
+const BASE_STATUS_DUR = 3.0; // 所有基礎異常統一持續 3.0 秒（受 INT 異常時長加成）
 const DARK_ZONE_DUR = 2.0;   // 暗蝕擊殺留下的暗影腐蝕領域固定持續 2.0 秒
 
 function normalizeStatusTag(tag) {
@@ -24,12 +24,13 @@ function normalizeStatusTag(tag) {
   return tag;
 }
 
+// 初始化敵人身上所有異常狀態計時器與疊層數值
 function initEnemyStatus(enemy) {
   enemy.burnTimer = 0; enemy.burnTick = 0; enemy.burnDps = 0;
   enemy.chillStacks = 0; enemy.freezeTimer = 0;
   enemy.shockTimer = 0; enemy.chainIcd = 0;
   enemy.windTimer = 0; enemy.windTick = 0; enemy.windDps = 0;
-  enemy.holySeal = 0;
+  enemy.holySeal = 0; enemy.holySealTimer = 0;
   enemy.armorBreakTimer = 0;
   enemy.darkTimer = 0; enemy.darkDps = 0;
   enemy.stunTimer = 0;
@@ -59,6 +60,7 @@ function getAwakenedTier(elem) {
   return maxTier;
 }
 
+// 寒氣疊層控制（1～2 層純累積，滿 3 層轉為完全凍結硬控場）
 function applyChillOrFreeze(enemy, stacks = 1, durMult = 1.0) {
   if (!enemy || enemy.freezeTimer > 0) return;
   enemy.chillStacks = (enemy.chillStacks || 0) + stacks;
@@ -69,32 +71,24 @@ function applyChillOrFreeze(enemy, stacks = 1, durMult = 1.0) {
   }
 }
 
-function applyHolySeal(enemy, addStacks = 1) {
+// 聖印疊層控制（上限 3 層，每次疊印刷新 3.0s 倒數計時器）
+function applyHolySeal(enemy, addStacks = 1, durMult = 1.0) {
   if (!enemy) return;
   enemy.holySeal = Math.min(3, (enemy.holySeal || 0) + addStacks);
+  enemy.holySealTimer = BASE_STATUS_DUR * durMult;
 }
 
-/**
- * 判定聖印是否引爆
- * 條件：超武命中時，必須同時符合「造成傷害」且「成功觸發異常」
- * @param {object} enemy - 目標敵人
- * @param {boolean} dealtDamage - 是否成功造成傷害
- * @param {number} baseChance - 基礎異常觸發機率
- * @param {number} mrChanceBonus - 來自 MR 的機率加成
- * @returns {boolean} 是否成功引爆聖印
- */
-function tryTriggerHolyResonance(enemy, dealtDamage, baseChance = 0.35, mrChanceBonus = 0) {
-  if (!enemy || (enemy.holySeal || 0) <= 0) return false;
-  if (!dealtDamage) return false; // 必須同時滿足傷害條件
-  
-  // 必須同時滿足異常觸發條件
-  if (!rollStatusChance(baseChance, mrChanceBonus)) return false;
-
-  // 成功引爆：清除或消耗聖印層數並觸發效果
+// 聖印雙條件引爆判定：必須嚴格疊滿 3 層，且同時滿足造成實際傷害 ＋ 通過 V2.6 異常率公式
+function tryTriggerHolyResonance(enemy, dealtDamage, mrChanceBonus = 0) {
+  if (!enemy || (enemy.holySeal || 0) < 3) return false;
+  if (!dealtDamage) return false;
+  if (!rollStatusChance(mrChanceBonus)) return false;
   enemy.holySeal = 0;
+  enemy.holySealTimer = 0;
   return true;
 }
 
+// 計算受擊端異常易傷乘區（聖印提供光／打擊 +20%，破甲提供末端獨立 ×1.25）
 function calcStatusDamageMods(enemy, element, isStrikeOrLight) {
   const tag = normalizeStatusTag(element);
   let addBonus = 0;
@@ -104,45 +98,24 @@ function calcStatusDamageMods(enemy, element, isStrikeOrLight) {
   return { addMult: 1 + addBonus, endMult };
 }
 
-/**
- * 判定異常狀態是否成功觸發
- * 裸體且素質為 0 時預設底線為 10% (0.1)，最高上限 85% (0.85)
- */
-function rollStatusChance(baseChance, mrChanceBonus = 0) {
-  const effectiveBase = (baseChance !== undefined && baseChance !== null) ? baseChance : 0.10;
-  return Math.random() < Math.min(0.85, effectiveBase + mrChanceBonus);
-}
-
-/**
- * 計算防禦與減傷邏輯（怪物傷害僅分為碰撞與射彈）
- * @param {object} playerStats - 玩家當前素質物件
- * @param {string} damageType - 傷害類型 ('collision' 近身碰撞 | 'projectile' 遠距射彈)
- * @returns {number} 減傷百分配比 (0.0 ~ 0.70)
- */
-function calculateMitigation(playerStats, damageType) {
-  if (!playerStats) return 0;
-  if (damageType === 'collision') {
-    // DEF (物理防禦) 專職應對怪物的近身碰撞傷害，上限 70%
-    const defValue = playerStats.DEF || 0;
-    return Math.min(0.70, defValue * 0.005);
-  } else if (damageType === 'projectile') {
-    // MR (魔法防禦) 專職應對怪物的遠距射彈傷害，上限 70%
-    const mrValue = playerStats.MR || 0;
-    return Math.min(0.70, mrValue * 0.005);
+// V2.6 統一異常狀態觸發率檢定（全技能統一：基礎 10% ＋ MR × 0.2% ＋ 詞綴加成，全域硬上限 85%）
+function rollStatusChance(mrChanceBonus = 0) {
+  let ok = false;
+  if (typeof SANDBOX_STATE !== 'undefined' && SANDBOX_STATE.active && SANDBOX_STATE.forceStatusMode) {
+    ok = true;
+  } else {
+    ok = Math.random() < Math.min(0.85, 0.10 + (mrChanceBonus || 0));
   }
-  return 0;
+  if (ok && typeof SANDBOX_STATE !== 'undefined' && SANDBOX_STATE.active) {
+    SANDBOX_STATE.statusProcs = (SANDBOX_STATE.statusProcs || 0) + 1;
+  }
+  return ok;
 }
 
-/**
- * 計算 DEF 帶來的最大生命值加成
- * 每點 DEF 提供 +3 Max HP
- */
-function calculateMaxHpBonus(defValue) {
-  return (defValue || 0) * 3;
-}
-
-function applyStatusTagsOnHit(enemy, statusTags, spellBase, stats, baseChance = 0.35, options = {}) {
-  if (!enemy || !statusTags) return;
+// 依據技能卡 statusTags 標籤陣列統一掛載七大異常狀態（全數採用 V2.6 統一異常機率公式）
+function applyStatusTagsOnHit(enemy, statusTags, spellBase, stats = {}, options = {}) {
+  if (!enemy || enemy.isDead || !statusTags) return;
+  if ((enemy.statusImmuneTimer || 0) > 0) return; // 【碎冰處決】後 2 秒內免疫所有異常狀態疊加
   const tagList = Array.isArray(statusTags) ? statusTags : [statusTags];
   const durMult = (stats && stats.statusDurMult) || 1.0;
   const mrChance = (stats && stats.statusChanceBonus) || 0;
@@ -150,15 +123,10 @@ function applyStatusTagsOnHit(enemy, statusTags, spellBase, stats, baseChance = 
   for (const rawTag of tagList) {
     const tag = normalizeStatusTag(rawTag);
     if (!tag || tag === 'none') continue;
+    if (!rollStatusChance(mrChance)) continue;
     if (tag === 'armor_break') {
-      const abChance = options.armorBreakChance ?? 0.65;
-      if (rollStatusChance(abChance, mrChance)) {
-        enemy.armorBreakTimer = Math.max(enemy.armorBreakTimer || 0, BASE_STATUS_DUR * durMult);
-      }
-      continue;
-    }
-    if (!rollStatusChance(baseChance, mrChance)) continue;
-    if (tag === 'fire') {
+      enemy.armorBreakTimer = Math.max(enemy.armorBreakTimer || 0, BASE_STATUS_DUR * durMult);
+    } else if (tag === 'fire') {
       enemy.burnTimer = Math.max(enemy.burnTimer || 0, BASE_STATUS_DUR * durMult);
       enemy.burnDps = Math.max(enemy.burnDps || 0, spellBase * 0.90);
     } else if (tag === 'ice') {
@@ -169,7 +137,7 @@ function applyStatusTagsOnHit(enemy, statusTags, spellBase, stats, baseChance = 
       enemy.windTimer = Math.max(enemy.windTimer || 0, BASE_STATUS_DUR * durMult);
       enemy.windDps = Math.max(enemy.windDps || 0, spellBase * 0.36);
     } else if (tag === 'holy') {
-      applyHolySeal(enemy, options.sealStacks ?? (options.isMelee ? 2 : 1));
+      applyHolySeal(enemy, options.sealStacks ?? (options.isMelee ? 2 : 1), durMult);
     } else if (tag === 'dark') {
       enemy.darkTimer = Math.max(enemy.darkTimer || 0, BASE_STATUS_DUR * durMult);
       enemy.darkDps = Math.max(enemy.darkDps || 0, spellBase * 0.32);
@@ -177,10 +145,11 @@ function applyStatusTagsOnHit(enemy, statusTags, spellBase, stats, baseChance = 
   }
 }
 
-function applyBaseStatusOnHit(enemy, element, spellBase, stats, baseChance = 0.35, options = {}) {
-  applyStatusTagsOnHit(enemy, element, spellBase, stats, baseChance, options);
+function applyBaseStatusOnHit(enemy, element, spellBase, stats, options = {}) {
+  applyStatusTagsOnHit(enemy, element, spellBase, stats, options);
 }
 
+// 計算異常狀態對敵人移動速度的影響（凍結定身 0x、感電緩速 15%／首領減半）
 function getEnemySpeedFactor(enemy) {
   if (!enemy) return 1.0;
   if (enemy.freezeTimer > 0 || enemy.stunTimer > 0) return 0;
@@ -193,29 +162,24 @@ function getEnemySpeedFactor(enemy) {
   return Math.max(0.15, factor);
 }
 
+// 計算異常狀態對敵人攻擊力的影響（聖印 ≥ 1 層降攻至 0.85x）
 function getEnemyAtkFactor(enemy) {
   if (!enemy) return 1.0;
   return (enemy.holySeal || 0) >= 1 ? 0.85 : 1.0;
 }
 
+// 動態讀取當前出戰角色設定檔 CHARACTERS[charId].resonances 的客製共鳴參數
 function getResonanceParams(elem) {
   const tag = normalizeStatusTag(elem);
   const tier = getAwakenedTier(tag);
   if (tier <= 0) return null;
+  const ch = typeof getCurrentCharData === 'function' ? getCurrentCharData() : null;
+  const resDef = (ch && ch.resonances) ? ch.resonances[tag] : null;
+  if (!resDef) return null;
   const idx = Math.min(4, Math.max(0, tier - 1));
-  if (tag === 'fire') return { tier, mult: [1.50, 1.80, 2.15, 2.50, 2.90][idx], radius: 115 };
-  if (tag === 'ice') return { tier, mult: [2.80, 3.40, 4.10, 4.80, 5.60][idx] };
-  if (tag === 'lightning') return { tier, mult: [1.35, 1.65, 2.00, 2.35, 2.75][idx], jumps: [3, 4, 5, 6, 7][idx], icd: 0.25 };
-  if (tag === 'holy') {
-    return {
-      tier,
-      polyMult: [2.60, 3.20, 3.90, 4.60, 5.40][idx],
-      hammerMult: [2.50, 3.10, 3.80, 4.50, 5.20][idx],
-      waveRadiusBonus: [0, 0.10, 0.20, 0.30, 0.40][idx],
-      waveSealChance: [0.35, 0.40, 0.45, 0.50, 0.55][idx]
-    };
+  const out = { tier };
+  for (const [k, v] of Object.entries(resDef)) {
+    out[k] = Array.isArray(v) ? v[Math.min(v.length - 1, idx)] : v;
   }
-  return null;
+  return out;
 }
-
-```

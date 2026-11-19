@@ -15,7 +15,7 @@ CHAR_SKILL_REGISTRY.tichiel = {
     },
     magicShield: {
       name: '💠 魔法盾牌', maxLv: 5,
-      desc: '魔法（投射物）減傷率 +3%'
+      desc: '魔法（射彈）減傷率 +3%'
     },
     angelWish: {
       name: '👼 天使之願', maxLv: 1,
@@ -25,17 +25,17 @@ CHAR_SKILL_REGISTRY.tichiel = {
   skills: {
     // === 法杖（MR）＆ 權杖／釘錘（DEF+H）共用主動池（共 7 招） ===
     holylight: {
-      name: '神聖之光', icon: '✨', evoName: '光之聚咒', evoIcon: '🌟', weaponGroup: 'staff_mace', reqWeaponType: 'staff',
+      name: '神聖之光', icon: '✨', weaponGroup: 'staff_mace', reqWeaponType: 'staff',
       type: 'magic', element: 'holy', statusTags: ['holy'], statTags: ['MR'], behaviorTags: ['ranged', 'projectile'], maxLv: 10,
-      baseDmg: 24, perLv: 7, baseCd: 1.40, canEvolve: true, reqPassive: 'mageTalent', evoSkillId: 'holypoly',
-      evoDesc: '【白魔術・魔法・MR・領域】遠處生成持續 2 秒的聖光漩渦牽引聚怪並每秒附加【聖印】，2 秒後引爆漩渦並向外發射無傷害聖光波紋補印。',
-      resonanceDesc: '目標疊滿 3 層【聖印】時雙條件引爆聖光淨化並擴散補印波紋。',
+      baseDmg: 24, perLv: 7, baseCd: 1.40, canEvolve: false,
       desc: '【白魔術・魔法・MR・遠程・射彈】召喚純淨聖光化作高速穿透光矢射向敵群，機率附加【聖印】。'
     },
     radiance: {
-      name: '光輝紋章', icon: '🔯', weaponGroup: 'staff_mace',
+      name: '光輝紋章', icon: '🔯', evoName: '光之聚咒', evoIcon: '🌟', weaponGroup: 'staff_mace', reqWeaponType: 'staff',
       type: 'magic', element: 'holy', statusTags: ['holy'], statTags: ['MR'], behaviorTags: ['aoe', 'zone'], maxLv: 10,
-      baseDmg: 16, perLv: 5, baseCd: 4.50, canEvolve: false,
+      baseDmg: 16, perLv: 5, baseCd: 4.50, canEvolve: true, reqPassive: 'mageTalent', evoSkillId: 'holypoly', disableWhenEvo: true,
+      evoDesc: '【白魔術・魔法・MR・範圍・領域】遠處生成持續 2 秒的聖光漩渦牽引聚怪並每秒附加【聖印】，2 秒後引爆漩渦並向外發射無傷害聖光波紋補印。',
+      resonanceDesc: '目標疊滿 3 層【聖印】時雙條件引爆聖光淨化並擴散補印波紋。',
       desc: '【白魔術・魔法・MR・範圍・領域】在地面展開神聖六芒星光陣持續灼燒敵人，機率附加【聖印】。'
     },
     healLight: {
@@ -45,7 +45,7 @@ CHAR_SKILL_REGISTRY.tichiel = {
       desc: '【白魔術・魔法・MR・範圍・領域】引導天界聖光柱轟擊並留下治癒光陣回復生命，機率附加【聖印】。'
     },
     holypoly: {
-      name: '光之聚咒', icon: '🌟', weaponGroup: 'staff_mace', reqWeaponType: 'staff', isSuperWeapon: true, evoFrom: 'holylight',
+      name: '光之聚咒', icon: '🌟', weaponGroup: 'staff_mace', reqWeaponType: 'staff', isSuperWeapon: true, evoFrom: 'radiance',
       type: 'magic', element: 'holy', statusTags: ['holy'], statTags: ['MR'], behaviorTags: ['aoe', 'zone'], maxLv: 3,
       baseDmg: 55, perLv: 22, baseCd: 6.00, canEvolve: false,
       resonanceDesc: '引爆目標身上的 3 層【聖印】造成巨額淨化傷害，並向周圍擴散補印波紋。',
@@ -54,7 +54,7 @@ CHAR_SKILL_REGISTRY.tichiel = {
     armorbreak: {
       name: '破壞盔甲', icon: '🔨', evoName: '失意狂擊', evoIcon: '💥', weaponGroup: 'staff_mace', reqWeaponType: 'mace',
       type: 'physical', element: 'holy', statusTags: ['holy', 'armor_break'], statTags: ['S', 'H'], behaviorTags: ['melee', 'aoe'], maxLv: 8,
-      baseDmg: 30, perLv: 10, baseCd: 2.20, canEvolve: true, reqPassive: 'blessing', evoSkillId: 'frenzyhammer',
+      baseDmg: 30, perLv: 10, baseCd: 2.20, canEvolve: true, reqPassive: 'lightWall', evoSkillId: 'frenzyhammer',
       evoDesc: '【戰錘技・物理・S+H・近戰・範圍】傾注全力發動近身連環重錘砸地，機率附加【聖印】並引爆擴散補印波紋。',
       resonanceDesc: '重擊雙條件引爆目標身上的 3 層【聖印】造成高額爆發並擴散補印波紋。',
       desc: '【戰錘技・物理・S+H・近戰・範圍】奮力揮動戰錘掃出半月重擊氣勁，機率附加【破甲】與【聖印】。'
@@ -143,39 +143,39 @@ CHAR_SKILL_REGISTRY.tichiel = {
       desc: '【冰系魔法・魔法・INT・射彈・範圍・領域】太陰極寒巨冰重擊大地後擴散無傷極寒冰霧，機率附加【凍結】。'
     },
 
-    // === ⚡ 電擊系魔杖五階純化卡池（前置階梯 2 -> 5 -> 8 -> 10） ===
-    thunder1: {
-      name: '落雷術', icon: '⚡', weaponGroup: 'wand', wandElem: 'thunder', tier: 1,
-      type: 'magic', element: 'lightning', statusTags: ['lightning'], statTags: ['INT'], behaviorTags: ['ranged', 'projectile'], maxLv: 10,
-      baseDmg: 18, perLv: 5, baseCd: 1.00, canEvolve: false,
-      desc: '【雷系魔法・魔法・INT・遠程・射彈】引導天際雷光化作多道落雷劈擊敵人，機率附加【感電】。'
-    },
-    thunder2: {
-      name: '環電術', icon: '🌀', weaponGroup: 'wand', wandElem: 'thunder', tier: 2, reqSkill: 'thunder1', reqSkillLv: 2,
-      type: 'magic', element: 'lightning', statusTags: ['lightning'], statTags: ['INT'], behaviorTags: ['aoe', 'zone'], maxLv: 10,
-      baseDmg: 22, perLv: 6, baseCd: 2.80, canEvolve: false,
-      desc: '【雷系魔法・魔法・INT・範圍・領域】以自身為中心釋放向外擴散再收回的雙段高壓電環，機率附加【感電】。'
-    },
-    thunder3: {
-      name: '雷球術', icon: '🔮', weaponGroup: 'wand', wandElem: 'thunder', tier: 3, reqSkill: 'thunder2', reqSkillLv: 5,
-      type: 'magic', element: 'lightning', statusTags: ['lightning'], statTags: ['INT'], behaviorTags: ['ranged', 'projectile'], maxLv: 10,
-      baseDmg: 26, perLv: 8, baseCd: 3.40, canEvolve: false,
-      desc: '【雷系魔法・魔法・INT・遠程・射彈】發射高速彈跳的高壓雷電球並引動連鎖電弧彈射，機率附加【感電】。'
-    },
-    thunder4: {
-      name: '狂雷術', icon: '⛈️', evoName: '雷道降臨・紫霄', evoIcon: '⚡', weaponGroup: 'wand', reqWeaponType: 'wand', wandElem: 'thunder', tier: 4, reqSkill: 'thunder3', reqSkillLv: 8,
-      type: 'magic', element: 'lightning', statusTags: ['lightning'], statTags: ['INT'], behaviorTags: ['projectile', 'aoe'], maxLv: 10,
-      baseDmg: 42, perLv: 12, baseCd: 4.20, canEvolve: true, reqPassive: 'mageTalent', evoSkillId: 'thunder5', disableWhenEvo: true,
-      evoDesc: '【雷系魔法・魔法・INT・射彈・範圍】紫霄神雷重擊並擴散高壓電環造成二次電擊，機率附加【感電】。',
-      resonanceDesc: '雷系技能命中【感電】敵人時觸發【九霄連鎖感電】，在敵群間連續彈射閃電。',
-      desc: '【雷系魔法・魔法・INT・射彈・範圍】喚來狂暴雷雲降下密集高壓雷隕轟擊，機率附加【感電】。'
-    },
-    thunder5: {
-      name: '雷道降臨・紫霄', icon: '⚡', weaponGroup: 'wand', wandElem: 'thunder', tier: 5, isSuperWeapon: true, evoFrom: 'thunder4',
-      type: 'magic', element: 'lightning', statusTags: ['lightning'], statTags: ['INT'], behaviorTags: ['projectile', 'aoe'], maxLv: 3,
-      baseDmg: 75, perLv: 24, baseCd: 4.50, canEvolve: false,
-      resonanceDesc: '雷系技能命中【感電】敵人時觸發【九霄連鎖感電】，在敵群間連續彈射閃電。',
-      desc: '【雷系魔法・魔法・INT・射彈・範圍】紫霄神雷重擊並擴散高壓電環造成二次電擊，機率附加【感電】。'
-    }
-  }
-};
+        // === ⚡ 電擊系魔杖五階純化卡池（前置階梯 2 -> 5 -> 8 -> 10） ===
+        thunder1: {
+          name: '落雷術', icon: '⚡', weaponGroup: 'wand', wandElem: 'thunder', tier: 1,
+          type: 'magic', element: 'lightning', statusTags: ['lightning'], statTags: ['INT'], behaviorTags: ['ranged', 'projectile'], maxLv: 10,
+          baseDmg: 14, perLv: 4, baseCd: 0.90, canEvolve: false,
+          desc: '【雷系魔法・魔法・INT・遠程・射彈】引導天際雷光化作多道單體落雷分別劈擊不同敵人，機率附加【感電】。'
+        },
+        thunder2: {
+          name: '環電術', icon: '🌀', weaponGroup: 'wand', wandElem: 'thunder', tier: 2, reqSkill: 'thunder1', reqSkillLv: 2,
+          type: 'magic', element: 'lightning', statusTags: ['lightning'], statTags: ['INT'], behaviorTags: ['aoe', 'zone'], maxLv: 10,
+          baseDmg: 20, perLv: 6, baseCd: 3.00, canEvolve: false,
+          desc: '【雷系魔法・魔法・INT・範圍・領域】以自身為中心釋放向外擴散再迅速回縮的雙段高壓電環，機率附加【感電】。'
+        },
+        thunder3: {
+          name: '雷球術', icon: '🔮', weaponGroup: 'wand', wandElem: 'thunder', tier: 3, reqSkill: 'thunder2', reqSkillLv: 5,
+          type: 'magic', element: 'lightning', statusTags: ['lightning'], statTags: ['INT'], behaviorTags: ['ranged', 'projectile'], maxLv: 10,
+          baseDmg: 16, perLv: 5, baseCd: 3.40, canEvolve: false,
+          desc: '【雷系魔法・魔法・INT・遠程・射彈】發射高速敵間彈跳的高壓雷電球，每次撞擊皆引動連鎖電弧彈跳，機率附加【感電】。'
+        },
+        thunder4: {
+          name: '狂雷術', icon: '⛈️', evoName: '雷道降臨・紫霄', evoIcon: '⚡', weaponGroup: 'wand', reqWeaponType: 'wand', wandElem: 'thunder', tier: 4, reqSkill: 'thunder3', reqSkillLv: 8,
+          type: 'magic', element: 'lightning', statusTags: ['lightning'], statTags: ['INT'], behaviorTags: ['projectile', 'aoe'], maxLv: 10,
+          baseDmg: 30, perLv: 9, baseCd: 3.60, canEvolve: true, reqPassive: 'mageTalent', evoSkillId: 'thunder5', disableWhenEvo: true,
+          evoDesc: '【雷系魔法・魔法・INT・射彈・範圍】紫霄神雷重擊並擴散高壓雷環造成二次電擊，機率附加【感電】。',
+          desc: '【雷系魔法・魔法・INT・射彈・範圍】喚來狂暴雷雲降下多道高壓範圍神雷轟擊，機率附加【感電】。'
+        },   
+        thunder5: {
+          name: '雷道降臨・紫霄', icon: '⚡', weaponGroup: 'wand', wandElem: 'thunder', tier: 5, isSuperWeapon: true, evoFrom: 'thunder4',
+          type: 'magic', element: 'lightning', statusTags: ['lightning'], statTags: ['INT'], behaviorTags: ['projectile', 'aoe'], maxLv: 3,
+          baseDmg: 45, perLv: 14, baseCd: 3.80, canEvolve: false,
+          resonanceDesc: '雷系技能命中【感電】敵人時觸發【雷殛過載】，引爆青藍色高壓電弧在敵群間連續彈射（周圍無其他敵人時直接劈擊本體）。',
+          desc: '【雷系魔法・魔法・INT・射彈・範圍】紫霄神雷重擊並擴散高壓雷環造成二次電擊，機率附加【感電】。'
+        }
+      }
+    };
+    
