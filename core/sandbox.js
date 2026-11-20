@@ -13,6 +13,7 @@ const SANDBOX_STATE = {
     dummyInvincible: false,  // 木樁不死鎖血（預設關閉：木樁可被擊殺觸發殉爆；開啟後木樁無敵）
     dummyAttack: false,      // 木樁主動移動碰撞（測試物理碰撞減傷與反傷）
     dummyShoot: false,       // 木樁遠程魔法射擊（測試魔法射彈減傷）
+    dummyKnockback: false,   // 允許木樁受擊退（開啟後普通木樁可被擊退位移並測試撞擊）
     panelCollapsed: false,
 
     // 即時 DPS 統計數據
@@ -31,6 +32,7 @@ const SANDBOX_STATE = {
       SANDBOX_STATE.dummyInvincible = false;
       SANDBOX_STATE.dummyAttack = false;
       SANDBOX_STATE.dummyShoot = false;
+      SANDBOX_STATE.dummyKnockback = false;
       SANDBOX_STATE.totalDmg = 0;
       SANDBOX_STATE.maxHit = 0;
       SANDBOX_STATE.elapsedTime = 0;
@@ -414,6 +416,8 @@ function maxAllOwnedSandboxSkills() {
         ${mkToggle('dummyInvincible', '🎯 木樁不死鎖血', '#38bdf8')}
         ${mkToggle('dummyAttack', '⚔️ 木樁移動碰撞 (測物減)', '#fb923c')}
         ${mkToggle('dummyShoot', '🔮 木樁魔法射擊 (測魔減)', '#c084fc')}
+        ${mkToggle('dummyKnockback', '💨 允許木樁受擊退 (測撞擊)', '#facc15')}
+
 
           <div style="border-top:1px solid #334155;padding-top:5px;display:grid;grid-template-columns:1fr 1fr;gap:4px;">
           <button onclick="spawnSandboxDummy('normal')" style="padding:5px;background:#1e293b;color:#fde047;border:1px solid #475569;border-radius:5px;cursor:pointer;">+ 普通木樁</button>

@@ -30,7 +30,7 @@ const CHARACTERS = {
       fire:      { mult: [1.50, 1.80, 2.15, 2.50, 2.90], radius: 115 },
       ice:       { mult: [2.80, 3.40, 4.10, 4.80, 5.60] },
       lightning: { mult: [1.80, 2.20, 2.65], jumps: 3, icd: 0.25 },
-      holy:      { polyMult: [2.60, 3.20, 3.90, 4.60, 5.40], hammerMult: [2.50, 3.10, 3.80, 4.50, 5.20], waveRadiusBonus: [0, 0.10, 0.20, 0.30, 0.40] }
+      holy:      { polyMult: [2.60, 3.20, 3.90, 4.60, 5.40], hammerMult: [3.00, 3.70, 4.50, 5.20, 6.00], waveRadiusBonus: [0, 0.10, 0.20, 0.30, 0.40] }
     },
     variants: {
       wand_fire:    { wName: '火魔杖', archetype: 'I',     initHp: 160, defaultTpl: 'w_wnd_f_1', baseStats: { S: 1, H: 2, I: 4, DEF: 1, MR: 3, DEX: 2, AGI: 1 } },

@@ -23,9 +23,9 @@ CHAR_SKILL_REGISTRY.tichiel = {
     }
   },
   skills: {
-    // === 法杖（MR）＆ 權杖／釘錘（DEF+H）共用主動池（共 7 招） ===
+    // === 法杖（MR）＆ 權杖／釘錘（DEF+H）共用主    // === 法杖（MR）＆ 權杖／釘錘（DEF+H）共用主動池（共 7 招，超武仍依武器型態唯一鎖定） ===
     holylight: {
-      name: '神聖之光', icon: '✨', weaponGroup: 'staff_mace', reqWeaponType: 'staff',
+      name: '神聖之光', icon: '✨', weaponGroup: 'staff_mace',
       type: 'magic', element: 'holy', statusTags: ['holy'], statTags: ['MR'], behaviorTags: ['ranged', 'projectile'], maxLv: 10,
       baseDmg: 24, perLv: 7, baseCd: 1.40, canEvolve: false,
       desc: '【白魔術・魔法・MR・遠程・射彈】召喚純淨聖光化作高速穿透光矢射向敵群，機率附加【聖印】。'
@@ -54,23 +54,23 @@ CHAR_SKILL_REGISTRY.tichiel = {
     armorbreak: {
       name: '破壞盔甲', icon: '🔨', evoName: '失意狂擊', evoIcon: '💥', weaponGroup: 'staff_mace', reqWeaponType: 'mace',
       type: 'physical', element: 'holy', statusTags: ['holy', 'armor_break'], statTags: ['S', 'H'], behaviorTags: ['melee', 'aoe'], maxLv: 8,
-      baseDmg: 30, perLv: 10, baseCd: 2.20, canEvolve: true, reqPassive: 'lightWall', evoSkillId: 'frenzyhammer',
-      evoDesc: '【戰錘技・物理・S+H・近戰・範圍】傾注全力發動近身連環重錘砸地，機率附加【聖印】並引爆擴散補印波紋。',
-      resonanceDesc: '重擊雙條件引爆目標身上的 3 層【聖印】造成高額爆發並擴散補印波紋。',
-      desc: '【戰錘技・物理・S+H・近戰・範圍】奮力揮動戰錘掃出半月重擊氣勁，機率附加【破甲】與【聖印】。'
+      baseDmg: 30, perLv: 10, baseCd: 2.20, canEvolve: true, reqPassive: 'lightWall', evoSkillId: 'frenzyhammer', disableWhenEvo: true,
+      evoDesc: '【戰錘技・物理・S+H・近戰・範圍】原地連續砸出 3 下近身重錘，機率附加【破甲】與【聖印】並高倍率引爆滿層聖印。',
+      resonanceDesc: '重擊雙條件引爆目標身上的 3 層【聖印】造成高額物理爆發。',
+      desc: '【戰錘技・物理・S+H・近戰・範圍】揮動戰錘掃出重擊擊飛前方全數敵人並引發二次撞擊傷害，機率附加【破甲】與【聖印】（手持法杖時不附帶破甲）。'
     },
     earthhammer: {
       name: '神聖震地錘', icon: '🌋', weaponGroup: 'staff_mace',
       type: 'physical', element: 'holy', statusTags: ['holy'], statTags: ['S', 'H'], behaviorTags: ['melee', 'aoe'], maxLv: 8,
       baseDmg: 26, perLv: 9, baseCd: 3.00, canEvolve: false,
-      desc: '【戰錘技・物理・S+H・近戰・範圍】重錘猛擊大地激起 360° 環形地震波震退敵群，機率附加【聖印】。'
+      desc: '【戰錘技・物理・S+H・近戰・範圍】重錘垂直猛擊大地激起 360° 神聖震波將敵群定在原地並大幅提高聖印疊層效率。'
     },
     frenzyhammer: {
       name: '失意狂擊', icon: '💥', weaponGroup: 'staff_mace', reqWeaponType: 'mace', isSuperWeapon: true, evoFrom: 'armorbreak',
-      type: 'physical', element: 'holy', statusTags: ['holy'], statTags: ['S', 'H'], behaviorTags: ['melee', 'aoe'], maxLv: 3,
-      baseDmg: 48, perLv: 18, baseCd: 4.80, canEvolve: false,
-      resonanceDesc: '狂暴連錘雙條件引爆目標身上的 3 層【聖印】造成高額爆發，並向周圍擴散補印波紋。',
-      desc: '【戰錘技・物理・S+H・近戰・範圍】傾注全力發動近身連環重錘砸地，機率附加【聖印】並擴散補印波紋。'
+      type: 'physical', element: 'holy', statusTags: ['holy', 'armor_break'], statTags: ['S', 'H'], behaviorTags: ['melee', 'aoe'], maxLv: 3,
+      baseDmg: 24, perLv: 9, baseCd: 4.80, canEvolve: false,
+      resonanceDesc: '狂暴 3 連錘雙條件引爆目標身上的 3 層【聖印】，造成基於 HACK 與 DEF 的巨額淨化爆發。',
+      desc: '【戰錘技・物理・S+H・近戰・範圍】傾注全力原地連續砸出 3 下近身重錘，機率附加【破甲】與【聖印】並引爆滿層聖印。'
     },
 
     // === 🔥 火焰系魔杖五階純化卡池（前置階梯 2 -> 5 -> 8 -> 10） ===
@@ -112,7 +112,7 @@ CHAR_SKILL_REGISTRY.tichiel = {
     ice1: {
       name: '冰彈術', icon: '❄️', weaponGroup: 'wand', wandElem: 'ice', tier: 1,
       type: 'magic', element: 'ice', statusTags: ['ice'], statTags: ['INT'], behaviorTags: ['ranged', 'projectile'], maxLv: 10,
-      baseDmg: 20, perLv: 6, baseCd: 1.30, canEvolve: false,
+      baseDmg: 17, perLv: 5, baseCd: 1.30, canEvolve: false,
       desc: '【冰系魔法・魔法・INT・遠程・射彈】射出高速彈跳的銳利冰晶箭彈，機率附加【凍結】。'
     },
     ice2: {
@@ -147,7 +147,7 @@ CHAR_SKILL_REGISTRY.tichiel = {
         thunder1: {
           name: '落雷術', icon: '⚡', weaponGroup: 'wand', wandElem: 'thunder', tier: 1,
           type: 'magic', element: 'lightning', statusTags: ['lightning'], statTags: ['INT'], behaviorTags: ['ranged', 'projectile'], maxLv: 10,
-          baseDmg: 14, perLv: 4, baseCd: 0.90, canEvolve: false,
+          baseDmg: 16, perLv: 5, baseCd: 0.90, canEvolve: false,
           desc: '【雷系魔法・魔法・INT・遠程・射彈】引導天際雷光化作多道單體落雷分別劈擊不同敵人，機率附加【感電】。'
         },
         thunder2: {

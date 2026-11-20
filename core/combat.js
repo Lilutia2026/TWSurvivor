@@ -1,0 +1,308 @@
+// ============================================================================
+// core/combat.js — 戰鬥傷害管線、元素共鳴爆發與統一尋怪引擎
+// ============================================================================
+
+function getSkillRawDmg(id, lv, evolved) {
+    const sk = ACTIVE_SKILLS[id];
+    if (!sk) return 20;
+    const cs = typeof getDerivedCombatStats === 'function' ? getDerivedCombatStats() : { st: {}, defThornsDmg: 0, physDmgMult: 1, magDmgMult: 1 };
+    const st = cs.st || {};
+    const w = (typeof saveData !== 'undefined' && saveData.equip) ? saveData.equip.weapon : null;
+    const wType = w ? w.type : 'longsword';
+  
+    const tags = sk.statTags || (sk.mainStat ? [sk.mainStat === 'I' ? 'INT' : sk.mainStat] : ['H']);
+    const hasH = tags.includes('H'), hasS = tags.includes('S');
+    const hasI = tags.includes('INT') || tags.includes('I'), hasMR = tags.includes('MR');
+    const hasPhysTag = hasH || hasS;
+    const hasMagTag = hasI || hasMR;
+  
+    let statPower = 0;
+    if (hasPhysTag && hasMagTag) {
+      const physPart = hasH ? ((st.H || 0) * 0.60) : ((st.S || 0) * 0.60);
+      statPower = ((st.I || 0) * 1.20) + physPart;
+    } else if (hasH && hasS) {
+      statPower = ((st.H || 0) * 1.00) + ((st.S || 0) * 0.50);
+    } else if (hasI && hasMR) {
+      statPower = ((st.I || 0) * 1.00) + ((st.MR || 0) * 0.80);
+    } else if (hasH) {
+      statPower = (st.H || 0) * 1.2 + (st.S || 0) * 0.1;
+    } else if (hasS) {
+      statPower = (st.S || 0) * 0.9 + (st.H || 0) * 0.2;
+    } else if (hasI) {
+      statPower = (st.I || 0) * 1.0 + (st.MR || 0) * 0.3;
+    } else if (hasMR) {
+      statPower = (st.MR || 0) * 1.0 + (st.I || 0) * 0.3;
+    }
+  
+    const isPhysWeapon = ['blade', 'rapier', 'longsword', 'tachi', 'greatsword', 'dagger', 'dual_blade', 'axe', 'spear', 'polearm', 'whip', 'flail', 'mace'].includes(wType);
+    const isCrossType = (isPhysWeapon && !hasPhysTag) || (!isPhysWeapon && !hasMagTag);
+    if (isCrossType) {
+      if (isPhysWeapon) statPower += ((st.S || 0) * 0.65 + (st.H || 0) * 0.65);
+      else statPower += ((st.I || 0) * 0.65 + (st.MR || 0) * 0.65);
+    }
+  
+    const isPhysSkill = sk.type === 'physical' || hasPhysTag;
+    const dmgTypeMult = isCrossType
+      ? Math.max(cs.physDmgMult || 1.0, cs.magDmgMult || 1.0)
+      : (isPhysSkill ? (cs.physDmgMult || 1.0) : (cs.magDmgMult || 1.0));
+  
+    const bTags = sk.behaviorTags || [];
+    const isMelee = (bTags.includes('melee') || bTags.includes('近戰') || (!bTags.includes('射彈') && !bTags.includes('projectile') && !bTags.includes('ranged'))) && hasPhysTag;
+    const defBonus = isMelee ? (cs.defThornsDmg || 0) : 0;
+  
+    const blessMult = 1 + (ownedPassives.blessing || 0) * 0.03;
+    const angelMult = ownedPassives.angelWish ? 0.90 : 1.0;
+    const evoMult = (evolved && !sk.isSuperWeapon) ? 1.45 : 1.0;
+    return ((sk.baseDmg + Math.max(0, lv - 1) * sk.perLv) + statPower + defBonus) * player.dmgMult * dmgTypeMult * blessMult * angelMult * evoMult;
+  }
+  
+  function getSpellBase() {
+    const st = typeof getTotalStats === 'function' ? getTotalStats() : {};
+    return (st.I || 1) * 1.0 + (st.MR || 1) * 0.3;
+  }
+  
+  function triggerThunderChain(srcEnemy, spellBase) {
+    const res = typeof getResonanceParams === 'function' ? getResonanceParams('lightning') : null;
+    if (!res || (srcEnemy.chainIcd || 0) > 0) return;
+    srcEnemy.chainIcd = res.icd;
+    let cur = srcEnemy;
+    const visited = new Set([srcEnemy]);
+    for (let j = 0; j < res.jumps; j++) {
+      let nextIdx = -1, minD = 240;
+      for (let i = 0; i < enemies.length; i++) {
+        const cand = enemies[i];
+        if (!visited.has(cand) && !cand.isDead) {
+          const d = Math.hypot(cand.x - cur.x, cand.y - cur.y);
+          if (d < minD) { minD = d; nextIdx = i; }
+        }
+      }
+      if (nextIdx === -1) {
+        // 周圍無其他可彈跳目標時，全部過載電流聚能劈向本體（2.20x 單體聚能爆發）
+        if (j === 0) {
+          const selfIdx = enemies.indexOf(srcEnemy);
+          if (selfIdx !== -1 && !srcEnemy.isDead) {
+            const singleDmg = Math.max(1, Math.round(spellBase * res.mult * 2.20));
+            lightnings.push({ x1: srcEnemy.x, y1: srcEnemy.y - 135, x2: srcEnemy.x, y2: srcEnemy.y, life: 0.28, kind: 'overload' });
+            damageTexts.push({ x: srcEnemy.x, y: srcEnemy.y - srcEnemy.radius - 18, txt: `⚡過載 ${singleDmg}`, color: '#38bdf8', fontSize: 17, life: 0.75 });
+            hitEnemy(selfIdx, singleDmg, { element: 'lightning', isChain: true, hideText: true });
+          }
+        }
+        break;
+      }
+      const nextE = enemies[nextIdx];
+      visited.add(nextE);
+      const chainDmg = Math.max(1, Math.round(spellBase * res.mult));
+      lightnings.push({ x1: cur.x, y1: cur.y, x2: nextE.x, y2: nextE.y, life: 0.25, kind: 'overload' });
+      damageTexts.push({ x: nextE.x, y: nextE.y - nextE.radius - 14, txt: `⚡過載 ${chainDmg}`, color: '#38bdf8', fontSize: 14, life: 0.60 });
+      hitEnemy(nextIdx, chainDmg, { element: 'lightning', isChain: true, hideText: true });
+      cur = nextE;
+    }
+  }
+  
+  function spawnHolySealWave(cx, cy, baseRadius) {
+    const r = baseRadius * player.areaMult;
+    const cs = typeof getDerivedCombatStats === 'function' ? getDerivedCombatStats() : { statusDurMult: 1.0, statusChanceBonus: 0 };
+    slashes.push({ type: 'holywave', x: cx, y: cy, range: r, arc: Math.PI * 2, life: 0.35 });
+    for (const e of enemies) {
+      if (Math.hypot(e.x - cx, e.y - cy) <= r + e.radius && typeof rollStatusChance === 'function' && rollStatusChance(cs.statusChanceBonus || 0)) {
+        if (typeof applyHolySeal === 'function') applyHolySeal(e, 1, cs.statusDurMult || 1.0);
+      }
+    }
+  }
+  
+  function hitEnemy(idx, rawDmg, opts = {}) {
+    const e = enemies[idx];
+    if (!e) return;
+    const cs = typeof getDerivedCombatStats === 'function' ? getDerivedCombatStats() : { critRate: 0.1, critDmg: 1.5, doubleHitChance: 0 };
+    const elem = typeof normalizeStatusTag === 'function' ? normalizeStatusTag(opts.element || 'none') : (opts.element || 'none');
+    const isStrikeOrLight = elem === 'holy' || opts.isStrike;
+    const resBonusMult = 1 + (ownedPassives.resonance || 0) * 0.12;
+  
+    const iceRes = (elem === 'ice' && e.freezeTimer > 0 && typeof getResonanceParams === 'function') ? getResonanceParams('ice') : null;
+    if (iceRes) { e.freezeTimer = 0; }
+  
+    const mod = typeof calcStatusDamageMods === 'function' ? calcStatusDamageMods(e, elem, isStrikeOrLight) : { addMult: 1, endMult: 1 };
+    const talentIgnore = (ownedPassives.mageTalent || 0) * 0.03;
+    const bossResist = (e.isFinalBoss ? 0.20 : (e.isMegaBoss ? 0.12 : 0)) * (1 - talentIgnore);
+    let finalDmg = rawDmg * mod.addMult * (1 - bossResist) * mod.endMult * (0.95 + Math.random() * 0.10);
+  
+    const extraCrit = (typeof opts.bonusCritFn === 'function') ? (opts.bonusCritFn(e) || 0) : 0;
+    const totalCrit = (cs.critRate || 0.05) + (player.bonusCritRate || 0) + extraCrit;
+    const isCrit = !opts.noCrit && (Math.random() < Math.min(1.0, totalCrit));
+    let isSuperCrit = false;
+    if (isCrit) {
+      finalDmg *= (cs.critDmg || 1.5);
+      const overflow = Math.max(0, totalCrit - 1.0);
+      if (overflow > 0 && Math.random() < overflow) {
+        isSuperCrit = true;
+        finalDmg *= (player.superCritMult || 1.5);
+      }
+    }
+  
+    const isZeroMode = typeof SANDBOX_STATE !== 'undefined' && SANDBOX_STATE.active && SANDBOX_STATE.zeroDmgMode;
+    const isDummyLocked = e.isDummy && typeof SANDBOX_STATE !== 'undefined' && SANDBOX_STATE.dummyInvincible;
+    const dmgInt = isZeroMode ? 0 : Math.max(1, Math.round(finalDmg));
+    e.hp -= dmgInt; e.hitFlash = 0.08;
+    if (isDummyLocked) e.hp = e.maxHp;
+    if (typeof recordSandboxDamage === 'function') recordSandboxDamage(dmgInt);
+    const tagIcon = isZeroMode ? '🛡️' : (isSuperCrit ? '💢' : (isCrit ? '💥' : ''));
+    const tagColor = isZeroMode ? '#94a3b8' : (isSuperCrit ? '#ff4d4f' : (isCrit ? '#fde047' : (opts.isDot ? '#fdba74' : '#fff')));
+    if (!opts.hideText) {
+      damageTexts.push({ x: e.x, y: e.y - e.radius, txt: `${tagIcon}${dmgInt}`, color: tagColor, life: 0.55 });
+    }
+  
+    // 【碎冰處決】獨立爆發結算、碎冰波紋、醒目大字飄字，並賦予 2.0 秒異常免疫防永凍
+    if (iceRes && !isZeroMode) {
+      e.statusImmuneTimer = 2.0;
+      e.chillStacks = 0;
+      const shatterDmg = Math.max(1, Math.round(getSpellBase() * iceRes.mult * resBonusMult * mod.endMult));
+      e.hp -= shatterDmg;
+      if (isDummyLocked) e.hp = e.maxHp;
+      if (typeof recordSandboxDamage === 'function') recordSandboxDamage(shatterDmg);
+      slashes.push({ type: 'iceshatter', x: e.x, y: e.y, range: (e.radius + 48) * player.areaMult, arc: Math.PI * 2, life: 0.28 });
+      damageTexts.push({ x: e.x, y: e.y - e.radius - 18, txt: `❄️碎冰處決 ${shatterDmg}`, color: '#38bdf8', fontSize: 18, life: 0.80 });
+    }
+  
+        // 【V2.5 聖印雙條件引爆】必須同時滿足：滿 3 層聖印 ＋ 造成傷害 (dmgInt > 0) ＋ 成功觸發異常 (rollStatusChance)
+        const dealtDamage = dmgInt > 0;
+        if (opts.consumeSeal && typeof tryTriggerHolyResonance === 'function') {
+          const effSealBonus = (cs.statusChanceBonus || 0) + (opts.sealBonusChance || 0);
+          const triggered = tryTriggerHolyResonance(e, dealtDamage, effSealBonus);   
+         if (triggered) {
+           const lRes = typeof getResonanceParams === 'function' ? getResonanceParams('holy') : null;
+           const mult = opts.sealBurstMult || (lRes ? lRes.polyMult : 3.2);
+           const stObj = cs.st || {};
+           const burstBase = opts.usePhysSealBase ? ((stObj.H || 0) * 1.0 + Math.round((stObj.DEF || 0) * 0.8)) : getSpellBase();
+           const burstDmg = Math.max(1, Math.round(burstBase * mult * resBonusMult * mod.endMult));
+           e.hp -= burstDmg;
+           if (isDummyLocked) e.hp = e.maxHp;
+           if (typeof recordSandboxDamage === 'function') recordSandboxDamage(burstDmg);
+           damageTexts.push({ x: e.x, y: e.y - e.radius - 16, txt: `✨聖印引爆 ${burstDmg}`, color: '#fef08a', fontSize: 17, life: 0.70 });
+           if (!opts.noSealWave) {
+             const wR = 135 * (1 + (lRes ? lRes.waveRadiusBonus : 0));
+             spawnHolySealWave(e.x, e.y, wR);
+           }
+         }
+       }  
+  
+    // 【引爆後疊層不浪費】確保在清空舊聖印後才執行當下這一擊的聖印疊層
+    if (opts.onAfterHit && e.hp > 0) {
+      opts.onAfterHit(e);
+    }
+  
+    if (e.shockTimer > 0 && !opts.isShockProc && e.hp > 0) {
+      const shockExtra = Math.max(1, Math.round(dmgInt * 0.15 * resBonusMult));
+      e.hp -= shockExtra;
+      damageTexts.push({ x: e.x + 12, y: e.y - e.radius - 10, txt: `⚡${shockExtra}`, color: '#fde047', life: 0.45 });
+    }
+  
+    if (elem === 'lightning' && !opts.isChain && !opts.isDot && e.shockTimer > 0) {
+      const blessMult = 1 + (ownedPassives.blessing || 0) * 0.03;
+      const fullResBase = getSpellBase() * resBonusMult * player.dmgMult * (cs.magDmgMult || 1.0) * blessMult;
+      triggerThunderChain(e, fullResBase);
+    }
+  
+    if (!opts.isDouble && !opts.isDot && Math.random() < (cs.doubleHitChance || 0)) {
+        hitEnemy(idx, rawDmg * 0.75, { ...opts, isDouble: true, consumeSeal: false });
+        return;
+      }
+    
+      if (isDummyLocked) e.hp = e.maxHp;
+      if (e.hp <= 0 && !e.isDead) {
+        e.isDead = true; // 標記已死亡，防止烈焰殉爆 AOE 再次命中同一具屍體造成無窮遞迴
+        const fireRes = (e.burnTimer > 0 && !opts.isMartyrBoom && typeof getResonanceParams === 'function') ? getResonanceParams('fire') : null;
+        if (fireRes) {
+          const boomR = fireRes.radius * player.areaMult;
+          slashes.push({ type: 'fireboom', x: e.x, y: e.y, range: boomR, arc: Math.PI * 2, life: 0.25 });
+          damageArea(e.x, e.y, boomR, 0, Math.PI * 2, getSpellBase() * fireRes.mult * resBonusMult, 12, { element: 'fire', isMartyrBoom: true });
+        }
+        if (e.darkTimer > 0) {
+          zones.push({ kind: 'dark_pool', x: e.x, y: e.y, radius: 75 * player.areaMult, life: typeof DARK_ZONE_DUR !== 'undefined' ? DARK_ZONE_DUR : 2.0, tickTimer: 0.5, dmg: e.darkDps || getSpellBase() * 0.32, lv: 1 });
+        }
+        if (e.isFinalBoss) { endGame(true); return; }
+        if (e.isMegaBoss) chests.push({ x: e.x, y: e.y, kind: 'gold' });
+        else if (e.isElite) chests.push({ x: e.x, y: e.y, kind: 'silver' });
+    
+        const baseDropChance = 0.015 * (player.dropRateMult || 1.0);
+        if (!e.isDummy && (e.isFinalBoss || e.isMegaBoss || e.isElite || Math.random() < baseDropChance)) {
+          const dropCount = e.isFinalBoss ? 3 : (e.isMegaBoss ? 2 : 1);
+          const rar = e.isFinalBoss ? 'legendary' : (e.isMegaBoss ? 'epic' : (e.isElite ? 'rare' : 'common'));
+          for (let d = 0; d < dropCount; d++) {
+            const dropItem = typeof createUnidentifiedDrop === 'function' ? createUnidentifiedDrop(rar, saveData.outLv + 10, null, (e.isFinalBoss || e.isMegaBoss) && d === 0) : null;
+            if (dropItem) lootBags.push({ x: e.x + (d * 24 - 12), y: e.y, item: dropItem, color: RARITIES[rar].color, rarName: RARITIES[rar].name });
+          }
+        }
+        gems.push({ x: e.x, y: e.y, val: e.expValue });
+        const curIdx = enemies.indexOf(e);
+        if (curIdx !== -1) enemies.splice(curIdx, 1);
+        if (!e.isDummy) kills++;
+      }
+    }
+    
+    function damageArea(cx, cy, range, facing, arc, baseDmg, kb, opts = {}) {
+      const cs = typeof getDerivedCombatStats === 'function' ? getDerivedCombatStats() : { knockbackMult: 1 };
+      const kbMult = cs.knockbackMult || 1;
+      let hitCount = 0;
+      const slammedSet = new Set();
+      for (let i = enemies.length - 1; i >= 0; i--) {
+        if (opts.maxTargets && hitCount >= opts.maxTargets) break;
+        const e = enemies[i], dx = e.x - cx, dy = e.y - cy;
+        if (Math.hypot(dx, dy) <= range + e.radius) {
+          let diff = Math.atan2(dy, dx) - facing;
+          while (diff > Math.PI) diff -= Math.PI * 2; while (diff < -Math.PI) diff += Math.PI * 2;
+          if (arc >= Math.PI * 1.9 || Math.abs(diff) <= arc / 2) {
+            hitCount++;
+            const rawKb = (typeof opts.kbRange === 'object' && opts.kbRange)
+              ? (opts.kbRange.min + Math.random() * (opts.kbRange.max - opts.kbRange.min))
+              : kb;
+            const kbFinal = rawKb * kbMult;
+            const allowDummyKb = e.isDummy && typeof SANDBOX_STATE !== 'undefined' && SANDBOX_STATE.active && SANDBOX_STATE.dummyKnockback;
+            const res = (e.isDummy && !allowDummyKb) ? 0 : ((e.isElite || e.isMegaBoss || e.isFinalBoss) ? 0.15 : 1);
+            const ang = Math.atan2(dy, dx), pushDist = kbFinal * res;
+            e.x += Math.cos(ang) * pushDist; e.y += Math.sin(ang) * pushDist;
+            if (opts.onTargetHit) opts.onTargetHit(e);
+            const finalBaseDmg = (typeof opts.dmgModFn === 'function') ? (baseDmg * (opts.dmgModFn(e) || 1)) : baseDmg;
+            hitEnemy(i, finalBaseDmg, opts);
+
+            // 擊退撞擊二次傷害（每名被擊退目標單次揮擊最多觸發 1 次撞擊）
+            if (opts.slamRatio && pushDist > 2 && !slammedSet.has(e) && enemies[i] === e && !e.isDead) {
+              for (let k = enemies.length - 1; k >= 0; k--) {
+                const other = enemies[k];
+                if (other !== e && !other.isDead && Math.hypot(other.x - e.x, other.y - e.y) <= e.radius + other.radius + 8) {
+                  slammedSet.add(e);
+                  const slamDmg = finalBaseDmg * opts.slamRatio;
+                  damageTexts.push({ x: other.x, y: other.y - other.radius - 12, txt: `💥撞擊`, color: '#fb923c', fontSize: 12, life: 0.50 });
+                  hitEnemy(k, slamDmg, { element: opts.element || 'none', noCrit: true });
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    // 統一尋怪引擎（預設採最近敵人優先 nearest，支援技能卡 targetMode 客製覆寫）
+    function findTargetEnemy(maxDist = 900, targetMode = 'nearest') {
+      if (!enemies || enemies.length === 0) return null;
+      const inRange = enemies.filter(e => Math.hypot(e.x - player.x, e.y - player.y) <= maxDist);
+      if (inRange.length === 0) return null;
+      if (targetMode === 'random') {
+        return inRange[Math.floor(Math.random() * inRange.length)];
+      }
+      if (targetMode === 'highestHp') {
+        return inRange.reduce((best, cur) => (cur.hp > best.hp ? cur : best), inRange[0]);
+      }
+      if (targetMode === 'status') {
+        const afflicted = inRange.filter(e => e.burnTimer > 0 || e.freezeTimer > 0 || e.shockTimer > 0 || e.windTimer > 0 || (e.holySeal || 0) > 0 || e.darkTimer > 0);
+        const pool = afflicted.length > 0 ? afflicted : inRange;
+        return pool.reduce((best, cur) => (Math.hypot(cur.x - player.x, cur.y - player.y) < Math.hypot(best.x - player.x, best.y - player.y) ? cur : best), pool[0]);
+      }
+      return inRange.reduce((best, cur) => (Math.hypot(cur.x - player.x, cur.y - player.y) < Math.hypot(best.x - player.x, best.y - player.y) ? cur : best), inRange[0]);
+    }
+    
+    function findNearestEnemy(maxDist) {
+      return findTargetEnemy(maxDist, 'nearest');
+    }
+    
+    
