@@ -118,11 +118,15 @@ function upgradeClassicHud() {
       ownedSkills[c.id] ? ownedSkills[c.id].lv++ : (ownedSkills[c.id] = { lv: 1, evolved: false, disabled: false });
     } else if (c.kind === 'passive') {
       ownedPassives[c.id] = (ownedPassives[c.id] || 0) + 1;
-      if (c.id === 'fastsword' || c.id === 'haste') player.cdMult *= 0.92;
+      if (c.id === 'fastsword') { player.cdMult *= 0.97; player.bonusDoubleHit = (player.bonusDoubleHit || 0) + 0.025; }
+      if (c.id === 'haste') player.cdMult *= 0.92;
       if (c.id === 'cdr') player.cdMult *= 0.94;
-      if (c.id === 'guard' || c.id === 'area') player.areaMult += 0.10;
+      if (c.id === 'guard') { /* 減傷由 getEffectivePhysReducePct / getEffectiveMagReducePct 動態讀取 */ }
+      if (c.id === 'area') player.areaMult += 0.10;
       if (c.id === 'might') player.dmgMult += 0.08;
       if (c.id === 'crit') player.bonusCritRate += 0.04;
+      if (c.id === 'speedUp') { player.speedMult += 0.07; player.bonusCritRate += 0.02; }
+      if (c.id === 'nobleFortune') { player.expMult = (player.expMult || 1.0) + 0.06; player.pickupRange = (player.pickupRange || 115) * 1.12; player.seedMult = (player.seedMult || 1.0) + 0.20; }
       if (c.id === 'lucky') player.dropRateMult = (player.dropRateMult || 1.0) + 0.20;
       if (c.id === 'windBoot') player.speedMult += 0.09;
       if (c.id === 'angelWish') player.speedMult -= 0.10;
@@ -155,11 +159,17 @@ function upgradeClassicHud() {
       const sk = ACTIVE_SKILLS[k];
       if (!sk || !sk.canEvolve || st.evolved || st.disabled || st.lv < sk.maxLv) return false;
       if (!sk.reqPassive || !ownedPassives[sk.reqPassive]) return false;
-      if (sk.reqWeaponType && curWType !== sk.reqWeaponType) return false;
+      const charEvo = (sk.evoByChar && sk.evoByChar[curCharId]) ? sk.evoByChar[curCharId] : null;
+      const targetEvoId = charEvo ? charEvo.evoSkillId : sk.evoSkillId;
+      const evoSk = targetEvoId ? (ACTIVE_SKILLS[targetEvoId] || (typeof GLOBAL_SKILL_POOL !== 'undefined' ? GLOBAL_SKILL_POOL[targetEvoId] : null)) : null;
+      const allowedWeapons = (evoSk && Array.isArray(evoSk.reqWeaponTypes)) ? evoSk.reqWeaponTypes
+        : (Array.isArray(sk.reqWeaponTypes) ? sk.reqWeaponTypes : (sk.reqWeaponType ? [sk.reqWeaponType] : null));
+      if (allowedWeapons && curWType && !allowedWeapons.includes(curWType)) return false;
       // 戰士劍類鐵則：唯有綁定當前武器本命技能的招式才具備超武昇華資格
       if (isSwordType && sigSkill && k !== sigSkill) return false;
       return true;
     });
+
     if (ready.length > 0) {
       hideSkillTooltip(); isPaused = true;
       currentChoices = ready.slice(0, 3).map(([id]) => {

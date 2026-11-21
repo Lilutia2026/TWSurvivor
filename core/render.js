@@ -12,7 +12,13 @@ function draw() {
     ctx.save(); ctx.translate(ox, oy);
     zones.forEach(z => {
       ctx.save();
-      if (z.kind === 'fire_sea') {
+      if (z.kind === 'wind_vortex') {
+        ctx.strokeStyle = 'rgba(52, 211, 153, 0.80)';
+        ctx.fillStyle = 'rgba(16, 185, 129, 0.14)';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.arc(z.x, z.y, z.radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.arc(z.x, z.y, z.radius * 0.62, gameTime * 5, gameTime * 5 + Math.PI * 1.4); ctx.stroke();
+      } else if (z.kind === 'fire_sea') {
         ctx.fillStyle = 'rgba(234,88,12,0.28)'; ctx.strokeStyle = 'rgba(251,146,60,0.75)'; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.arc(z.x, z.y, z.radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       } else if (z.kind === 'dark_pool') {
@@ -93,6 +99,23 @@ function draw() {
     ctx.restore();
     return;
   }
+  if (p.skillId === 'senku') {
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(Math.atan2(p.vy, p.vx));
+    const r = p.radius * 1.35;
+    ctx.fillStyle = 'rgba(186, 230, 253, 0.35)';
+    ctx.strokeStyle = '#e0f2fe';
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    ctx.arc(-r * 0.25, 0, r, -Math.PI * 0.42, Math.PI * 0.42);
+    ctx.arc(-r * 0.65, 0, r * 0.88, Math.PI * 0.42, -Math.PI * 0.42, true);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
   const col = p.type === 'fire' ? '#fb923c' : (p.type === 'ice' ? '#38bdf8' : (p.type === 'holy' ? '#fef08a' : '#4ade80'));
   ctx.fillStyle = col; ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2); ctx.fill();
 });
@@ -104,7 +127,82 @@ enemyProjectiles.forEach(ep => {
 slashes.forEach(s => {
   ctx.save();
   const sx = (s.x !== undefined) ? s.x : player.x, sy = (s.y !== undefined) ? s.y : player.y, ang = s.angle || 0;
-  if (s.type === 'aurora' || (s.arc && s.arc <= 0.65)) {
+  if (s.type === 'aurora_needle') {
+    const maxLife = s.maxLife || 0.20;
+    ctx.globalAlpha = Math.max(0, Math.min(1, s.life / maxLife));
+    ctx.translate(sx, sy);
+    ctx.rotate(ang);
+    const halfW = s.baseW || 16;
+    const len = s.range;
+    const grad = ctx.createLinearGradient(0, 0, len, 0);
+    if (s.isThunder) {
+      grad.addColorStop(0, s.isOverload ? 'rgba(250, 204, 21, 0.35)' : 'rgba(56, 189, 248, 0.30)');
+      grad.addColorStop(1, s.isOverload ? 'rgba(254, 240, 138, 0.95)' : 'rgba(224, 242, 254, 0.95)');
+    } else {
+      grad.addColorStop(0, 'rgba(56, 189, 248, 0.28)');
+      grad.addColorStop(1, 'rgba(224, 242, 254, 0.92)');
+    }
+    ctx.fillStyle = grad;
+    ctx.strokeStyle = s.isOverload ? '#fef08a' : '#bae6fd';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(14, -halfW);
+    ctx.lineTo(len, 0);
+    ctx.lineTo(14, halfW);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // 65% 處標示尖針 100% 滿額傷害甜區分界線
+    const sweetX = len * 0.65;
+    const sweetW = halfW * (1 - 0.65);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(sweetX, -sweetW);
+    ctx.lineTo(sweetX, sweetW);
+    ctx.stroke();
+  } else if (s.type === 'senku_pillars') {
+    const maxLife = s.maxLife || 0.32;
+    ctx.globalAlpha = Math.max(0, Math.min(1, s.life / maxLife));
+    const arcSpan = s.arc || 0.58;
+    ctx.fillStyle = 'rgba(253, 224, 71, 0.14)';
+    ctx.strokeStyle = 'rgba(254, 240, 138, 0.85)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.arc(sx, sy, s.range, ang - arcSpan / 2, ang + arcSpan / 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // 沿扇形區域繪製多道金白色垂直衝擊光柱
+    const steps = [0.30, 0.55, 0.78, 0.94];
+    const sideAngles = [-arcSpan * 0.30, 0, arcSpan * 0.30];
+    steps.forEach((stPct, idx) => {
+      sideAngles.forEach(aOff => {
+        const px = sx + Math.cos(ang + aOff) * (s.range * stPct);
+        const py = sy + Math.sin(ang + aOff) * (s.range * stPct);
+        const colW = 10 + idx * 4;
+        const colH = 55 + idx * 18;
+        ctx.fillStyle = 'rgba(254, 240, 138, 0.45)';
+        ctx.fillRect(px - colW / 2, py - colH, colW, colH);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+        ctx.fillRect(px - colW * 0.22, py - colH * 0.92, colW * 0.44, colH * 0.92);
+      });
+    });
+  } else if (s.type === 'renga' || s.type === 'renga_fire') {
+    const isFire = s.type === 'renga_fire';
+    ctx.globalAlpha = Math.max(0, Math.min(1, s.life / 0.20));
+    const arcSpan = s.arc || 1.85;
+    ctx.fillStyle = isFire ? 'rgba(249, 115, 22, 0.26)' : 'rgba(148, 163, 184, 0.24)';
+    ctx.strokeStyle = isFire ? '#fdba74' : '#f8fafc';
+    ctx.lineWidth = isFire ? 4 : 3.5;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.arc(sx, sy, s.range, ang - arcSpan / 2, ang + arcSpan / 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  } else if (s.type === 'aurora' || (s.arc && s.arc <= 0.65)) {
     const ex = sx + Math.cos(ang) * s.range, ey = sy + Math.sin(ang) * s.range;
     ctx.strokeStyle = s.evolved ? 'rgba(250,204,21,0.9)' : 'rgba(125,211,252,0.85)';
     ctx.lineWidth = s.evolved ? 12 : 8; ctx.lineCap = 'round';

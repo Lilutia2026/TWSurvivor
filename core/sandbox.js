@@ -1,7 +1,6 @@
 /**
  * ==================================================================
- * 《TW倖存者》木樁測試場獨立模組 (core/sandbox.js) - Part 1/2
- * 鐵則：所有設定皆封裝於 SANDBOX_STATE，絕不污染正式關卡與存檔
+ * 《TW倖存者》木樁測試場獨立模組 
  * ==================================================================
  */
 
@@ -223,17 +222,13 @@ function maxAllOwnedSandboxSkills() {
     }
   }
   
-  // 測試場專用：任意添加或升級指定主動技 / 被動技
-  function getAllSandboxTestableSkills() {
-    const map = {};
-    if (typeof ACTIVE_SKILLS !== 'undefined') Object.assign(map, ACTIVE_SKILLS);
-    if (typeof CHAR_SKILL_REGISTRY !== 'undefined') {
-      for (const entry of Object.values(CHAR_SKILL_REGISTRY)) {
-        if (entry && entry.skills) Object.assign(map, entry.skills);
+       // 測試場專用：依目前進場角色與武器雙向過濾出可測試主動技（不顯示其他角色無關技能）
+       function getAllSandboxTestableSkills() {
+        if (typeof getActiveSkillPool === 'function') return getActiveSkillPool();
+        const map = {};
+        if (typeof ACTIVE_SKILLS !== 'undefined') Object.assign(map, ACTIVE_SKILLS);
+        return map;
       }
-    }
-    return map;
-  }
   
   function addSandboxSkillOrPassive(kind, id) {
     if (!SANDBOX_STATE.active || !id) return;
@@ -259,11 +254,14 @@ function maxAllOwnedSandboxSkills() {
       const cur = ownedPassives[id] || 0;
       if (cur < (p.maxLv || 5)) {
         ownedPassives[id] = cur + 1;
-        if (id === 'fastsword' || id === 'haste') player.cdMult *= 0.92;
+        if (id === 'fastsword') { player.cdMult *= 0.97; player.bonusDoubleHit = (player.bonusDoubleHit || 0) + 0.025; }
+        if (id === 'haste') player.cdMult *= 0.92;
         if (id === 'cdr') player.cdMult *= 0.94;
-        if (id === 'guard' || id === 'area') player.areaMult += 0.10;
+        if (id === 'area') player.areaMult += 0.10;
         if (id === 'might') player.dmgMult += 0.08;
         if (id === 'crit') player.bonusCritRate += 0.04;
+        if (id === 'speedUp') { player.speedMult += 0.07; player.bonusCritRate += 0.02; }
+        if (id === 'nobleFortune') { player.expMult = (player.expMult || 1.0) + 0.06; player.pickupRange = (player.pickupRange || 115) * 1.12; player.seedMult = (player.seedMult || 1.0) + 0.20; }
         if (id === 'windBoot') player.speedMult += 0.09;
         if (id === 'heal') player.regen += 1.2;
       }
@@ -292,11 +290,14 @@ function maxAllOwnedSandboxSkills() {
       const pName = (pPool[id] && pPool[id].name) || id;
       // 依原有等級反向還原被動屬性倍率
       for (let i = 0; i < lv; i++) {
-        if (id === 'fastsword' || id === 'haste') player.cdMult /= 0.92;
+        if (id === 'fastsword') { player.cdMult /= 0.97; player.bonusDoubleHit = Math.max(0, (player.bonusDoubleHit || 0) - 0.025); }
+        if (id === 'haste') player.cdMult /= 0.92;
         if (id === 'cdr') player.cdMult /= 0.94;
-        if (id === 'guard' || id === 'area') player.areaMult -= 0.10;
+        if (id === 'area') player.areaMult -= 0.10;
         if (id === 'might') player.dmgMult -= 0.08;
         if (id === 'crit') player.bonusCritRate -= 0.04;
+        if (id === 'speedUp') { player.speedMult -= 0.07; player.bonusCritRate = Math.max(0, (player.bonusCritRate || 0) - 0.02); }
+        if (id === 'nobleFortune') { player.expMult = Math.max(1.0, (player.expMult || 1.0) - 0.06); player.pickupRange = Math.max(115, (player.pickupRange || 115) / 1.12); player.seedMult = Math.max(1.0, (player.seedMult || 1.0) - 0.20); }
         if (id === 'windBoot') player.speedMult -= 0.09;
         if (id === 'heal') player.regen = Math.max(0, player.regen - 1.2);
       }
@@ -325,6 +326,9 @@ function maxAllOwnedSandboxSkills() {
         if ((e.holySeal || 0) > 0) tags.push(`✨聖印 ${e.holySeal}/3`);
         if (e.armorBreakTimer > 0) tags.push('🔨破甲');
         if (e.darkTimer > 0) tags.push('🌑暗蝕');
+        if ((e.swordBrandTimer || 0) > 0) tags.push('🔥灼印');
+        if ((e.windUnbalanceTimer || 0) > 0) tags.push('🌀失衡');
+
     
         if (tags.length > 0) {
           const txt = tags.join(' '); 

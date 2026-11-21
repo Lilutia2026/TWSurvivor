@@ -15,6 +15,12 @@ const CHARACTERS = {
     id: 'lucien', name: '路西安．卡爾茲', title: '卡雷德的貴公子', color: '#3b82f6', playable: true,
     defaultVariant: 'longsword',
     equipTags: ['all', 'heavy', 'shield', 'longsword', 'blade', 'rapier'],
+    skillTags: ['sword_art', 'common_elem', 'lucien_unique'],
+    resonances: {
+      lightning: { overloadHits:5, overloadCritDmg: [0.50, 0.60, 0.70], shockCritBonus: 0.15, arcPct: 0.10 },
+      fire:      { sparkChance: [0.55, 0.65, 0.65], sparkPct: 0.12, brandDmgBonus: [0.16, 0.19, 0.22], burnExtraBonus: 0.08 },
+      wind:      { vortexDur: 2.0, unbalanceDur: 1.0, widthBonus: [0.15, 0.20, 0.25], lv3SuppressBonus: 0.15, cutPct: 0.12 }
+    },
     variants: {
       longsword: { wName: '長劍', archetype: 'S+H', initHp: 220, defaultTpl: 'w_long_1', baseStats: { S: 4, H: 3, I: 1, DEF: 2, MR: 1, DEX: 2, AGI: 1 } },
       blade:     { wName: '彎刀', archetype: 'H',   initHp: 240, defaultTpl: 'w_bld_1',  baseStats: { S: 3, H: 4, I: 1, DEF: 2, MR: 1, DEX: 2, AGI: 1 } },
@@ -26,6 +32,7 @@ const CHARACTERS = {
     id: 'tichiel', name: '蒂琪愛兒．朱斯彼昂', title: '天真爛漫的聖女', color: '#f472b6', playable: true,
     defaultVariant: 'wand_fire',
     equipTags: ['all', 'robe', 'crystal', 'wand', 'staff', 'mace'],
+    skillTags: ['tichiel_magic', 'staff_mace', 'tichiel_unique'],
     resonances: {
       fire:      { mult: [1.50, 1.80, 2.15, 2.50, 2.90], radius: 115 },
       ice:       { mult: [2.80, 3.40, 4.10, 4.80, 5.60] },

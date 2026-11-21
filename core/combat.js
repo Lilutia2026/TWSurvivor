@@ -50,11 +50,26 @@ function getSkillRawDmg(id, lv, evolved) {
     const isMelee = (bTags.includes('melee') || bTags.includes('近戰') || (!bTags.includes('射彈') && !bTags.includes('projectile') && !bTags.includes('ranged'))) && hasPhysTag;
     const defBonus = isMelee ? (cs.defThornsDmg || 0) : 0;
   
-    const blessMult = 1 + (ownedPassives.blessing || 0) * 0.03;
-    const angelMult = ownedPassives.angelWish ? 0.90 : 1.0;
-    const evoMult = (evolved && !sk.isSuperWeapon) ? 1.45 : 1.0;
-    return ((sk.baseDmg + Math.max(0, lv - 1) * sk.perLv) + statPower + defBonus) * player.dmgMult * dmgTypeMult * blessMult * angelMult * evoMult;
-  }
+        // 劍刀雙修：同時持有【劍技】與【刀技】主動技能時，物理技能傷害每級額外 +2%
+        let dualMasteryMult = 1.0;
+        const dualLv = ownedPassives.dualMastery || 0;
+        if (dualLv > 0 && isPhysSkill && typeof ownedSkills !== 'undefined') {
+          let hasSwordArt = false, hasBladeArt = false;
+          for (const [oid, ost] of Object.entries(ownedSkills)) {
+            if (!ost || ost.disabled) continue;
+            const osk = ACTIVE_SKILLS[oid];
+            if (!osk || !osk.desc) continue;
+            if (osk.desc.includes('【劍技')) hasSwordArt = true;
+            if (osk.desc.includes('【刀技')) hasBladeArt = true;
+          }
+          if (hasSwordArt && hasBladeArt) dualMasteryMult += dualLv * 0.02;
+        }
+    
+        const blessMult = 1 + (ownedPassives.blessing || 0) * 0.03;
+        const angelMult = ownedPassives.angelWish ? 0.90 : 1.0;
+        const evoMult = (evolved && !sk.isSuperWeapon) ? 1.45 : 1.0;
+        return ((sk.baseDmg + Math.max(0, lv - 1) * sk.perLv) + statPower + defBonus) * player.dmgMult * dmgTypeMult * dualMasteryMult * blessMult * angelMult * evoMult;
+      }   
   
   function getSpellBase() {
     const st = typeof getTotalStats === 'function' ? getTotalStats() : {};
@@ -122,16 +137,33 @@ function getSkillRawDmg(id, lv, evolved) {
     if (iceRes) { e.freezeTimer = 0; }
   
     const mod = typeof calcStatusDamageMods === 'function' ? calcStatusDamageMods(e, elem, isStrikeOrLight) : { addMult: 1, endMult: 1 };
-    const talentIgnore = (ownedPassives.mageTalent || 0) * 0.03;
+    const physIgnore = opts.isPhysSkill ? ((ownedPassives.dualMastery || 0) * 0.03) : 0;
+    const talentIgnore = Math.min(0.60, (ownedPassives.mageTalent || 0) * 0.03 + physIgnore);
     const bossResist = (e.isFinalBoss ? 0.20 : (e.isMegaBoss ? 0.12 : 0)) * (1 - talentIgnore);
-    let finalDmg = rawDmg * mod.addMult * (1 - bossResist) * mod.endMult * (0.95 + Math.random() * 0.10);
+
+    // 劍傷灼印（烈焰連牙斬）與氣流撕裂（閃空翔烈破＋龍捲刃術）
+    let lucienBrandMult = 1.0;
+    if (opts.isPhysSkill && (e.swordBrandTimer || 0) > 0) {
+      const firePartnerOn = typeof ownedSkills !== 'undefined' && !!ownedSkills.fire1;
+      const burnExtra = (firePartnerOn && e.burnTimer > 0) ? 0.08 : 0;
+      lucienBrandMult += (e.swordBrandBonus || 0.16) + burnExtra;
+    }
+    if (opts.isPhysSkill && e.windTimer > 0 && typeof ownedSkills !== 'undefined' && ownedSkills.senku_wind && ownedSkills.windblade && !opts.isWindCutProc) {
+      e.windTimer += 0.6;
+      const windCutDmg = Math.max(1, Math.round(rawDmg * 0.12));
+      damageTexts.push({ x: e.x - 14, y: e.y - e.radius - 10, txt: `🍃氣流 ${windCutDmg}`, color: '#6ee7b7', fontSize: 12, life: 0.45 });
+      hitEnemy(idx, windCutDmg, { element: 'wind', noCrit: true, isWindCutProc: true, hideText: true });
+    }
+
+    let finalDmg = rawDmg * mod.addMult * lucienBrandMult * (1 - bossResist) * mod.endMult * (0.95 + Math.random() * 0.10);
   
-    const extraCrit = (typeof opts.bonusCritFn === 'function') ? (opts.bonusCritFn(e) || 0) : 0;
+    const staticGuideCrit = (opts.isPhysSkill && e.shockTimer > 0 && typeof ownedSkills !== 'undefined' && ownedSkills.aurora_lightning && ownedSkills.thunder1) ? 0.15 : 0;
+    const extraCrit = ((typeof opts.bonusCritFn === 'function') ? (opts.bonusCritFn(e) || 0) : 0) + staticGuideCrit;
     const totalCrit = (cs.critRate || 0.05) + (player.bonusCritRate || 0) + extraCrit;
     const isCrit = !opts.noCrit && (Math.random() < Math.min(1.0, totalCrit));
     let isSuperCrit = false;
     if (isCrit) {
-      finalDmg *= (cs.critDmg || 1.5);
+      finalDmg *= ((cs.critDmg || 1.5) + (opts.bonusCritDmg || 0));
       const overflow = Math.max(0, totalCrit - 1.0);
       if (overflow > 0 && Math.random() < overflow) {
         isSuperCrit = true;
@@ -220,6 +252,14 @@ function getSkillRawDmg(id, lv, evolved) {
           zones.push({ kind: 'dark_pool', x: e.x, y: e.y, radius: 75 * player.areaMult, life: typeof DARK_ZONE_DUR !== 'undefined' ? DARK_ZONE_DUR : 2.0, tickTimer: 0.5, dmg: e.darkDps || getSpellBase() * 0.32, lv: 1 });
         }
         if (e.isFinalBoss) { endGame(true); return; }
+        const nobleLv = ownedPassives.nobleFortune || 0;
+        if (nobleLv > 0 && (e.isMegaBoss || e.isElite) && typeof saveData !== 'undefined') {
+          const bonusSeed = Math.round((e.isMegaBoss ? 30 : 12) * nobleLv * 0.20);
+          if (bonusSeed > 0) {
+            saveData.seed = (saveData.seed || 0) + bonusSeed;
+            damageTexts.push({ x: e.x, y: e.y - e.radius - 14, txt: `💰+${bonusSeed} Seed`, color: '#fde047', fontSize: 12, life: 0.65 });
+          }
+        }
         if (e.isMegaBoss) chests.push({ x: e.x, y: e.y, kind: 'gold' });
         else if (e.isElite) chests.push({ x: e.x, y: e.y, kind: 'silver' });
     

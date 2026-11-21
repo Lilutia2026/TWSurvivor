@@ -31,19 +31,21 @@ function getEffectiveCdMult(extraFactor = 1.0) {
   return Math.max(0.35, player.cdMult * extraFactor);
 }
 
-// 計算物理（碰撞）減傷百分比（上限 70%）
+// 計算物理（碰撞）減傷百分比（上限 70%，含小愛光之壁障術與路西安萊格藍治之護）
 function getEffectivePhysReducePct(cs) {
   const basePct = (cs && cs.physReducePct) ? cs.physReducePct : 0;
   const wallLv = (typeof ownedPassives !== 'undefined' && ownedPassives.lightWall) ? ownedPassives.lightWall : 0;
-  const rawMult = (1 - basePct / 100) * Math.pow(0.97, wallLv);
+  const guardLv = (typeof ownedPassives !== 'undefined' && ownedPassives.guard) ? ownedPassives.guard : 0;
+  const rawMult = (1 - basePct / 100) * Math.pow(0.97, wallLv + guardLv);
   return Math.min(70, Math.round((1 - rawMult) * 100));
 }
 
-// 計算魔法（射彈）減傷百分比（上限 70%）
+// 計算魔法（射彈）減傷百分比（上限 70%，含小愛魔法盾牌與路西安萊格藍治之護）
 function getEffectiveMagReducePct(cs) {
   const basePct = (cs && cs.magReducePct) ? cs.magReducePct : 0;
   const msLv = (typeof ownedPassives !== 'undefined' && ownedPassives.magicShield) ? ownedPassives.magicShield : 0;
-  const rawMult = (1 - basePct / 100) * Math.pow(0.97, msLv);
+  const guardLv = (typeof ownedPassives !== 'undefined' && ownedPassives.guard) ? ownedPassives.guard : 0;
+  const rawMult = (1 - basePct / 100) * Math.pow(0.97, msLv) * Math.pow(0.985, guardLv);
   return Math.min(70, Math.round((1 - rawMult) * 100));
 }
 
@@ -160,7 +162,28 @@ function update(dt) {
       }
       return z.life > 0;
     }
-    if (z.kind === 'holypoly') {
+    if (z.kind === 'wind_vortex') {
+      for (const e of enemies) {
+        const dx = z.x - e.x, dy = z.y - e.y, dist = Math.hypot(dx, dy);
+        if (dist <= z.radius + e.radius) {
+          e.windUnbalanceTimer = Math.max(e.windUnbalanceTimer || 0, 1.0);
+          if (!e.isDummy && dist > 14) {
+            const pullSpeed = z.pullForce || 62;
+            e.x += (dx / dist) * pullSpeed * dt;
+            e.y += (dy / dist) * pullSpeed * dt;
+          }
+        }
+      }
+      if (z.tickTimer <= 0) {
+        z.tickTimer = 0.5;
+        for (let j = enemies.length - 1; j >= 0; j--) {
+          const e = enemies[j];
+          if (Math.hypot(e.x - z.x, e.y - z.y) <= z.radius + e.radius) {
+            hitEnemy(j, z.dmg, { element: 'wind', noCrit: true });
+          }
+        }
+      }
+    } else if (z.kind === 'holypoly') {
       for (const e of enemies) {
         const d = Math.hypot(z.x - e.x, z.y - e.y);
         if (d < z.radius && d > 12) { const a = Math.atan2(z.y - e.y, z.x - e.x); e.x += Math.cos(a) * 95 * dt; e.y += Math.sin(a) * 95 * dt; }
@@ -370,8 +393,10 @@ for (let i = enemies.length - 1; i >= 0; i--) {
   const e = enemies[i];
   if (e.freezeTimer > 0) e.freezeTimer -= dt; if (e.stunTimer > 0) e.stunTimer -= dt;
   if (e.statusImmuneTimer > 0) e.statusImmuneTimer -= dt;
-  if (e.shockTimer > 0) e.shockTimer -= dt; if (e.armorBreakTimer > 0) e.armorBreakTimer -= dt;
-  if (e.darkTimer > 0) e.darkTimer -= dt; if (e.chainIcd > 0) e.chainIcd -= dt;
+  if (e.shockTimer > 0) e.shockTimer -= dt;      if (e.armorBreakTimer > 0) e.armorBreakTimer -= dt;
+  if (e.darkTimer > 0) e.darkTimer -= dt;
+  if ((e.swordBrandTimer || 0) > 0) e.swordBrandTimer -= dt;
+  if ((e.windUnbalanceTimer || 0) > 0) e.windUnbalanceTimer -= dt;
   if (e.holySealTimer > 0 && (e.holySealTimer -= dt) <= 0) { e.holySealTimer = 0; e.holySeal = 0; }
   if (e.hitFlash > 0) e.hitFlash -= dt;
 

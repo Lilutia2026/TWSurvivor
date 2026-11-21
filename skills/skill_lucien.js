@@ -1,55 +1,95 @@
-// 路西安．卡爾茲 專屬技能與輔助庫（V2.4 標籤規則基準版）
-CHAR_SKILL_REGISTRY.lucien = {
-  skills: {
-    renga: {
-      name: '連犽斬', icon: '🗡️', evoName: '疾風連犽斬', evoIcon: '⚔️', type: 'physical', element: 'none', maxLv: 8,
-      statTags: ['H'], behaviorTags: ['範圍'], baseDmg: 22, perLv: 8, baseCd: 0.90,
-      canEvolve: true, reqPassive: 'fastsword',
-      resonancePartner: 'firearrow',
-      resonanceDesc: '持有【火箭術】時，疾風連犽斬揮砍機率附加【點燃】，擊殺點燃敵人引發【烈焰殉爆】。',
-      evoDesc: '【刀技・物理・H・範圍】刀勢化作無盡疾風連斬，攻擊範圍與傷害大幅躍升。',
-      desc: '【刀技・物理・H・範圍】如疾風驟雨般向前方扇形揮出凌厲連斬。'
-    },
-    aurora: {
-      name: '極光刺', icon: '🤺', evoName: '衝雷劍', evoIcon: '⚡', type: 'physical', element: 'none', maxLv: 8,
-      statTags: ['S'], behaviorTags: ['範圍'], baseDmg: 30, perLv: 11, baseCd: 0.65,
-      canEvolve: true, reqPassive: 'haste',
-      resonancePartner: 'thunder',
-      resonanceDesc: '持有【電擊術】時，衝雷劍突刺機率附加【感電】並自動彈射連鎖閃電。',
-      evoDesc: '【劍技・物理・S・範圍】劍鋒凝聚狂暴雷光，化作貫穿戰場的極速閃電突刺。',
-      desc: '【劍技・物理・S・範圍】將劍氣凝聚於一點，化作極光鎖敵直線突刺。'
-    },
-    enbu: {
-      name: '圓月斬', icon: '🌙', evoName: '狂風暴襲', evoIcon: '🌪️', type: 'physical', element: 'none', maxLv: 8,
-      statTags: ['H'], behaviorTags: ['範圍'], baseDmg: 20, perLv: 7, baseCd: 1.45,
-      canEvolve: true, reqPassive: 'guard',
-      resonancePartner: 'windblade',
-      resonanceDesc: '持有【龍捲刃】時，狂風暴襲旋轉機率附加【遲緩】並向四周射出穿透風刃。',
-      evoDesc: '【刀技・物理・H・範圍】迴旋刀氣化為席捲全場的毀滅風暴，範圍與威力全面解放。',
-      desc: '【刀技・物理・H・範圍】以自身為軸心高速迴旋，斬出圓月般的 360° 刀氣波。'
-    },
-    windblade: {
-      name: '龍捲刃', icon: '🍃', type: 'magic', element: 'wind', maxLv: 10,
-      statTags: ['INT'], behaviorTags: ['射彈'], baseDmg: 15, perLv: 5, baseCd: 1.15,
-      canEvolve: false,
-      desc: '【風系魔法・INT・射彈】喚出呼嘯旋轉的青色風刃追蹤敵人，機率附加【遲緩】。'
-    },
-    firearrow: {
-      name: '火箭術', icon: '🔥', type: 'magic', element: 'fire', maxLv: 10,
-      statTags: ['INT'], behaviorTags: ['射彈'], baseDmg: 22, perLv: 7, baseCd: 1.30,
-      canEvolve: false,
-      desc: '【火系魔法・INT・射彈】凝聚熾熱魔力射出烈焰箭矢貫穿敵陣，機率附加【點燃】。'
-    },
-    thunder: {
-      name: '電擊術', icon: '🌩️', type: 'magic', element: 'thunder', maxLv: 10,
-      statTags: ['INT'], behaviorTags: ['射彈'], baseDmg: 28, perLv: 9, baseCd: 1.65,
-      canEvolve: false,
-      desc: '【雷系魔法・INT・射彈】引動天際雷雲降下高壓落雷劈擊敵群，機率附加【感電】。'
-    }
+// 路西安．卡爾茲（小陸）專屬技能與輔助庫（V2.8 統一大卡池雙向標籤定案版・共 13 張卡片）
+const LUCIEN_PASSIVES = {
+  fastsword: {
+    name: '⚡ 萊格藍治快劍術', reqChar: ['lucien'], skillTags: ['lucien_unique'], maxLv: 5,
+    desc: '每級連擊觸發率 +2.5%、全技能冷卻縮減 +3%（細劍超武昇華鑰匙）'
   },
-  passives: {
-    fastsword: { name: '⚡ 萊格藍治快劍術', maxLv: 5, desc: '全技能冷卻縮減 +8%、移動速度 +4%' },
-    guard:     { name: '🛡️ 萊格藍治之護',   maxLv: 5, desc: '【範圍】技能攻擊範圍 +10%' },
-    haste:     { name: '🌪️ 疾風連斬之舞',   maxLv: 5, desc: '全技能冷卻縮減 +8%' }
+  guard: {
+    name: '🛡️ 萊格藍治之護', reqChar: ['lucien'], skillTags: ['lucien_unique'], maxLv: 5,
+    desc: '每級物理（碰撞）減傷 +3%、魔法（射彈）減傷 +1.5%（彎刀超武昇華鑰匙）'
+  },
+  dualMastery: {
+    name: '⚔️ 劍刀雙修', reqChar: ['lucien'], skillTags: ['lucien_unique'], maxLv: 5,
+    desc: '每級物理技能無視抗性 +3%；同時持有劍技與刀技時物理傷害 +2%（長劍超武昇華鑰匙）'
+  },
+  speedUp: {
+    name: '🌪️ 疾速術', reqChar: ['lucien'], skillTags: ['lucien_unique'], maxLv: 5,
+    desc: '每級移動速度 +7%、全技能暴擊率 +2%'
+  },
+  nobleFortune: {
+    name: '💰 富豪之道', reqChar: ['lucien'], skillTags: ['lucien_unique'], maxLv: 5,
+    desc: '每級經驗獲取 +6%、拾取範圍 +12%、精英與首領額外掉落 Seed +20%'
   }
 };
+
+const LUCIEN_SKILLS = {
+  // === 物理劍刀基礎主動池（全劍可選，超武依武器型態唯一鎖定） ===
+  aurorathrust: {
+    name: '極光刺刃', icon: '🗡️', evoName: '極光雷閃刺', evoIcon: '⚡',
+    reqChar: ['lucien'], skillTags: ['sword_art'], reqWeaponTypes: ['rapier', 'blade', 'longsword'],
+    type: 'physical', element: 'physical', statusTags: [], statTags: ['S'], behaviorTags: ['melee', 'aoe'], maxLv: 8,
+    baseDmg: 28, perLv: 10, baseCd: 0.75, canEvolve: true, reqPassive: 'fastsword', evoSkillId: 'aurora_lightning', disableWhenEvo: true,
+    evoDesc: '【劍技・物理・雷・S・近戰・範圍】瞬間刺出 3 道交錯極光雷閃錐光，累計命中觸發【雷電超載】延長距離並放大暴擊傷害。',
+    desc: '【劍技・物理・S・近戰・範圍】向前方突刺出窄圓錐極光劍芒，劍尖末端（65% 射程外）造成 100% 傷害，前端造成 70% 傷害（細劍本命技）。'
+  },
+  renga: {
+    name: '連牙斬', icon: '⚔️', evoName: '烈焰連牙斬', evoIcon: '🔥',
+    reqChar: ['lucien'], skillTags: ['sword_art'], reqWeaponTypes: ['rapier', 'blade', 'longsword'],
+    type: 'physical', element: 'physical', statusTags: [], statTags: ['H'], behaviorTags: ['melee', 'aoe'], maxLv: 8,
+    baseDmg: 24, perLv: 8, baseCd: 1.30, canEvolve: true, reqPassive: 'guard', evoSkillId: 'renga_fire', disableWhenEvo: true,
+    evoDesc: '【刀技・物理・火・H・近戰・範圍】前方大扇形 4 連狂暴烈焰劈砍，高機率引爆火花並附加【劍傷灼印】放大物理連斬傷害。',
+    desc: '【刀技・物理・H・近戰・範圍】高速揮刀連續劈砍前方扇形敵群，LV.4 升級為 3 連斬（彎刀本命技）。'
+  },
+  senku: {
+    name: '閃空烈破', icon: '🌙', evoName: '閃空翔烈破', evoIcon: '🌪️',
+    reqChar: ['lucien'], skillTags: ['sword_art'], reqWeaponTypes: ['rapier', 'blade', 'longsword'],
+    type: 'physical', element: 'physical', statusTags: [], statTags: ['S', 'H'], behaviorTags: ['ranged', 'projectile'], maxLv: 8,
+    baseDmg: 25, perLv: 9, baseCd: 1.15, canEvolve: true, reqPassive: 'dualMastery', evoSkillId: 'senku_wind', disableWhenEvo: true,
+    evoDesc: '【劍技・物理・風・S+H・遠程・範圍】向前方扇形轟出多道金白色衝擊光柱，每 3 次施放捲起 2.0s【真空風渦】聚怪並擴寬光柱。',
+    desc: '【劍技・物理・S+H・遠程・射彈】揮劍斬出高速穿透新月劍氣投射物貫穿直線敵群，LV.8 雙發齊射（長劍本命技）。'
+  },
+  enbu: {
+    name: '圓月斬', icon: '🌀',
+    reqChar: ['lucien'], skillTags: ['sword_art'], reqWeaponTypes: ['rapier', 'blade', 'longsword'],
+    type: 'physical', element: 'physical', statusTags: [], statTags: ['H'], behaviorTags: ['melee', 'aoe'], maxLv: 8,
+    baseDmg: 20, perLv: 7, baseCd: 1.45, canEvolve: false,
+    desc: '【刀技・物理・H・近戰・範圍】以自身為中心 360° 迴旋揮斬橫掃周身敵群並附帶輕微擊退護身。'
+  },
+    // === 路西安一轉元素超武（一武器類型 ＝ 每局唯一超武；本質為物理劍刀技，需持有對應元素法術卡才啟動元素共鳴） ===
+    aurora_lightning: {
+      name: '極光雷閃刺', icon: '⚡', reqChar: ['lucien'], skillTags: ['sword_art'], reqWeaponTypes: ['rapier'],
+      isSuperWeapon: true, evoFrom: 'aurorathrust', resonancePartner: 'thunder1',
+      type: 'physical', element: 'lightning', statusTags: [], statTags: ['S'], behaviorTags: ['melee', 'aoe'], maxLv: 3,
+      baseDmg: 34, perLv: 12, baseCd: 0.85, canEvolve: false,
+      resonanceDesc: '需同時持有【⚡ 落雷術】啟動：命中【感電】目標觸發【靜電導引】，物理劍技對其暴擊率額外 +15%。',
+      desc: '【劍技・物理・雷・S・近戰・範圍】瞬間刺出 3 道交錯極光雷閃尖刺，累計命中 5 次（LV.3 降至 4 次）觸發【雷電超載】延長距離並放大暴傷（+50%/+60%/+70%）。'
+    },
+    renga_fire: {
+      name: '烈焰連牙斬', icon: '🔥', reqChar: ['lucien'], skillTags: ['sword_art'], reqWeaponTypes: ['blade'],
+      isSuperWeapon: true, evoFrom: 'renga', resonancePartner: 'fire1',
+      type: 'physical', element: 'fire', statusTags: [], statTags: ['H'], behaviorTags: ['melee', 'aoe'], maxLv: 3,
+      baseDmg: 30, perLv: 10, baseCd: 1.40, canEvolve: false,
+      resonanceDesc: '需同時持有【🔥 火箭術】啟動：命中【點燃】目標觸發【助燃劍氣】，使【劍傷灼印】物理增傷額外再 +8%（滿級合計 +30%）。',
+      desc: '【刀技・物理・火・H・近戰・範圍】大扇形 4 連狂暴烈焰劈砍（LV.3 第 4 斬 1.35x），機率引爆火花並附加 2 秒【劍傷灼印】使物理劍技增傷（+16%/+19%/+22%）。'
+    },
+    senku_wind: {
+      name: '閃空翔烈破', icon: '🌪️', reqChar: ['lucien'], skillTags: ['sword_art'], reqWeaponTypes: ['longsword'],
+      isSuperWeapon: true, evoFrom: 'senku', resonancePartner: 'windblade',
+      type: 'physical', element: 'wind', statusTags: [], statTags: ['S', 'H'], behaviorTags: ['ranged', 'aoe'], maxLv: 3,
+      baseDmg: 56, perLv: 19, baseCd: 1.25, canEvolve: false,
+      resonanceDesc: '需同時持有【🍃 龍捲刃術】啟動：命中【鎌鼬】目標觸發【氣流撕裂】，延長鎌鼬時間並追加微幅風壓切割。',
+      desc: '【劍技・物理・風・S+H・遠程・範圍】向前方遠距離轟出多道金白色衝擊光柱（每級射程 +10%），每 3 次施放捲起 2.0s【真空風渦】與 1.0s 失衡，擴寬光柱（+15%/+20%/+25%）且 LV.3 對牽引與失衡目標壓制增傷 +15%。'
+    }, 
+
+  // === 跨角色共用元素法術（common_elem） ===
+  windblade: {
+    name: '龍捲刃術', icon: '🍃', skillTags: ['common_elem'], reqWeaponTypes: ['longsword', 'blade', 'rapier', 'tachi', 'greatsword'],
+    type: 'magic', element: 'wind', statusTags: ['wind'], statTags: ['INT'], behaviorTags: ['ranged', 'projectile'], maxLv: 10,
+    baseDmg: 21, perLv: 6, baseCd: 1.15, canEvolve: false,
+    desc: '【風系魔法・魔法・INT・遠程・射彈】凝聚疾風魔力發射高速穿透風刃，機率附加【鎌鼬】。'
+  }
+};
+
+CHAR_SKILL_REGISTRY.lucien = { passives: LUCIEN_PASSIVES, skills: LUCIEN_SKILLS };
+if (typeof registerGlobalPassives === 'function') registerGlobalPassives(LUCIEN_PASSIVES);
+if (typeof registerGlobalSkills === 'function') registerGlobalSkills(LUCIEN_SKILLS);
