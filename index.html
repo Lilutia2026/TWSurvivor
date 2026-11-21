@@ -43,7 +43,7 @@
   <!-- 卡雷德準備大廳 -->
   <div id="lobbyModal" class="modal" style="display:flex;">
     <div class="panel">
-      <h2 style="color:#fde047;text-align:center;">⚔ TW倖存者 — 卡雷德準備大廳（V2.4）</h2>
+      <h2 style="color:#fde047;text-align:center;">⚔ TW倖存者 — 卡雷德準備大廳（V2.9）</h2>
       <div id="lobbyHeader" style="text-align:center;font-size:13px;color:#cbd5e1;margin-top:6px;"></div>
       <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-top:8px;">
         <button class="stat-btn" style="width:auto;padding:4px 10px;background:#64748b;color:#fff;" onclick="resetStats()">🔄 洗點</button>
@@ -82,7 +82,7 @@
   <!-- 角色詳細資訊視窗 -->
   <div id="charDetailModal" class="modal">
     <div class="panel" style="max-width:760px;">
-      <h2 style="color:#fde047;text-align:center;">📊 角色完整素質與 V2.4 公式明細</h2>
+      <h2 style="color:#fde047;text-align:center;">📊 角色完整素質與公式明細</h2>
       <div id="charDetailContent" class="status-grid"></div>
       <div style="text-align:center;margin-top:12px;">
         <button class="stat-btn" style="width:140px;height:32px;" onclick="toggleCharDetailModal(false)">關閉視窗</button>
@@ -111,15 +111,19 @@
 
   <!-- 依相依性順序載入所有核心腳本 -->
   <script src="data/characters.js"></script>
-  <script src="data/raw_tw_skills.js"></script> 
+  <script src="data/raw_tw_skills.js"></script>
   <script src="data/item_weapon_swords.js"></script>
+  <script src="data/item_weapon_heavy.js"></script>
+  <script src="data/item_weapon_light.js"></script>
   <script src="data/item_weapon_magic.js"></script>
   <script src="data/item_weapons.js"></script>
   <script src="data/armor_sub.js"></script>
   <script src="data/armor_body.js"></script>
   <script src="data/armor_parts.js"></script>
   <script src="data/armor_special.js"></script>
+  <script src="data/armor_wings.js"></script>
   <script src="data/item_armors.js"></script>
+  <script src="data/item_event.js"></script>
   <script src="data/item_consumable.js"></script>
   <script src="core/equip.js"></script>
   <script src="core/resonance.js"></script>

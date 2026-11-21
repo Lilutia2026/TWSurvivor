@@ -40,12 +40,11 @@ const CHARACTERS = {
       holy:      { polyMult: [2.60, 3.20, 3.90, 4.60, 5.40], hammerMult: [3.00, 3.70, 4.50, 5.20, 6.00], waveRadiusBonus: [0, 0.10, 0.20, 0.30, 0.40] }
     },
     variants: {
-      wand_fire:    { wName: '火魔杖', archetype: 'I',     initHp: 160, defaultTpl: 'w_wnd_f_1', baseStats: { S: 1, H: 2, I: 4, DEF: 1, MR: 3, DEX: 2, AGI: 1 } },
-      wand_ice:     { wName: '冰魔杖', archetype: 'I',     initHp: 160, defaultTpl: 'w_wnd_i_1', baseStats: { S: 1, H: 2, I: 4, DEF: 1, MR: 3, DEX: 2, AGI: 1 } },
-      wand_thunder: { wName: '雷魔杖', archetype: 'I',     initHp: 160, defaultTpl: 'w_wnd_t_1', baseStats: { S: 1, H: 2, I: 4, DEF: 1, MR: 3, DEX: 2, AGI: 1 } },
-      staff:        { wName: '法杖',   archetype: 'MR',    initHp: 170, defaultTpl: 'w_stf_1',   baseStats: { S: 2, H: 2, I: 2, DEF: 2, MR: 3, DEX: 2, AGI: 1 } },
-      mace:         { wName: '釘錘',   archetype: 'DEF+H', initHp: 180, defaultTpl: 'w_mac_1',   baseStats: { S: 2, H: 3, I: 1, DEF: 3, MR: 2, DEX: 2, AGI: 1 } }
+      wand:  { wName: '法杖', archetype: 'I',      initHp: 170, defaultTpl: 'w_wand_0', baseStats: { S: 1, H: 1, I: 5, DEF: 1, MR: 3, DEX: 1, AGI: 2 } },
+      staff: { wName: '權杖', archetype: 'MR',     initHp: 185, defaultTpl: 'w_stf_0',  baseStats: { S: 1, H: 1, I: 3, DEF: 2, MR: 5, DEX: 1, AGI: 1 } },
+      mace:  { wName: '釘錘', archetype: 'DEF+MR', initHp: 215, defaultTpl: 'w_mace_0', baseStats: { S: 1, H: 3, I: 2, DEF: 4, MR: 3, DEX: 1, AGI: 1 } }
     }
+
   },
 
   boris: {

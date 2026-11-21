@@ -1,31 +1,79 @@
-// 身體鎧甲資料庫（白字僅保留原版七大素質：S / H / I / DEF / MR / DEX / AGI，其餘詞條全數捨棄）
+// 身體防具資料庫（輕鎧 all / 重鎧 heavy / 法袍 robe / 忍服 ninja；LV.4 ～ LV.190）
 const ARMOR_BODY_ITEMS = [
-    // === 輕鎧＆套裝鎧甲（equipTag: 'all'） ===
-    { tplId: 'arm_4',    slot: 'armor', equipTag: 'all', name: '光耀布衣',     reqLv: 4,  reqStats: {},          DEF: 3 },
-    { tplId: 'arm_12',   slot: 'armor', equipTag: 'all', name: '光耀緊身衣',   reqLv: 12, reqStats: { DEF: 3 },  DEF: 8, MR: 3 },
-    { tplId: 'arm_20',   slot: 'armor', equipTag: 'all', name: '光耀金屬鎧甲', reqLv: 20, reqStats: { DEF: 4 },  DEF: 16, MR: 5 },
-    { tplId: 'arm_28',   slot: 'armor', equipTag: 'all', name: '光耀魔晶甲',   reqLv: 28, reqStats: { DEF: 5 },  DEF: 22, MR: 6, AGI: 2 },
-    { tplId: 'arm_35',   slot: 'armor', equipTag: 'all', name: '天鷹戰甲',     reqLv: 35, reqStats: { DEF: 10 }, DEF: 25, MR: 12, AGI: 3 },
-    { tplId: 'arm_42',   slot: 'armor', equipTag: 'all', name: '聖石鎧甲',     reqLv: 42, reqStats: { DEF: 14 }, DEF: 28, MR: 16, AGI: 4 },
-    { tplId: 'arm_52',   slot: 'armor', equipTag: 'all', name: '聖騎士之鎧',   reqLv: 52, reqStats: { DEF: 18 }, DEF: 32, MR: 20, AGI: 5 },
-    { tplId: 'arm_61_f', slot: 'armor', equipTag: 'all', name: '紅焰鎧甲',     reqLv: 61, reqStats: { DEF: 20 }, DEF: 40, MR: 28 },
-    { tplId: 'arm_61_i', slot: 'armor', equipTag: 'all', name: '冰寒鎧甲',     reqLv: 61, reqStats: { DEF: 20 }, DEF: 40, MR: 32 },
-    { tplId: 'arm_62',   slot: 'armor', equipTag: 'all', name: '極速戰甲',     reqLv: 62, reqStats: { DEF: 22 }, DEF: 36, MR: 24, AGI: 8 },
+  // === 輕鎧（equipTag: 'all'，全職業通用） ===
+  { tplId: 'a_light_4',   equipTag: 'all', name: '光耀布衣',       reqLv: 4,   reqStats: {},          DEF: 3,  MR: 1,  obtain: 'drop' },
+  { tplId: 'a_light_8',   equipTag: 'all', name: '光耀皮衣',       reqLv: 8,   reqStats: { DEF: 2 },  DEF: 4,  MR: 3,  obtain: 'drop' },
+  { tplId: 'a_light_12',  equipTag: 'all', name: '光耀緊身衣',     reqLv: 12,  reqStats: { DEF: 3 },  DEF: 8,  MR: 6,  obtain: 'drop' },
+  { tplId: 'a_light_16',  equipTag: 'all', name: '光耀鎖甲',       reqLv: 16,  reqStats: { DEF: 3 },  DEF: 12, MR: 7,  obtain: 'drop' },
+  { tplId: 'a_light_20',  equipTag: 'all', name: '光耀金屬鎧甲',   reqLv: 20,  reqStats: { DEF: 4 },  DEF: 16, MR: 8,  obtain: 'drop' },
+  { tplId: 'a_light_24',  equipTag: 'all', name: '光耀蜥皮甲',     reqLv: 24,  reqStats: { DEF: 4 },  DEF: 19, MR: 10, obtain: 'drop' },
+  { tplId: 'a_light_28',  equipTag: 'all', name: '光耀魔晶甲',     reqLv: 28,  reqStats: { DEF: 5 },  DEF: 21, MR: 12, obtain: 'drop' },
+  { tplId: 'a_light_35',  equipTag: 'all', name: '天鷹戰甲',       reqLv: 35,  reqStats: { DEF: 10 }, DEF: 23, MR: 14, obtain: 'drop' },
+  { tplId: 'a_light_42',  equipTag: 'all', name: '聖石鎧甲',       reqLv: 42,  reqStats: { DEF: 14 }, DEF: 25, MR: 17, obtain: 'drop' },
+  { tplId: 'a_light_52',  equipTag: 'all', name: '聖騎士之鎧',     reqLv: 52,  reqStats: { DEF: 18 }, DEF: 27, MR: 20, obtain: 'drop' },
+  { tplId: 'a_light_62',  equipTag: 'all', name: '極速戰甲',       reqLv: 62,  reqStats: { DEF: 22 }, DEF: 32, MR: 22, obtain: 'drop' },
+  { tplId: 'a_light_75',  equipTag: 'all', name: '武神鎧甲',       reqLv: 75,  reqStats: { DEF: 24 }, DEF: 36, MR: 25, obtain: 'drop' },
+  { tplId: 'a_light_90',  equipTag: 'all', name: '古代鎧甲',       reqLv: 90,  reqStats: { DEF: 28 }, DEF: 42, MR: 28, obtain: 'drop' },
+  { tplId: 'a_light_105', equipTag: 'all', name: '[聖]天鷹戰甲',   reqLv: 105, reqStats: { DEF: 32 }, DEF: 48, MR: 33, obtain: 'craft', craftRecipe: null },
+  { tplId: 'a_light_125', equipTag: 'all', name: '巴爾哈拉戰甲',   reqLv: 125, reqStats: { DEF: 36 }, DEF: 55, MR: 38, obtain: 'craft', craftRecipe: null },
+  { tplId: 'a_light_150', equipTag: 'all', name: '尼福爾海姆輕鎧', reqLv: 150, reqStats: { DEF: 40 }, DEF: 63, MR: 44, obtain: 'craft', craftRecipe: null },
+  { tplId: 'a_light_190', equipTag: 'all', name: '真・神聖戰甲',   reqLv: 190, reqStats: { DEF: 46 }, DEF: 74, MR: 52, obtain: 'craft', craftRecipe: null },
+
+    // === 重鎧（equipTag: 'heavy'，物理系重裝角色專用） ===
+    { tplId: 'a_heavy_4',   equipTag: 'heavy', name: '鱗甲',           reqLv: 4,   reqStats: { DEF: 1 },  DEF: 4,   obtain: 'drop' },
+    { tplId: 'a_heavy_8',   equipTag: 'heavy', name: '扳甲',           reqLv: 8,   reqStats: { DEF: 2 },  DEF: 6,   obtain: 'drop' },
+    { tplId: 'a_heavy_12',  equipTag: 'heavy', name: '骨甲',           reqLv: 12,  reqStats: { DEF: 3 },  DEF: 10,  obtain: 'drop' },
+    { tplId: 'a_heavy_16',  equipTag: 'heavy', name: '魔晶甲',         reqLv: 16,  reqStats: { DEF: 4 },  DEF: 14,  obtain: 'drop' },
+    { tplId: 'a_heavy_20',  equipTag: 'heavy', name: '金錢甲',         reqLv: 20,  reqStats: { DEF: 5 },  DEF: 18,  obtain: 'drop' },
+    { tplId: 'a_heavy_24',  equipTag: 'heavy', name: '金屬鎧甲',       reqLv: 24,  reqStats: { DEF: 6 },  DEF: 22,  obtain: 'drop' },
+    { tplId: 'a_heavy_28',  equipTag: 'heavy', name: '飛云甲',         reqLv: 28,  reqStats: { DEF: 7 },  DEF: 26,  obtain: 'drop' },
+    { tplId: 'a_heavy_35',  equipTag: 'heavy', name: '金屬鏈甲',       reqLv: 35,  reqStats: { DEF: 8 },  DEF: 28,  obtain: 'drop' },
+    { tplId: 'a_heavy_42',  equipTag: 'heavy', name: '金屬環甲',       reqLv: 42,  reqStats: { DEF: 9 },  DEF: 32,  obtain: 'drop' },
+    { tplId: 'a_heavy_52',  equipTag: 'heavy', name: '鎖環甲',         reqLv: 52,  reqStats: { DEF: 12 }, DEF: 35,  obtain: 'drop' },
+    { tplId: 'a_heavy_62',  equipTag: 'heavy', name: '鏈鎖鎧甲',       reqLv: 62,  reqStats: { DEF: 20 }, DEF: 41,  obtain: 'drop' },
+    { tplId: 'a_heavy_75',  equipTag: 'heavy', name: '白鱗鏈甲',       reqLv: 75,  reqStats: { DEF: 27 }, DEF: 58,  obtain: 'drop' },
+    { tplId: 'a_heavy_90',  equipTag: 'heavy', name: '古代鏈甲',       reqLv: 90,  reqStats: { DEF: 27 }, DEF: 60,  obtain: 'drop' },
+    { tplId: 'a_heavy_105', equipTag: 'heavy', name: '[聖]飛云重鎧',   reqLv: 105, reqStats: { DEF: 35 }, DEF: 72,  obtain: 'craft', craftRecipe: null },
+    { tplId: 'a_heavy_125', equipTag: 'heavy', name: '巴爾哈拉重鎧',   reqLv: 125, reqStats: { DEF: 40 }, DEF: 84,  obtain: 'craft', craftRecipe: null },
+    { tplId: 'a_heavy_150', equipTag: 'heavy', name: '尼福爾海姆重鎧', reqLv: 150, reqStats: { DEF: 46 }, DEF: 98,  obtain: 'craft', craftRecipe: null },
+    { tplId: 'a_heavy_190', equipTag: 'heavy', name: '真・神聖重鎧',   reqLv: 190, reqStats: { DEF: 54 }, DEF: 115, obtain: 'craft', craftRecipe: null },
   
-    // === 重鎧（equipTag: 'heavy'） ===
-    { tplId: 'hv_16',    slot: 'armor', equipTag: 'heavy', name: '魔晶甲',     reqLv: 16, reqStats: { DEF: 4 },  DEF: 15 },
-    { tplId: 'hv_28',    slot: 'armor', equipTag: 'heavy', name: '飛雲甲',     reqLv: 28, reqStats: { DEF: 7 },  DEF: 26 },
-    { tplId: 'hv_42',    slot: 'armor', equipTag: 'heavy', name: '金屬環甲',   reqLv: 42, reqStats: { DEF: 9 },  DEF: 32 },
-    { tplId: 'hv_62',    slot: 'armor', equipTag: 'heavy', name: '鏈鎖鎧甲',   reqLv: 62, reqStats: { DEF: 20 }, DEF: 42 },
-  
-    // === 法袍（equipTag: 'robe'） ===
-    { tplId: 'rb_16',    slot: 'armor', equipTag: 'robe', name: '學徒長袍',    reqLv: 16, reqStats: { MR: 4 },   DEF: 5, MR: 8, I: 4 },
-    { tplId: 'rb_28',    slot: 'armor', equipTag: 'robe', name: '蜥皮長袍',    reqLv: 28, reqStats: { MR: 7 },   DEF: 8, MR: 12, I: 8 },
-    { tplId: 'rb_42',    slot: 'armor', equipTag: 'robe', name: '魔導袍',      reqLv: 42, reqStats: { MR: 9 },   DEF: 12, MR: 15, I: 14 },
-    { tplId: 'rb_62',    slot: 'armor', equipTag: 'robe', name: '魔斗之袍',    reqLv: 62, reqStats: { MR: 18 },  DEF: 18, MR: 22, I: 22 },
-  
-    // === 忍服（equipTag: 'ninja'） ===
-    { tplId: 'nj_28',    slot: 'armor', equipTag: 'ninja', name: '風之禮讚',   reqLv: 28, reqStats: { DEX: 14 }, DEF: 19, AGI: 7 },
-    { tplId: 'nj_62',    slot: 'armor', equipTag: 'ninja', name: '天忍之服',   reqLv: 62, reqStats: { DEX: 22 }, DEF: 28, AGI: 13 }
+      // === 法袍（equipTag: 'robe'，魔法師系專用） ===
+  { tplId: 'a_robe_4',   equipTag: 'robe', name: '披風',           reqLv: 4,   reqStats: { MR: 1 },  DEF: 3,  MR: 1,  obtain: 'drop' },
+  { tplId: 'a_robe_8',   equipTag: 'robe', name: '披肩',           reqLv: 8,   reqStats: { MR: 2 },  DEF: 4,  MR: 2,  obtain: 'drop' },
+  { tplId: 'a_robe_12',  equipTag: 'robe', name: '皮製長袍',       reqLv: 12,  reqStats: { MR: 3 },  DEF: 6,  MR: 2,  obtain: 'drop' },
+  { tplId: 'a_robe_16',  equipTag: 'robe', name: '學徒長袍',       reqLv: 16,  reqStats: { MR: 4 },  DEF: 5,  MR: 7,  obtain: 'drop' },
+  { tplId: 'a_robe_20',  equipTag: 'robe', name: '綿製長袍',       reqLv: 20,  reqStats: { MR: 5 },  DEF: 5,  MR: 8,  obtain: 'drop' },
+  { tplId: 'a_robe_24',  equipTag: 'robe', name: '羽毛長袍',       reqLv: 24,  reqStats: { MR: 6 },  DEF: 6,  MR: 9,  obtain: 'drop' },
+  { tplId: 'a_robe_28',  equipTag: 'robe', name: '蜥皮長袍',       reqLv: 28,  reqStats: { MR: 7 },  DEF: 7,  MR: 10, obtain: 'drop' },
+  { tplId: 'a_robe_35',  equipTag: 'robe', name: '絲質長袍',       reqLv: 35,  reqStats: { MR: 8 },  DEF: 10, MR: 12, obtain: 'drop' },
+  { tplId: 'a_robe_42',  equipTag: 'robe', name: '魔導袍',         reqLv: 42,  reqStats: { MR: 9 },  DEF: 11, MR: 13, obtain: 'drop' },
+  { tplId: 'a_robe_52',  equipTag: 'robe', name: '幻影長袍',       reqLv: 52,  reqStats: { MR: 10 }, DEF: 13, MR: 14, obtain: 'drop' },
+  { tplId: 'a_robe_62',  equipTag: 'robe', name: '魔斗之袍',       reqLv: 62,  reqStats: { MR: 18 }, DEF: 16, MR: 17, obtain: 'drop' },
+  { tplId: 'a_robe_75',  equipTag: 'robe', name: '元素之袍',       reqLv: 75,  reqStats: { MR: 22 }, DEF: 22, MR: 22, obtain: 'drop' },
+  { tplId: 'a_robe_90',  equipTag: 'robe', name: '古代之袍',       reqLv: 90,  reqStats: { MR: 24 }, DEF: 27, MR: 26, obtain: 'drop' },
+  { tplId: 'a_robe_105', equipTag: 'robe', name: '[聖]絲質長袍',   reqLv: 105, reqStats: { MR: 30 }, DEF: 35, MR: 32, obtain: 'craft', craftRecipe: null },
+  { tplId: 'a_robe_125', equipTag: 'robe', name: '巴爾哈拉法袍',   reqLv: 125, reqStats: { MR: 35 }, DEF: 41, MR: 38, obtain: 'craft', craftRecipe: null },
+  { tplId: 'a_robe_150', equipTag: 'robe', name: '尼福爾海姆法袍', reqLv: 150, reqStats: { MR: 40 }, DEF: 48, MR: 45, obtain: 'craft', craftRecipe: null },
+  { tplId: 'a_robe_190', equipTag: 'robe', name: '真・神聖法袍',   reqLv: 190, reqStats: { MR: 46 }, DEF: 57, MR: 54, obtain: 'craft', craftRecipe: null },
+
+    // === 忍服（equipTag: 'ninja'，娜雅特蕾依／美菈專用） ===
+    { tplId: 'a_nin_4',   equipTag: 'ninja', name: '體育服',         reqLv: 4,   reqStats: { DEX: 2, DEF: 1 },   DEF: 2,  obtain: 'drop' },
+    { tplId: 'a_nin_8',   equipTag: 'ninja', name: '運動服',         reqLv: 8,   reqStats: { DEX: 4, DEF: 2 },   DEF: 3,  obtain: 'drop' },
+    { tplId: 'a_nin_12',  equipTag: 'ninja', name: '下級刺客服',     reqLv: 12,  reqStats: { DEX: 6, DEF: 2 },   DEF: 5,  obtain: 'drop' },
+    { tplId: 'a_nin_16',  equipTag: 'ninja', name: '中級刺客服',     reqLv: 16,  reqStats: { DEX: 8, DEF: 3 },   DEF: 9,  obtain: 'drop' },
+    { tplId: 'a_nin_20',  equipTag: 'ninja', name: '高級刺客服',     reqLv: 20,  reqStats: { DEX: 10, DEF: 3 },  DEF: 13, obtain: 'drop' },
+    { tplId: 'a_nin_24',  equipTag: 'ninja', name: '魔力忍服',       reqLv: 24,  reqStats: { DEX: 12, DEF: 4 },  DEF: 16, obtain: 'drop' },
+    { tplId: 'a_nin_28',  equipTag: 'ninja', name: '風之禮讚',       reqLv: 28,  reqStats: { DEX: 14, DEF: 4 },  DEF: 19, obtain: 'drop' },
+    { tplId: 'a_nin_35',  equipTag: 'ninja', name: '冒險旅服',       reqLv: 35,  reqStats: { DEX: 16, DEF: 5 },  DEF: 20, obtain: 'drop' },
+    { tplId: 'a_nin_42',  equipTag: 'ninja', name: '跆拳道服',       reqLv: 42,  reqStats: { DEX: 18, DEF: 5 },  DEF: 23, obtain: 'drop' },
+    { tplId: 'a_nin_52',  equipTag: 'ninja', name: '勇氣忍服',       reqLv: 52,  reqStats: { DEX: 20, DEF: 6 },  DEF: 26, obtain: 'drop' },
+    { tplId: 'a_nin_62',  equipTag: 'ninja', name: '天忍之服',       reqLv: 62,  reqStats: { DEX: 22, DEF: 7 },  DEF: 27, obtain: 'drop' },
+    { tplId: 'a_nin_75',  equipTag: 'ninja', name: '聖光忍服',       reqLv: 75,  reqStats: { DEX: 24, DEF: 8 },  DEF: 32, obtain: 'drop' },
+    { tplId: 'a_nin_90',  equipTag: 'ninja', name: '古代忍服',       reqLv: 90,  reqStats: { DEX: 26, DEF: 9 },  DEF: 36, obtain: 'drop' },
+    { tplId: 'a_nin_105', equipTag: 'ninja', name: '[聖]風之禮讚',   reqLv: 105, reqStats: { DEX: 30, DEF: 10 }, DEF: 42, obtain: 'craft', craftRecipe: null },
+    { tplId: 'a_nin_125', equipTag: 'ninja', name: '巴爾哈拉忍服',   reqLv: 125, reqStats: { DEX: 34, DEF: 12 }, DEF: 49, obtain: 'craft', craftRecipe: null },
+    { tplId: 'a_nin_150', equipTag: 'ninja', name: '尼福爾海姆忍服', reqLv: 150, reqStats: { DEX: 38, DEF: 14 }, DEF: 57, obtain: 'craft', craftRecipe: null },
+    { tplId: 'a_nin_190', equipTag: 'ninja', name: '真・神聖忍服',   reqLv: 190, reqStats: { DEX: 44, DEF: 17 }, DEF: 68, obtain: 'craft', craftRecipe: null }
   ];
   

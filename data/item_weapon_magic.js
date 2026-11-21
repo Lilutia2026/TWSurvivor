@@ -1,20 +1,66 @@
-// 魔導武器資料庫（元素魔杖 wand / 法杖 staff / 釘錘 mace；未來可擴充雙槍 dual_pistol / 魔術杖 magic_staff / 拳套 gauntlet）
+// 魔導與神聖打擊武器資料庫（法杖 wand / 權杖 staff / 釘錘 mace；LV.0 ～ LV.190）
 const WEAPON_MAGIC_ITEMS = [
-    // === 元素魔杖（equipTag: 'wand'，鑑定隨機賦予火／冰／雷屬性詞條，INT 攻擊型） ===
-    { tplId: 'w_wnd_f_1', slot: 'weapon', equipTag: 'wand', wandElem: 'fire',    name: '學徒魔杖',     reqLv: 1,  reqStats: {},        startSkill: 'fire1',    I: 11,  MR: 5 },
-    { tplId: 'w_wnd_i_1', slot: 'weapon', equipTag: 'wand', wandElem: 'ice',     name: '學徒魔杖',     reqLv: 1,  reqStats: {},        startSkill: 'ice1',     I: 11,  MR: 5 },
-    { tplId: 'w_wnd_t_1', slot: 'weapon', equipTag: 'wand', wandElem: 'thunder', name: '學徒魔杖',     reqLv: 1,  reqStats: {},        startSkill: 'thunder1', I: 11,  MR: 5 },
-    { tplId: 'w_wnd_28',  slot: 'weapon', equipTag: 'wand',                      name: '星光水晶魔杖', reqLv: 28, reqStats: { I: 36 }, startSkill: 'fire1',    I: 46,  MR: 22 },
-    { tplId: 'w_wnd_62',  slot: 'weapon', equipTag: 'wand',                      name: '聖靈魔杖',     reqLv: 62, reqStats: { I: 76 }, startSkill: 'fire1',    I: 105, MR: 52 },
-  
-    // === 法杖（equipTag: 'staff'，白魔法 MR 輔助型） ===
-    { tplId: 'w_stf_1',   slot: 'weapon', equipTag: 'staff',                     name: '木製短杖',     reqLv: 1,  reqStats: {},        startSkill: 'holylight', MR: 9,  I: 5,  DEF: 2 },
-    { tplId: 'w_stf_28',  slot: 'weapon', equipTag: 'staff',                     name: '聖光牧杖',     reqLv: 28, reqStats: { MR: 36 }, startSkill: 'holylight', MR: 38, I: 18, DEF: 10 },
-    { tplId: 'w_stf_62',  slot: 'weapon', equipTag: 'staff',                     name: '燭天使聖柱',   reqLv: 62, reqStats: { MR: 76 }, startSkill: 'holylight', MR: 85, I: 42, DEF: 26 },
-  
-    // === 釘錘（equipTag: 'mace'，DEF + H 近戰防衛型） ===
-    { tplId: 'w_mac_1',   slot: 'weapon', equipTag: 'mace',                      name: '見習釘錘',     reqLv: 1,  reqStats: {},        startSkill: 'armorbreak', H: 6,  S: 3,  DEF: 6,  MR: 4 },
-    { tplId: 'w_mac_28',  slot: 'weapon', equipTag: 'mace',                      name: '神聖戰錘',     reqLv: 28, reqStats: { DEF: 32 }, startSkill: 'armorbreak', H: 28, S: 14, DEF: 28, MR: 16 },
-    { tplId: 'w_mac_62',  slot: 'weapon', equipTag: 'mace',                      name: '聖裁碎星錘',   reqLv: 62, reqStats: { DEF: 68 }, startSkill: 'armorbreak', H: 65, S: 32, DEF: 64, MR: 38 }
+  // === 法杖（equipTag: 'wand'，元素魔法型，鑑定隨機決定火/冰/雷元素卡池） ===
+  { tplId: 'w_wand_0',   equipTag: 'wand', name: '老舊的法杖',     reqLv: 1,   reqStats: {},         I: 3,  S: 1, H: 2, DEF: 1, MR: 2,  obtain: 'drop' },
+  { tplId: 'w_wand_4',   equipTag: 'wand', name: '學徒之杖',       reqLv: 4,   reqStats: { I: 5 },   I: 8,  S: 1, H: 2, DEF: 1, MR: 3,  obtain: 'drop' },
+  { tplId: 'w_wand_8',   equipTag: 'wand', name: '光之杖',         reqLv: 8,   reqStats: { I: 10 },  I: 11, S: 1, H: 2, DEF: 2, MR: 5,  obtain: 'drop' },
+  { tplId: 'w_wand_12',  equipTag: 'wand', name: '智慧之杖',       reqLv: 12,  reqStats: { I: 15 },  I: 14, S: 1, H: 3, DEF: 4, MR: 7,  obtain: 'drop' },
+  { tplId: 'w_wand_16',  equipTag: 'wand', name: '瑟芬斯之杖',     reqLv: 16,  reqStats: { I: 20 },  I: 17, S: 1, H: 4, DEF: 5, MR: 9,  obtain: 'drop' },
+  { tplId: 'w_wand_20',  equipTag: 'wand', name: '魔術師之杖',     reqLv: 20,  reqStats: { I: 25 },  I: 22, S: 2, H: 3, DEF: 4, MR: 10, obtain: 'drop' },
+  { tplId: 'w_wand_24',  equipTag: 'wand', name: '巫師之杖',       reqLv: 24,  reqStats: { I: 30 },  I: 28, S: 2, H: 4, DEF: 5, MR: 11, obtain: 'drop' },
+  { tplId: 'w_wand_28',  equipTag: 'wand', name: '原素之杖',       reqLv: 28,  reqStats: { I: 35 },  I: 37, S: 3, H: 6, DEF: 4, MR: 10, obtain: 'drop' },
+  { tplId: 'w_wand_35',  equipTag: 'wand', name: '約文杖',         reqLv: 35,  reqStats: { I: 40 },  I: 40, S: 3, H: 3, DEF: 3, MR: 14, obtain: 'drop' },
+  { tplId: 'w_wand_42',  equipTag: 'wand', name: '天使之杖',       reqLv: 42,  reqStats: { I: 45 },  I: 41, S: 3, H: 3, DEF: 3, MR: 14, obtain: 'drop' },
+  { tplId: 'w_wand_52',  equipTag: 'wand', name: '女神之淚',       reqLv: 52,  reqStats: { I: 62 },  I: 45, S: 3, H: 3, DEF: 4, MR: 14, obtain: 'drop' },
+  { tplId: 'w_wand_62',  equipTag: 'wand', name: '風之力',         reqLv: 62,  reqStats: { I: 85 },  I: 49, S: 3, H: 3, DEF: 5, MR: 16, obtain: 'drop' },
+  { tplId: 'w_wand_75',  equipTag: 'wand', name: '聖天使之眼',     reqLv: 75,  reqStats: { I: 102 }, I: 53, S: 3, H: 3, DEF: 6, MR: 17, obtain: 'drop' },
+  { tplId: 'w_wand_90',  equipTag: 'wand', name: '映月',           reqLv: 90,  reqStats: { I: 108 }, I: 58, S: 3, H: 3, DEF: 8, MR: 19, obtain: 'drop' },
+  { tplId: 'w_wand_105', equipTag: 'wand', name: '[聖]天使之杖',   reqLv: 105, reqStats: { I: 112 }, I: 66, S: 3, H: 3, DEF: 8, MR: 19, obtain: 'craft', craftRecipe: null },
+  { tplId: 'w_wand_125', equipTag: 'wand', name: '神器・神之喻',   reqLv: 125, reqStats: { I: 116 }, I: 75, S: 3, H: 3, DEF: 8, MR: 20, obtain: 'craft', craftRecipe: null },
+  { tplId: 'w_wand_145', equipTag: 'wand', name: '美惠・靈界之杖', reqLv: 145, reqStats: { I: 120 }, I: 83, S: 3, H: 3, DEF: 8, MR: 21, obtain: 'craft', craftRecipe: null },
+  { tplId: 'w_wand_165', equipTag: 'wand', name: '靈界・聖女之杖', reqLv: 165, reqStats: { I: 125 }, I: 88, S: 3, H: 3, DEF: 8, MR: 22, obtain: 'craft', craftRecipe: null },
+  { tplId: 'w_wand_190', equipTag: 'wand', name: '櫻・芷馨',       reqLv: 190, reqStats: { I: 135 }, I: 96, S: 4, H: 4, DEF: 9, MR: 23, obtain: 'craft', craftRecipe: null },
+ 
+  // === 權杖（equipTag: 'staff'，白魔法輔助型，本命技：神聖之光 holylight） ===
+  { tplId: 'w_stf_0',   equipTag: 'staff', name: '老舊的權杖', reqLv: 1,  reqStats: {},         MR: 3,  I: 2,  S: 2,  H: 3,  DEF: 1, obtain: 'drop' },
+  { tplId: 'w_stf_4',   equipTag: 'staff', name: '冥想權杖',   reqLv: 4,  reqStats: { MR: 5 },  MR: 7,  I: 3,  S: 5,  H: 5,  DEF: 1, obtain: 'drop' },
+  { tplId: 'w_stf_8',   equipTag: 'staff', name: '魔法權杖',   reqLv: 8,  reqStats: { MR: 10 }, MR: 10, I: 5,  S: 6,  H: 8,  DEF: 2, obtain: 'drop' },
+  { tplId: 'w_stf_12',  equipTag: 'staff', name: '獸首權杖',   reqLv: 12, reqStats: { MR: 15 }, MR: 14, I: 7,  S: 10, H: 12, DEF: 3, obtain: 'drop' },
+  { tplId: 'w_stf_16',  equipTag: 'staff', name: '輕型權杖',   reqLv: 16, reqStats: { MR: 20 }, MR: 17, I: 11, S: 16, H: 17, DEF: 2, obtain: 'drop' },
+  { tplId: 'w_stf_20',  equipTag: 'staff', name: '聖者權杖',   reqLv: 20, reqStats: { MR: 25 }, MR: 21, I: 11, S: 20, H: 21, DEF: 3, obtain: 'drop' },
+  { tplId: 'w_stf_24',  equipTag: 'staff', name: '鋼製權杖',   reqLv: 24, reqStats: { MR: 30 }, MR: 27, I: 12, S: 26, H: 27, DEF: 3, obtain: 'drop' },
+  { tplId: 'w_stf_28',  equipTag: 'staff', name: '白銀權杖',   reqLv: 28, reqStats: { MR: 35 }, MR: 35, I: 13, S: 29, H: 33, DEF: 3, obtain: 'drop' },
+  { tplId: 'w_stf_35',  equipTag: 'staff', name: '黃金權杖',   reqLv: 35, reqStats: { MR: 40 }, MR: 38, I: 15, S: 30, H: 34, DEF: 3, obtain: 'drop' },
+  { tplId: 'w_stf_42',  equipTag: 'staff', name: '水晶權杖',   reqLv: 42, reqStats: { MR: 45 }, MR: 39, I: 14, S: 32, H: 36, DEF: 3, obtain: 'drop' },
+  { tplId: 'w_stf_52',  equipTag: 'staff', name: '祭司權杖',       reqLv: 52,  reqStats: { MR: 62 },  MR: 44, I: 15, S: 28, H: 33, DEF: 6, obtain: 'drop' },
+  { tplId: 'w_stf_62',  equipTag: 'staff', name: '魔導仕權杖',     reqLv: 62,  reqStats: { MR: 77 },  MR: 48, I: 17, S: 29, H: 34, DEF: 6, obtain: 'drop' },
+  { tplId: 'w_stf_75',  equipTag: 'staff', name: '混沌權杖',       reqLv: 75,  reqStats: { MR: 92 },  MR: 52, I: 18, S: 29, H: 32, DEF: 6, obtain: 'drop' },
+  { tplId: 'w_stf_90',  equipTag: 'staff', name: '幻魔權杖',       reqLv: 90,  reqStats: { MR: 99 },  MR: 56, I: 20, S: 30, H: 33, DEF: 8, obtain: 'drop' },
+  { tplId: 'w_stf_105', equipTag: 'staff', name: '[聖]水晶權杖',   reqLv: 105, reqStats: { MR: 103 }, MR: 64, I: 22, S: 32, H: 30, DEF: 8, obtain: 'craft', craftRecipe: null },
+  { tplId: 'w_stf_125', equipTag: 'staff', name: '神器・櫻之舞',   reqLv: 125, reqStats: { MR: 108 }, MR: 74, I: 24, S: 34, H: 35, DEF: 8, obtain: 'craft', craftRecipe: null },
+  { tplId: 'w_stf_145', equipTag: 'staff', name: '美惠・魔之錫杖', reqLv: 145, reqStats: { MR: 113 }, MR: 83, I: 26, S: 36, H: 36, DEF: 9, obtain: 'craft', craftRecipe: null },
+  { tplId: 'w_stf_165', equipTag: 'staff', name: '靈界・暗羽之杖', reqLv: 165, reqStats: { MR: 117 }, MR: 89, I: 31, S: 38, H: 37, DEF: 9, obtain: 'craft', craftRecipe: null },
+  { tplId: 'w_stf_190', equipTag: 'staff', name: '櫻・蕙露',       reqLv: 190, reqStats: { MR: 127 }, MR: 97, I: 36, S: 41, H: 39, DEF: 9, obtain: 'craft', craftRecipe: null },
+
+    // === 釘錘（equipTag: 'mace'，神聖物理打擊型，本命技：破壞盔甲 armorbreak） ===
+    { tplId: 'w_mace_0',  equipTag: 'mace', name: '老舊的釘錘', reqLv: 1,  reqStats: {},         H: 3,  S: 2,  I: 3,  DEF: 1, MR: 2,  obtain: 'drop' },
+    { tplId: 'w_mace_4',  equipTag: 'mace', name: '釘錘',       reqLv: 4,  reqStats: { H: 4 },   H: 9,  S: 4,  I: 3,  DEF: 1, MR: 3,  obtain: 'drop' },
+    { tplId: 'w_mace_8',  equipTag: 'mace', name: '神佑之錘',   reqLv: 8,  reqStats: { H: 8 },   H: 12, S: 7,  I: 5,  DEF: 1, MR: 5,  obtain: 'drop' },
+    { tplId: 'w_mace_12', equipTag: 'mace', name: '玩具錘子',   reqLv: 12, reqStats: { H: 12 },  H: 17, S: 12, I: 7,  DEF: 1, MR: 7,  obtain: 'drop' },
+    { tplId: 'w_mace_16', equipTag: 'mace', name: '白銀釘錘',   reqLv: 16, reqStats: { H: 16 },  H: 22, S: 17, I: 10, DEF: 1, MR: 10, obtain: 'drop' },
+    { tplId: 'w_mace_20', equipTag: 'mace', name: '黃金釘錘',   reqLv: 20, reqStats: { H: 20 },  H: 28, S: 22, I: 11, DEF: 1, MR: 11, obtain: 'drop' },
+    { tplId: 'w_mace_24', equipTag: 'mace', name: '爭戰釘錘',   reqLv: 24, reqStats: { H: 24 },  H: 33, S: 27, I: 12, DEF: 1, MR: 12, obtain: 'drop' },
+    { tplId: 'w_mace_28', equipTag: 'mace', name: '聖鬥士之錘', reqLv: 28, reqStats: { H: 28 },  H: 42, S: 28, I: 14, DEF: 2, MR: 13, obtain: 'drop' },
+    { tplId: 'w_mace_35', equipTag: 'mace', name: '流星釘錘',   reqLv: 35, reqStats: { H: 32 },  H: 46, S: 35, I: 14, DEF: 2, MR: 17, obtain: 'drop' },
+    { tplId: 'w_mace_42', equipTag: 'mace', name: '秘錘・封魂', reqLv: 42, reqStats: { H: 36 },  H: 50, S: 41, I: 16, DEF: 5, MR: 20, obtain: 'drop' },
+    { tplId: 'w_mace_52',  equipTag: 'mace', name: '七彩神金錘',     reqLv: 52,  reqStats: { H: 40 },  H: 53, S: 45, I: 18, DEF: 6,  MR: 21, obtain: 'drop' },
+    { tplId: 'w_mace_62',  equipTag: 'mace', name: '琅琊錘',         reqLv: 62,  reqStats: { H: 54 },  H: 55, S: 49, I: 20, DEF: 6,  MR: 22, obtain: 'drop' },
+    { tplId: 'w_mace_75',  equipTag: 'mace', name: '末日之錘',       reqLv: 75,  reqStats: { H: 70 },  H: 57, S: 51, I: 22, DEF: 7,  MR: 23, obtain: 'drop' },
+    { tplId: 'w_mace_90',  equipTag: 'mace', name: '磁暴',           reqLv: 90,  reqStats: { H: 76 },  H: 62, S: 53, I: 24, DEF: 9,  MR: 25, obtain: 'drop' },
+    { tplId: 'w_mace_105', equipTag: 'mace', name: '[聖]秘錘・封魂', reqLv: 105, reqStats: { H: 80 },  H: 68, S: 59, I: 27, DEF: 10, MR: 27, obtain: 'craft', craftRecipe: null },
+    { tplId: 'w_mace_125', equipTag: 'mace', name: '神器・時之序',   reqLv: 125, reqStats: { H: 85 },  H: 75, S: 66, I: 29, DEF: 11, MR: 29, obtain: 'craft', craftRecipe: null },
+    { tplId: 'w_mace_145', equipTag: 'mace', name: '美惠・懺悔之錘', reqLv: 145, reqStats: { H: 90 },  H: 83, S: 72, I: 31, DEF: 12, MR: 31, obtain: 'craft', craftRecipe: null },
+    { tplId: 'w_mace_165', equipTag: 'mace', name: '靈界・封魔之錘', reqLv: 165, reqStats: { H: 95 },  H: 88, S: 76, I: 33, DEF: 12, MR: 33, obtain: 'craft', craftRecipe: null },
+    { tplId: 'w_mace_190', equipTag: 'mace', name: '櫻・蓼風',       reqLv: 190, reqStats: { H: 105 }, H: 93, S: 80, I: 37, DEF: 13, MR: 40, obtain: 'craft', craftRecipe: null }
   ];
   

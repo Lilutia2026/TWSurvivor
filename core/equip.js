@@ -13,19 +13,27 @@ const SLOT_NAMES = {
 
 const EQUIP_TEMPLATES = [
   ...(typeof ITEM_WEAPONS !== 'undefined' ? ITEM_WEAPONS : []),
-  ...(typeof ITEM_ARMORS !== 'undefined' ? ITEM_ARMORS : [])
+  ...(typeof ITEM_ARMORS !== 'undefined' ? ITEM_ARMORS : []),
+  ...(typeof EVENT_ITEMS !== 'undefined' ? EVENT_ITEMS : [])
 ];
 
 const PHYS_WEAPON_AFFIXES = [{ key: 'physDmgPct', label: '物理傷害', min: 6, max: 18, unit: '%' }, { key: 'critRate', label: '暴擊率', min: 4, max: 12, unit: '%' }, { key: 'critDmg', label: '暴擊傷害', min: 10, max: 25, unit: '%' }, { key: 'cdr', label: '冷卻縮減', min: 3, max: 8, unit: '%' }];
 const MAG_WEAPON_AFFIXES  = [{ key: 'magDmgPct',  label: '魔法傷害', min: 6, max: 18, unit: '%' }, { key: 'critRate', label: '暴擊率', min: 4, max: 12, unit: '%' }, { key: 'critDmg', label: '暴擊傷害', min: 10, max: 25, unit: '%' }, { key: 'cdr', label: '冷卻縮減', min: 3, max: 8, unit: '%' }];
 
 const SLOT_AFFIX_POOLS = {
-  longsword: PHYS_WEAPON_AFFIXES,
-  blade:     PHYS_WEAPON_AFFIXES,
-  rapier:    PHYS_WEAPON_AFFIXES,
-  mace:      PHYS_WEAPON_AFFIXES,
-  wand:      MAG_WEAPON_AFFIXES,
-  staff:     MAG_WEAPON_AFFIXES,
+  longsword:  PHYS_WEAPON_AFFIXES,
+  blade:      PHYS_WEAPON_AFFIXES,
+  rapier:     PHYS_WEAPON_AFFIXES,
+  tachi:      PHYS_WEAPON_AFFIXES,
+  greatsword: PHYS_WEAPON_AFFIXES,
+  spear:      PHYS_WEAPON_AFFIXES,
+  polearm:    PHYS_WEAPON_AFFIXES,
+  dagger:     PHYS_WEAPON_AFFIXES,
+  dual_blade: PHYS_WEAPON_AFFIXES,
+  axe:        PHYS_WEAPON_AFFIXES,
+  whip:       PHYS_WEAPON_AFFIXES,
+  flail:      PHYS_WEAPON_AFFIXES,
+  mace:       PHYS_WEAPON_AFFIXES,
   weapon:    [...PHYS_WEAPON_AFFIXES.slice(0, 1), ...MAG_WEAPON_AFFIXES],
   shield:    [{ key: 'thorns', label: '反傷荊棘', min: 15, max: 35, unit: '%' }, { key: 'hp', label: '最大HP', min: 30, max: 70, unit: '' }, { key: 'physDmgPct', label: '物理傷害', min: 4, max: 12, unit: '%' }],
   ring:      [{ key: 'physDmgPct', label: '物理傷害', min: 5, max: 14, unit: '%' }, { key: 'magDmgPct', label: '魔法傷害', min: 5, max: 14, unit: '%' }, { key: 'critRate', label: '暴擊率', min: 5, max: 14, unit: '%' }, { key: 'critDmg', label: '暴擊傷害', min: 12, max: 28, unit: '%' }],
@@ -61,10 +69,19 @@ function generateEquipUid() {
   return Number(`${Date.now().toString().slice(-8)}${(_uidSeq++ % 9000) + 1000}`);
 }
 
-// 生成未鑑定裝備（排除翅膀 back 部位，翅膀改由 LV.15 任務取得並透過合成升級）
-function createUnidentifiedDrop(rarity = 'white', maxLv = 60, targetSlots = null, forceSelfChar = false) {
+// 全域一般關卡掉落等級上限（當前版本開放至 LV.62；LV.75+ 暫不掉落，LV.90+ 走合成系統）
+const CURRENT_DROP_MAX_LV = 62;
+
+// 生成未鑑定裝備（僅掉落 LV.62 以下常駐裝，嚴格排除翅膀 back、活動裝 isEvent 與合成專屬裝 craft）
+function createUnidentifiedDrop(rarity = 'white', maxLv = CURRENT_DROP_MAX_LV, targetSlots = null, forceSelfChar = false) {
   const curChar = (typeof saveData !== 'undefined' && saveData.charId) ? saveData.charId : 'lucien';
-  let candidates = EQUIP_TEMPLATES.filter(t => t.reqLv <= maxLv && t.slot !== 'back');
+  const effectiveMaxLv = Math.min(maxLv || CURRENT_DROP_MAX_LV, CURRENT_DROP_MAX_LV);
+  let candidates = EQUIP_TEMPLATES.filter(t =>
+    t.reqLv <= effectiveMaxLv &&
+    !t.isWing &&
+    !t.isEvent &&
+    (!t.obtain || t.obtain === 'drop')
+  );
   if (targetSlots && targetSlots.length > 0) {
     const f = candidates.filter(t => targetSlots.includes(t.slot));
     if (f.length > 0) candidates = f;
@@ -222,4 +239,23 @@ function recastWandElement(weaponItem, newElem) {
   weaponItem.startSkill = elemMap[newElem].startSkill;
   weaponItem.elemRecast = true;
   return { ok: true, msg: `🌈 元素轉換成功！${weaponItem.name} 已轉換為【${elemMap[newElem].name}卡池】！` };
+}
+
+// ==================================================================
+// 6. 【預留介面】LV.90 以上高階裝備合成系統（待素材與配方定案後啟用）
+// ==================================================================
+function getCraftableEquipTemplates(slotFilter = null) {
+  return EQUIP_TEMPLATES.filter(t =>
+    t.obtain === 'craft' &&
+    !t.isEvent &&
+    (!slotFilter || t.slot === slotFilter)
+  );
+}
+
+function craftHighTierEquip(tplId, targetRarity = 'blue') {
+  const tpl = EQUIP_TEMPLATES.find(t => t.tplId === tplId && t.obtain === 'craft');
+  if (!tpl) return { ok: false, msg: '找不到對應的高階合成裝備配方！' };
+  if (!tpl.craftRecipe) return { ok: false, msg: `【${tpl.name}】的合成系統尚未開放，敬請期待！` };
+  // TODO：後續實裝扣除素材／金幣並呼叫 identifyEquipItem({ uid: generateEquipUid(), tplId, slot: tpl.slot, rarity: targetRarity, identified: false })
+  return { ok: false, msg: '合成功能建置中' };
 }

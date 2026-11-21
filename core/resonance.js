@@ -124,11 +124,12 @@ function applyStatusTagsOnHit(enemy, statusTags, spellBase, stats = {}, options 
     const tag = normalizeStatusTag(rawTag);
     if (!tag || tag === 'none') continue;
     if (!rollStatusChance(mrChance)) continue;
+    const resMult = (typeof player !== 'undefined' && player.resonanceDmgMult) ? player.resonanceDmgMult : 1.0;
     if (tag === 'armor_break') {
       enemy.armorBreakTimer = Math.max(enemy.armorBreakTimer || 0, BASE_STATUS_DUR * durMult);
     } else if (tag === 'fire') {
       enemy.burnTimer = Math.max(enemy.burnTimer || 0, BASE_STATUS_DUR * durMult);
-      enemy.burnDps = Math.max(enemy.burnDps || 0, spellBase * 0.90);
+      enemy.burnDps = Math.max(enemy.burnDps || 0, spellBase * 0.90 * resMult);
     } else if (tag === 'ice') {
       applyChillOrFreeze(enemy, options.chillStacks || 1, durMult);
     } else if (tag === 'lightning') {
@@ -140,7 +141,7 @@ function applyStatusTagsOnHit(enemy, statusTags, spellBase, stats = {}, options 
       applyHolySeal(enemy, options.sealStacks ?? (options.isMelee ? 2 : 1), durMult);
     } else if (tag === 'dark') {
       enemy.darkTimer = Math.max(enemy.darkTimer || 0, BASE_STATUS_DUR * durMult);
-      enemy.darkDps = Math.max(enemy.darkDps || 0, spellBase * 0.32);
+      enemy.darkDps = Math.max(enemy.darkDps || 0, spellBase * 0.32 * resMult);
     }
   }
 }
