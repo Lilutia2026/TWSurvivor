@@ -224,24 +224,51 @@ function maxAllOwnedSandboxSkills() {
     }
   }
   
-       // 測試場專用：依目前進場角色與武器雙向過濾出可測試主動技（不顯示其他角色無關技能）
-       function getAllSandboxTestableSkills() {
-        if (typeof getActiveSkillPool === 'function') return getActiveSkillPool();
-        const map = {};
-        if (typeof ACTIVE_SKILLS !== 'undefined') Object.assign(map, ACTIVE_SKILLS);
-        return map;
+        // 測試場專用：下拉選單元素篩選狀態（'all' | 'fire' | 'ice' | 'thunder'），完全不改動武器與存檔
+  let sandboxElemFilter = 'all';
+
+  function setSandboxElemFilter(elem) {
+    sandboxElemFilter = elem || 'all';
+    renderSandboxPanel();
+    const labelMap = { all: '🌈 全屬性（火／冰／雷）', fire: '🔥 火系元素', ice: '❄️ 冰結元素', thunder: '⚡ 雷電元素' };
+    if (typeof showBanner === 'function') showBanner(`🔮 測試場技能選單已切換為【${labelMap[sandboxElemFilter] || sandboxElemFilter}】`);
+  }
+
+  // 測試場專用：進場自動載入「當前角色全武器流派主動技能池（小路全劍系／小愛全元素白魔釘錘）」，不受手持武器限制
+  function ensureSandboxFullSkillPool() {
+    if (typeof ACTIVE_SKILLS === 'undefined') return;
+    const basePool = typeof getActiveSkillPool === 'function' ? getActiveSkillPool() : {};
+    Object.assign(ACTIVE_SKILLS, basePool);
+    const curChar = (typeof saveData !== 'undefined' && saveData.charId) ? saveData.charId : 'lucien';
+    if (typeof CHAR_SKILL_REGISTRY !== 'undefined' && CHAR_SKILL_REGISTRY[curChar]) {
+      for (const [id, sk] of Object.entries(CHAR_SKILL_REGISTRY[curChar].skills || {})) {
+        if (!ACTIVE_SKILLS[id]) {
+          ACTIVE_SKILLS[id] = { ...sk, timer: 0.2 };
+        }
       }
-  
+    }
+  }
+
+  function getAllSandboxTestableSkills() {
+    ensureSandboxFullSkillPool();
+    const map = {};
+    const src = (typeof ACTIVE_SKILLS !== 'undefined') ? ACTIVE_SKILLS : {};
+    for (const [id, sk] of Object.entries(src)) {
+      if (sandboxElemFilter !== 'all' && sk.wandElem && sk.wandElem !== sandboxElemFilter) continue;
+      map[id] = sk;
+    }
+    return map;
+  }
+
   function addSandboxSkillOrPassive(kind, id) {
     if (!SANDBOX_STATE.active || !id) return;
     if (kind === 'skill') {
       const allSk = getAllSandboxTestableSkills();
       const sk = allSk[id];
       if (!sk) return;
-      if (typeof ACTIVE_SKILLS !== 'undefined' && typeof getActiveSkillPool === 'function') {
-        for (const k of Object.keys(ACTIVE_SKILLS)) delete ACTIVE_SKILLS[k];
-        Object.assign(ACTIVE_SKILLS, getActiveSkillPool());
-      } 
+      if (typeof ACTIVE_SKILLS !== 'undefined' && !ACTIVE_SKILLS[id]) {
+        ACTIVE_SKILLS[id] = { ...sk, timer: 0.2 };
+      }
       if (ownedSkills[id]) {
         ownedSkills[id].disabled = false;
         ownedSkills[id].lv = Math.min(sk.maxLv || 10, ownedSkills[id].lv + 1);
@@ -456,13 +483,23 @@ function maxAllOwnedSandboxSkills() {
           </div>
         </div>
   
+                              <div style="border-top:1px solid #334155;padding-top:5px;">
+          <div style="color:#94a3b8;font-size:10px;margin-bottom:3px;">🔮 測試選單元素篩選（全屬性卡池可自由混搭）：</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:3px;">
+            <button onclick="setSandboxElemFilter('all')" style="padding:3px 2px;background:${sandboxElemFilter === 'all' ? '#eab308' : '#1e293b'};color:${sandboxElemFilter === 'all' ? '#0f172a' : '#e2e8f0'};border:1px solid #64748b;border-radius:4px;font-weight:bold;cursor:pointer;">🌈全</button>
+            <button onclick="setSandboxElemFilter('fire')" style="padding:3px 2px;background:${sandboxElemFilter === 'fire' ? '#ef4444' : '#7f1d1d'};color:#fff;border:1px solid #ef4444;border-radius:4px;font-weight:bold;cursor:pointer;">🔥火</button>
+            <button onclick="setSandboxElemFilter('ice')" style="padding:3px 2px;background:${sandboxElemFilter === 'ice' ? '#38bdf8' : '#1e3a8a'};color:${sandboxElemFilter === 'ice' ? '#0f172a' : '#bfdbfe'};border:1px solid #38bdf8;border-radius:4px;font-weight:bold;cursor:pointer;">❄️冰</button>
+            <button onclick="setSandboxElemFilter('thunder')" style="padding:3px 2px;background:${sandboxElemFilter === 'thunder' ? '#eab308' : '#713f12'};color:${sandboxElemFilter === 'thunder' ? '#0f172a' : '#fef08a'};border:1px solid #eab308;border-radius:4px;font-weight:bold;cursor:pointer;">⚡雷</button>
+          </div>
+        </div>
+
         <div style="border-top:1px solid #334155;padding-top:6px;display:flex;gap:4px;">
           <button onclick="restoreSandboxDefaults()" style="flex:1;padding:6px;background:#eab308;color:#0f172a;font-weight:bold;border:none;border-radius:6px;cursor:pointer;">🔄 恢復預設</button>
           <button onclick="exitSandboxToLobby()" style="padding:6px 8px;background:#dc2626;color:#fff;font-weight:bold;border:none;border-radius:6px;cursor:pointer;">🚪 離開</button>
         </div>
       </div>`;
   }
- 
+
   function exitSandboxToLobby() {
     resetSandboxState(false);
     isPaused = true;

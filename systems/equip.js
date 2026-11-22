@@ -72,9 +72,20 @@ function generateEquipUid() {
 // 全域一般關卡掉落等級上限（當前版本開放至 LV.62；LV.75+ 暫不掉落，LV.90+ 走合成系統）
 const CURRENT_DROP_MAX_LV = 62;
 
+// 輔助：取得裝備的真實種類標籤（武器取 subType/type/equipTag，防具取 equipTag）
+function getItemCategoryTag(it) {
+  if (!it) return 'all';
+  if (it.slot === 'weapon') {
+    const wSub = (it.subType && it.subType !== 'weapon') ? it.subType : ((it.type && it.type !== 'weapon') ? it.type : it.equipTag);
+    return wSub || 'all';
+  }
+  return it.equipTag || 'all';
+}
+
 // 生成未鑑定裝備（僅掉落 LV.62 以下常駐裝，嚴格排除翅膀 back、活動裝 isEvent 與合成專屬裝 craft）
 function createUnidentifiedDrop(rarity = 'white', maxLv = CURRENT_DROP_MAX_LV, targetSlots = null, forceSelfChar = false) {
-  const curChar = (typeof saveData !== 'undefined' && saveData.charId) ? saveData.charId : 'lucien';
+  const curCharData = typeof getCurrentCharData === 'function' ? getCurrentCharData() : { id: 'lucien', equipTags: ['all'] };
+  const charTags = curCharData.equipTags || ['all'];
   const effectiveMaxLv = Math.min(maxLv || CURRENT_DROP_MAX_LV, CURRENT_DROP_MAX_LV);
   let candidates = EQUIP_TEMPLATES.filter(t =>
     t.reqLv <= effectiveMaxLv &&
@@ -86,9 +97,13 @@ function createUnidentifiedDrop(rarity = 'white', maxLv = CURRENT_DROP_MAX_LV, t
     const f = candidates.filter(t => targetSlots.includes(t.slot));
     if (f.length > 0) candidates = f;
   }
+  const isFitChar = (t) => {
+    const tag = getItemCategoryTag(t);
+    return tag === 'all' || charTags.includes('all') || charTags.includes(tag);
+  };
   const wantSelf = forceSelfChar || (Math.random() < 0.65);
-  const selfPool = candidates.filter(t => t.allowChars.includes('all') || t.allowChars.includes(curChar));
-  const otherPool = candidates.filter(t => !t.allowChars.includes('all') && !t.allowChars.includes(curChar));
+  const selfPool = candidates.filter(isFitChar);
+  const otherPool = candidates.filter(t => !isFitChar(t));
   const finalPool = (wantSelf && selfPool.length > 0) ? selfPool : (otherPool.length > 0 ? otherPool : candidates);
   const tpl = finalPool[Math.floor(Math.random() * finalPool.length)];
   return { uid: generateEquipUid(), tplId: tpl.tplId, slot: tpl.slot, rarity, identified: false };
@@ -98,57 +113,58 @@ function createUnidentifiedDrop(rarity = 'white', maxLv = CURRENT_DROP_MAX_LV, t
 function identifyEquipItem(unidItem) {
   const tpl = EQUIP_TEMPLATES.find(t => t.tplId === unidItem.tplId);
   const rar = RARITIES[unidItem.rarity] || RARITIES.white;
+  const realSub = tpl.subType || tpl.type || tpl.equipTag || tpl.slot;
   let assignedElem = tpl.wandElem || null;
   let assignedStartSkill = tpl.startSkill || null;
-  if (tpl.subType === 'wand' && !assignedElem) {
+  if (realSub === 'wand' && !assignedElem) {
     const elems = ['fire', 'ice', 'thunder'];
     assignedElem = elems[Math.floor(Math.random() * elems.length)];
     assignedStartSkill = `${assignedElem}1`;
   }
   const item = {
-    uid: unidItem.uid, tplId: tpl.tplId, slot: tpl.slot, subType: tpl.subType, type: tpl.subType,
-    equipTag: tpl.equipTag || 'all', wandElem: assignedElem, name: tpl.name, rarity: unidItem.rarity, reqLv: tpl.reqLv,
-    reqStats: { ...tpl.reqStats }, allowChars: [...tpl.allowChars], startSkill: assignedStartSkill,
+    uid: unidItem.uid, tplId: tpl.tplId, slot: tpl.slot, subType: realSub, type: realSub,
+    equipTag: tpl.equipTag || realSub || 'all', wandElem: assignedElem, name: tpl.name, rarity: unidItem.rarity, reqLv: tpl.reqLv,
+    reqStats: { ...(tpl.reqStats || {}) }, startSkill: assignedStartSkill,
     engraved: false, elemRecast: false, synthCount: 0, maxSynth: 3,
     baseRolled: {}, identified: true, affixes: [], legendEffect: null
   };
-  for (const [stat, range] of Object.entries(tpl.base)) {
+  for (const [stat, range] of Object.entries(tpl.base || {})) {
     const roll = Math.round((range.min + Math.floor(Math.random() * (range.max - range.min + 1))) * rar.mult);
     item.baseRolled[stat] = roll; item[stat] = roll;
   }
-  const poolKey = SLOT_AFFIX_POOLS[tpl.subType] ? tpl.subType : (SLOT_AFFIX_POOLS[tpl.slot] ? tpl.slot : 'default');
+  const poolKey = SLOT_AFFIX_POOLS[realSub] ? realSub : (SLOT_AFFIX_POOLS[tpl.slot] ? tpl.slot : 'default');
   const pool = [...SLOT_AFFIX_POOLS[poolKey]].sort(() => Math.random() - 0.5);
   for (let i = 0; i < Math.min(rar.affixes, pool.length); i++) {
     const afObj = rollSingleAffix(pool[i], rar.mult * 0.85);
     item[afObj.key] = (item[afObj.key] || 0) + afObj.val;
     item.affixes.push(afObj);
   }
-  if (rar.hasLegend) item.legendEffect = SLOT_LEGEND_EFFECTS[tpl.subType] || SLOT_LEGEND_EFFECTS[tpl.slot] || SLOT_LEGEND_EFFECTS.default;
+  if (rar.hasLegend) item.legendEffect = SLOT_LEGEND_EFFECTS[realSub] || SLOT_LEGEND_EFFECTS[tpl.slot] || SLOT_LEGEND_EFFECTS.default;
   return item;
 }
-// 穿戴門檻與職業驗證
+
+// 穿戴門檻與職業驗證標籤名稱對照
 const EQUIP_TAG_NAMES = {
-  all: '全職業通用', heavy: '重鎧系', robe: '法袍系',
-  ninja: '忍服系', shield: '盾牌類', knuckle: '指虎類', crystal: '魔導手鐲類'
+  all: '全職業通用', heavy: '重鎧系', robe: '法袍系', ninja: '忍服系',
+  shield: '盾牌類', knuckle: '指虎類', crystal: '魔導手鐲類',
+  longsword: '長劍類', blade: '彎刀類', rapier: '細劍類', tachi: '太刀類', greatsword: '巨劍類',
+  spear: '槍類', polearm: '棍類', dagger: '短劍類', dual_blade: '雙斧類', axe: '戰斧類',
+  whip: '鞭類', flail: '鏈錘類', wand: '魔杖類', staff: '權杖類', mace: '釘錘類'
 };
 
-// 穿戴門檻、類別標籤（equipTag）與素質要求驗證
+// 穿戴門檻、類別標籤（equipTags）與素質要求驗證（統一由角色挑選裝備種類標籤）
 function canEquipItem(item) {
   if (!item || !item.identified) return { ok: false, reason: '裝備尚未鑑定' };
   const curCharData = typeof getCurrentCharData === 'function' ? getCurrentCharData() : { id: 'lucien', equipTags: ['all'] };
-  const curChar = curCharData.id;
-
-  // 1. 檢查類別標籤（重鎧 / 法袍 / 忍服 / 盾牌 / 指虎 / 水晶）
-  const tag = item.equipTag || 'all';
   const charTags = curCharData.equipTags || ['all'];
-  if (tag !== 'all' && !charTags.includes(tag)) {
-    return { ok: false, reason: `職業不符（限定【${EQUIP_TAG_NAMES[tag] || tag}】適性角色）` };
-  }
-  // 2. 檢查武器角色限定（劍類限定劍士、法杖/魔杖/釘錘限定法師，不鎖死型態）
-  if (item.allowChars && !item.allowChars.includes('all') && !item.allowChars.includes(curChar)) {
-    return { ok: false, reason: '角色定位不符，無法裝備此武器' };
-  }
-  // 3. 檢查等級與七大素質門檻（點高對應素質即可跨型態穿戴）
+
+   // 1. 統一由角色 equipTags 比對武器種類與防具類別標籤（僅 tag === 'all' 的通用飾品全職業皆可穿）
+   const tag = getItemCategoryTag(item);
+   if (tag !== 'all' && !charTags.includes(tag)) {
+     return { ok: false, reason: `角色武器／防具適性不符（需要【${EQUIP_TAG_NAMES[tag] || tag}】標籤）` };
+   }
+ 
+  // 2. 檢查等級與七大素質門檻（點高對應素質即可跨型態穿戴）
   const curLv = (typeof saveData !== 'undefined' && saveData.outLv) ? saveData.outLv : 1;
   if (item.reqLv && curLv < item.reqLv) return { ok: false, reason: `需要角色等級 LV.${item.reqLv}（目前 LV.${curLv}）` };
   if (item.reqStats && typeof getTotalStats === 'function') {
@@ -203,7 +219,7 @@ function recastEquipAffixes(item) {
   return { ok: true, msg: `✨ 洗煉完成！${item.name} 的魔法副詞條已重新賦予！` };
 }
 
-// 三層優先級讀取武器本命技能（1. customStartSkill 轉換石改造 ➔ 2. startSkill 武器預設 ➔ 3. 型態預設映射）
+// 三層優先級讀取武器初始技能（1. customStartSkill 轉換石改造 ➔ 2. startSkill 武器預設 ➔ 3. 型態預設映射）
 function getWeaponSignatureSkill(weapon) {
   if (!weapon) return 'senku';
   if (weapon.customStartSkill) return weapon.customStartSkill;
@@ -213,7 +229,7 @@ function getWeaponSignatureSkill(weapon) {
   return map[weapon.type] || 'senku';
 }
 
-// 4. 消耗【技能刻印石】自選覆寫劍類武器本命技能（限 LV.15 以上劍類 1 次；法杖/釘錘/魔杖禁用）
+// 4. 消耗【技能刻印石】自選覆寫劍類武器初始技能（限 LV.15 以上劍類 1 次；法杖/釘錘/魔杖禁用）
 function engraveWeaponSkill(weaponItem, newSkillId) {
   if (!weaponItem || weaponItem.slot !== 'weapon' || !weaponItem.identified) return { ok: false, msg: '請選擇一把已鑑定的武器！' };
   if (!['longsword', 'blade', 'rapier'].includes(weaponItem.type)) return { ok: false, msg: '僅限物理劍類武器可使用技能刻印石（法杖、釘錘與魔杖不可使用）！' };
@@ -225,7 +241,7 @@ function engraveWeaponSkill(weaponItem, newSkillId) {
   weaponItem.customStartSkill = newSkillId;
   weaponItem.startSkill = newSkillId;
   weaponItem.engraved = true;
-  return { ok: true, msg: `🔮 刻印成功！${weaponItem.name} 的本命技能已改造為【${targetSk.name}】！` };
+  return { ok: true, msg: `🔮 刻印成功！${weaponItem.name} 的初始技能已改造為【${targetSk.name}】！` };
 }
 
 // 5. 消耗【元素魔晶石】改寫元素魔杖的屬性詞條與對應卡池（限 LV.15 以上魔杖 1 次，不扣合成次數）

@@ -12,7 +12,7 @@ const DEFAULT_SAVE = {
   autoStats: { S: 0, H: 0, I: 0, DEF: 0, MR: 0, DEX: 0, AGI: 0 },
   allocated: { S: 0, H: 0, I: 0, DEF: 0, MR: 0, DEX: 0, AGI: 0 },
   equip: {
-    weapon: { tplId: 'w_long_1', slot: 'weapon', type: 'longsword', name: '學徒長劍', rarity: 'white', reqLv: 1, reqStats: {}, startSkill: 'senku', H: 4, S: 4, identified: true, affixes: [] },
+    weapon: { tplId: 'w_long_1', slot: 'weapon', subType: 'longsword', type: 'longsword', equipTag: 'longsword', name: '學徒長劍', rarity: 'white', reqLv: 1, reqStats: {}, startSkill: 'senku', H: 4, S: 4, identified: true, affixes: [] },
     sub: null, head: null, armor: null, gloves: null, shoes: null, back: null, relic: null
   },
   bag: []
@@ -108,15 +108,25 @@ function switchCharacterVariant(charId, variantId) {
   let totalRefund = 0;
   for (let lv = 2; lv <= saveData.outLv; lv++) { applyAutoLevelGrowth(); totalRefund += getLevelPts(lv); }
   saveData.freePts = totalRefund;
-  const tpl = (typeof WEAPON_TEMPLATES !== 'undefined') ? WEAPON_TEMPLATES.find(w => w.tplId === vData.defaultTpl) : null;
+  const wPool = typeof EQUIP_TEMPLATES !== 'undefined' ? EQUIP_TEMPLATES : (typeof ITEM_WEAPONS !== 'undefined' ? ITEM_WEAPONS : []);
+  const tpl = wPool.find(w => w.tplId === vData.defaultTpl) || null;
   if (tpl) {
+    const realSub = tpl.subType || tpl.type || tpl.equipTag || vid;
+    const defaultElem = (realSub === 'wand') ? (tpl.wandElem || 'fire') : (tpl.wandElem || null);
+    const defaultSk = tpl.startSkill || (realSub === 'wand' ? `${defaultElem}1` : (realSub === 'staff' ? 'holylight' : (realSub === 'mace' ? 'armorbreak' : 'senku')));
+    const baseS = tpl.base?.S?.min || tpl.S || 0;
+    const baseH = tpl.base?.H?.min || tpl.H || 0;
+    const baseI = tpl.base?.I?.min || tpl.I || 0;
+    const baseDEF = tpl.base?.DEF?.min || tpl.DEF || 0;
+    const baseMR = tpl.base?.MR?.min || tpl.MR || 0;
     saveData.equip.weapon = {
-      uid: Date.now(), tplId: tpl.tplId, slot: 'weapon', type: tpl.type, equipTag: tpl.equipTag || tpl.type,
-      wandElem: tpl.wandElem || null, name: tpl.name, rarity: 'white', reqLv: 1, reqStats: {},
-      startSkill: tpl.startSkill, S: tpl.S || 0, H: tpl.H || 0, I: tpl.I || 0, DEF: tpl.DEF || 0, MR: tpl.MR || 0,
+      uid: Date.now(), tplId: tpl.tplId, slot: 'weapon', subType: realSub, type: realSub, equipTag: tpl.equipTag || realSub,
+      wandElem: defaultElem, name: tpl.name, rarity: 'white', reqLv: 1, reqStats: {},
+      startSkill: defaultSk, baseRolled: { ...(baseS ? { S: baseS } : {}), ...(baseH ? { H: baseH } : {}), ...(baseI ? { I: baseI } : {}), ...(baseDEF ? { DEF: baseDEF } : {}), ...(baseMR ? { MR: baseMR } : {}) },
+      S: baseS, H: baseH, I: baseI, DEF: baseDEF, MR: baseMR,
       identified: true, affixes: []
     };
-  }  
+  }
   writeSave(); renderLobby();
 }
 const ID_COST = { white: 10, green: 25, blue: 60, purple: 150, gold: 400 };
@@ -339,18 +349,22 @@ function showLobbyEquipTooltip(e, source, keyOrUid) {
   const it = source === 'equip' ? saveData.equip[keyOrUid] : saveData.bag.find(i => i.uid === Number(keyOrUid));
   if (!it || !it.identified) return;
   const r = RARITIES[it.rarity] || RARITIES.white;
-  const wTypeMap = { longsword: '長劍', blade: '彎刀', rapier: '細劍', wand: '魔杖', staff: '法杖', mace: '釘錘' };
+  const wTypeMap = { longsword: '長劍', blade: '彎刀', rapier: '細劍', tachi: '太刀', greatsword: '巨劍', spear: '槍', polearm: '棍', dagger: '短劍', dual_blade: '雙斧', axe: '戰斧', whip: '鞭', flail: '鏈錘', wand: '魔杖', staff: '權杖', mace: '釘錘' };
   const tagMap = { heavy: '重鎧', robe: '法袍', ninja: '忍服', shield: '盾牌', knuckle: '指虎', crystal: '魔導手鐲' };
-  const typeLabel = it.slot === 'weapon' ? (wTypeMap[it.type] || '武器') : (tagMap[it.equipTag] || SLOT_NAMES[it.slot]);
+  const inferredType = (it.tplId && it.tplId.startsWith('w_wand_')) ? 'wand' : ((it.tplId && it.tplId.startsWith('w_stf_')) ? 'staff' : ((it.tplId && it.tplId.startsWith('w_mace_')) ? 'mace' : null));
+  const realWType = (it.subType && it.subType !== 'weapon') ? it.subType : ((it.type && it.type !== 'weapon') ? it.type : (it.equipTag && it.equipTag !== 'all' ? it.equipTag : inferredType));
+  const typeLabel = it.slot === 'weapon' ? (wTypeMap[realWType] || '武器') : (tagMap[it.equipTag] || SLOT_NAMES[it.slot]);
   const statMap = { S: 'STAB', H: 'HACK', I: 'INT', DEF: 'DEF', MR: 'MR', DEX: 'DEX', AGI: 'AGI' };
   const baseLines = Object.entries(it.baseRolled || {}).map(([k, v]) => `<span style="color:#93c5fd;">${statMap[k] || k} +${it[k] || v}</span>`).join(' ｜ ');
   const reqStatsStr = Object.entries(it.reqStats || {}).map(([k, v]) => `${statMap[k] || k}≥${v}`).join('、');
   const maxS = it.maxSynth ?? 3, remS = Math.max(0, maxS - (it.synthCount ?? 0));
   const elemMap = { fire: '🔥 火系元素', ice: '❄️ 冰系元素', thunder: '⚡ 雷系元素' };
-  const sigSkillId = (it.slot === 'weapon' && typeof getWeaponSignatureSkill === 'function') ? getWeaponSignatureSkill(it) : it.startSkill;
+  const isWand = realWType === 'wand';
+  const dispElem = it.wandElem || (isWand ? 'fire' : null);
+  const sigSkillId = (!isWand && it.slot === 'weapon' && typeof getWeaponSignatureSkill === 'function') ? getWeaponSignatureSkill(it) : (!isWand ? it.startSkill : null);
   const sigBadge = it.customStartSkill ? '（已改造）' : '';
-  const startSkTag = (it.slot === 'weapon' && sigSkillId) ? `<div style="color:#38bdf8;font-size:11px;margin-top:2px;">⚔️ 本命技能：【${getSkillDisplayName(sigSkillId)}】${sigBadge}</div>` : '';
-  const elemTag = it.wandElem ? `<div style="color:#fde047;font-size:11px;margin-top:2px;">🔮 屬性詞條：${elemMap[it.wandElem] || it.wandElem}</div>` : '';
+  const startSkTag = (!isWand && it.slot === 'weapon' && sigSkillId) ? `<div style="color:#38bdf8;font-size:11px;margin-top:2px;">⚔️ 初始技能：【${getSkillDisplayName(sigSkillId)}】${sigBadge}</div>` : '';
+  const elemTag = dispElem ? `<div style="color:#fde047;font-size:11px;margin-top:2px;">🔮 魔杖屬性：${elemMap[dispElem] || dispElem}</div>` : '';
   const reqLine = `<div style="color:#94a3b8;font-size:11px;margin-top:2px;">需求：LV.${it.reqLv || 1}${reqStatsStr ? ' ｜ ' + reqStatsStr : ''} ｜ 🔨 剩餘合成：${remS}/${maxS}</div>`;
   const affixLines = (it.affixes && it.affixes.length > 0)
     ? `<div style="margin-top:5px;padding-top:4px;border-top:1px solid #334155;">${it.affixes.map(a => typeof a === 'object' ? `<span style="color:${a.color || '#4ade80'};">• ${a.label} +${a.val}${a.unit || ''}</span>` : `<span style="color:#4ade80;">• ${a}</span>`).join('<br>')}</div>`
@@ -474,8 +488,14 @@ function renderLobby() {
 
     const rarOrder = { gold: 5, purple: 4, blue: 3, green: 2, white: 1 };
     const slotOrder = { weapon: 1, sub: 2, head: 3, armor: 4, gloves: 5, shoes: 6, back: 7, relic: 8 };
-    const charTags = ch.equipTags || ['all'];
-    const isCharFit = (it) => (!it.allowChars || it.allowChars.includes('all') || it.allowChars.includes(saveData.charId)) && (!it.equipTag || it.equipTag === 'all' || charTags.includes(it.equipTag));
+    const charTags = ch.equipTags || [];
+    const isCharFit = (it) => {
+      const wSub = it.slot === 'weapon'
+        ? ((it.subType && it.subType !== 'weapon') ? it.subType : ((it.type && it.type !== 'weapon') ? it.type : it.equipTag))
+        : null;
+      const tag = wSub || it.equipTag || 'all';
+      return tag === 'all' || charTags.includes(tag);
+    };
     const sortedBag = [...saveData.bag].sort((a, b) => {
       if (!a.identified !== !b.identified) return a.identified ? 1 : -1;
       const fitA = isCharFit(a) ? 1 : 0, fitB = isCharFit(b) ? 1 : 0;
@@ -495,8 +515,11 @@ function renderLobby() {
             return `<div class="bag-item" style="border-left:3px solid ${r.color};"><span style="color:${r.color};">❓ [未鑑定] ${r.name}${SLOT_NAMES[it.slot]}袋</span><button class="stat-btn" style="width:auto;padding:2px 8px;" onclick="identifySingle(${it.uid})">🔍 鑑定 (${cost} Seed)</button></div>`;
           }
           const fit = isCharFit(it);
-          const opacityStyle = fit ? '' : 'opacity:0.55;', unfitTag = fit ? '' : '<span style="font-size:10px;color:#f87171;margin-left:4px;">[他職]</span>';
-          return `<div class="bag-item" style="border-left:3px solid ${r.color};cursor:help;${opacityStyle}" onmouseenter="showLobbyEquipTooltip(event,'bag','${it.uid}')" onmousemove="moveLobbyTooltip(event)" onmouseleave="hideLobbyTooltip()"><div><strong style="color:${r.color};">${it.name}</strong> <span style="font-size:11px;color:#94a3b8;">(LV.${it.reqLv || 1})</span>${unfitTag}</div><button class="stat-btn" style="width:auto;padding:2px 10px;background:${fit ? '#22c55e' : '#475569'};color:${fit ? '#052e16' : '#cbd5e1'};" onclick="event.stopPropagation();equipFromBag(${it.uid})">穿戴</button></div>`;
+          const canEq = fit && (typeof canEquipItem !== 'function' || canEquipItem(it).ok);
+          const opacityStyle = canEq ? '' : 'opacity:0.42;background:rgba(15,23,42,0.85);';
+          const unfitTag = !fit ? '<span style="font-size:10px;color:#f87171;margin-left:4px;">[適性不符]</span>' : (!canEq ? '<span style="font-size:10px;color:#fbbf24;margin-left:4px;">[能力不足]</span>' : '');
+          const btnStyle = canEq ? 'background:#22c55e;color:#052e16;' : 'background:#1e293b;color:#64748b;border:1px solid #334155;cursor:not-allowed;';
+          return `<div class="bag-item" style="border-left:3px solid ${r.color};cursor:help;${opacityStyle}" onmouseenter="showLobbyEquipTooltip(event,'bag','${it.uid}')" onmousemove="moveLobbyTooltip(event)" onmouseleave="hideLobbyTooltip()"><div><strong style="color:${r.color};">${it.name}</strong> <span style="font-size:11px;color:#94a3b8;">(LV.${it.reqLv || 1})</span>${unfitTag}</div><button class="stat-btn" style="width:auto;padding:2px 10px;${btnStyle}" ${canEq ? '' : 'disabled'} onclick="event.stopPropagation();equipFromBag(${it.uid})">${canEq ? '穿戴' : '不可穿'}</button></div>`;
         }).join('');
   }
 }
