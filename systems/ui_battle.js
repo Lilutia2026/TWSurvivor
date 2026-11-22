@@ -64,7 +64,7 @@ function upgradeClassicHud() {
     }
   
     for (const [k, sk] of Object.entries(ACTIVE_SKILLS)) {
-      if (sk.isSuperWeapon) continue;
+      if (sk.isSuperWeapon && !ownedSkills[k]) continue;
       if (hasAngel && (k === 'fire4' || k === 'ice4')) continue;
       if (sk.reqSkill && (!ownedSkills[sk.reqSkill] || ownedSkills[sk.reqSkill].lv < (sk.reqSkillLv || 2))) continue;
       const o = ownedSkills[k], maxL = sk.maxLv || 10;
@@ -80,11 +80,15 @@ function upgradeClassicHud() {
       if (k === 'angelWish' && (ownedSkills.fire4 || ownedSkills.fire5 || ownedSkills.ice4 || ownedSkills.ice5)) continue;
       const lv = ownedPassives[k] || 0, maxP = p.maxLv || 5;
       if (lv < maxP && (lv > 0 || Object.keys(ownedPassives).length < MAX_PASSIVE_SKILLS)) {
+        const isCharUnique = Array.isArray(p.reqChar) && p.reqChar.length > 0;
         const targetSkName = passiveToSkillMap[k];
-        const pTag = targetSkName ? `可使【${targetSkName}】技能昇華` : '被動輔助強化';
+        const pTag = targetSkName
+          ? `🌟 角色專屬・可使【${targetSkName}】昇華`
+          : (isCharUnique ? '💜 角色專屬被動' : '被動輔助強化');
         const stepText = getPassiveGainText(k, 1) || p.desc;
         const pDesc = lv > 0 ? `<strong style="color:#4ade80;">▲ ${stepText}</strong>` : stepText;
-        pool.push({ kind: 'passive', id: k, weight: lv > 0 ? 2.5 : 1.0, title: lv > 0 ? `${p.name} LV.${lv} → LV.${lv + 1}` : `【新輔助】${p.name}`, desc: pDesc, tag: pTag });
+        const titleColor = isCharUnique ? `<span style="color:#e9d5ff;">${p.name}</span>` : p.name;
+        pool.push({ kind: 'passive', id: k, weight: lv > 0 ? 2.5 : 1.0, title: lv > 0 ? `${titleColor} LV.${lv} → LV.${lv + 1}` : `【新輔助】${titleColor}`, desc: pDesc, tag: pTag });
       }
     }
     if (!pool.length) {
@@ -108,11 +112,22 @@ function upgradeClassicHud() {
     if (c.kind === 'evolve') {
       const sk = ACTIVE_SKILLS[c.id];
       if (ownedSkills[c.id] && sk) {
-        if (sk.disableWhenEvo && sk.evoSkillId) {
-          ownedSkills[c.id].disabled = true; ownedSkills[c.id].evolved = true;
-          ownedSkills[c.evoSkillId] = { lv: 1, evolved: true, disabled: false };
-        } else { ownedSkills[c.id].evolved = true; }
-        showBanner(`🌟 技能昇華！【${sk.name}】昇華為【${sk.evoName}】！`);
+        const curCid = (typeof saveData !== 'undefined' && saveData.charId) ? saveData.charId : 'lucien';
+        const charEvo = (sk.evoByChar && sk.evoByChar[curCid]) ? sk.evoByChar[curCid] : null;
+        const finalEvoId = c.targetEvoId || (charEvo ? charEvo.evoSkillId : sk.evoSkillId);
+        const finalEvoName = charEvo ? charEvo.evoName : (sk.evoName || sk.name);
+
+        if (sk.disableWhenEvo && finalEvoId) {
+          ownedSkills[c.id].disabled = true;
+          ownedSkills[c.id].evolved = true;
+          if (!ACTIVE_SKILLS[finalEvoId] && typeof GLOBAL_SKILL_POOL !== 'undefined' && GLOBAL_SKILL_POOL[finalEvoId]) {
+            ACTIVE_SKILLS[finalEvoId] = { ...GLOBAL_SKILL_POOL[finalEvoId], timer: 0.2 };
+          }
+          ownedSkills[finalEvoId] = { lv: 1, evolved: true, disabled: false };
+        } else {
+          ownedSkills[c.id].evolved = true;
+        }
+        showBanner(`🌟 技能昇華！【${sk.name}】昇華為【${finalEvoName}】！`);
       }
     } else if (c.kind === 'skill') {
       ownedSkills[c.id] ? ownedSkills[c.id].lv++ : (ownedSkills[c.id] = { lv: 1, evolved: false, disabled: false });
@@ -122,7 +137,7 @@ function upgradeClassicHud() {
       if (c.id === 'haste') player.cdMult *= 0.92;
       if (c.id === 'cdr') player.cdMult *= 0.94;
       if (c.id === 'guard') { /* 減傷由 getEffectivePhysReducePct / getEffectiveMagReducePct 動態讀取 */ }
-      if (c.id === 'area') player.areaMult += 0.10;
+      if (c.id === 'area') player.areaMult += 0.06;
       if (c.id === 'might') player.dmgMult += 0.08;
       if (c.id === 'crit') player.bonusCritRate += 0.04;
       if (c.id === 'speedUp') { player.speedMult += 0.07; player.bonusCritRate += 0.02; }
@@ -205,7 +220,10 @@ function getSkillTooltipEl() {
       const sk = ACTIVE_SKILLS[id], st = ownedSkills[id];
       if (!sk || !st) return;
       const rawDmg = Math.round(getSkillRawDmg(id, st.lv, st.evolved));
-      const realCd = (sk.baseCd * getEffectiveCdMult(Math.pow(0.95, st.lv - 1))).toFixed(2);
+      let skillCdScale = 1.0;
+      if (id === 'divinePrayer') skillCdScale = 1 - Math.floor(st.lv / 3) * 0.10;
+      if (id === 'spiralHammer') skillCdScale = 1 - (st.lv >= 7 ? 0.20 : (st.lv >= 3 ? 0.10 : 0));
+      const realCd = (sk.baseCd * skillCdScale * getEffectiveCdMult(1.0)).toFixed(2);
       const isEvo = !!(st.evolved || sk.isSuperWeapon);
       const curStatusText = getSkillCurrentStatusText(id, sk, st.lv, isEvo);
       const partnerId = sk.resonancePartner || sk.resonanceSkill;
@@ -301,7 +319,7 @@ function togglePause() {
   
       const skillBadges = Object.entries(ownedSkills).map(([k, v]) => {
         const sk = ACTIVE_SKILLS[k] || { name: k };
-        const dispName = v.evolved ? (sk.evoName || sk.name) : sk.name;
+        const dispName = (!v.disabled && v.evolved && sk.evoName) ? sk.evoName : sk.name;
         const iconChar = (v.evolved && sk.evoIcon) ? sk.evoIcon : (sk.icon || dispName.slice(0, 1));
         const isMax = v.lv >= (sk.maxLv || 10);
         const isEvo = !!(v.evolved || sk.isSuperWeapon);

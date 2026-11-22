@@ -27,8 +27,8 @@ function renderStageSelectUI() {
     const infoEl = document.getElementById('stage-player-summary');
     if (!listEl) return;
 
-    const pLv = (typeof saveData !== 'undefined' && saveData.lv) ? saveData.lv : 1;
-    const cName = (typeof CHARACTERS !== 'undefined' && saveData?.selectedChar && CHARACTERS[saveData.selectedChar]?.name) || '冒險者';
+    const pLv = (typeof saveData !== 'undefined' && saveData.outLv) ? saveData.outLv : 1;
+    const cName = saveData?.charName || (typeof CHARACTERS !== 'undefined' && saveData?.charId && CHARACTERS[saveData.charId]?.name) || '冒險者';
     if (infoEl) {
         infoEl.innerHTML = `出戰角色：<b>${cName}</b> (LV.${pLv}) ｜ 房間人數：<b>${1 + (TOWN_STATE?.roomMembers?.length || 0)} / 4</b>`;
     }
@@ -64,19 +64,12 @@ function selectStageOption(stageId) {
 function launchSelectedStage() {
     const stageView = document.getElementById('stage-select-view');
     if (stageView) stageView.style.display = 'none';
-
-    // 記錄當前選擇的關卡 ID
     window.CURRENT_STAGE_ID = STAGE_SELECT_STATE.selectedStageId;
 
-    // 確保舊版大廳保持隱藏，並直接觸發原本紅色「出發冒險」按鈕的開戰事件
-    const oldLobby = document.getElementById('lobby');
+    const oldLobby = document.getElementById('lobbyModal');
     if (oldLobby) oldLobby.style.display = 'none';
 
-    const oldStartBtn = Array.from(document.querySelectorAll('#lobby button'))
-        .find(b => b.textContent && b.textContent.includes('出發冒險'));
-    if (oldStartBtn && typeof oldStartBtn.onclick === 'function') {
-        oldStartBtn.onclick();
-    } else if (typeof startGame === 'function') {
-        startGame();
+    if (typeof startBattle === 'function') {
+        startBattle();
     }
 }

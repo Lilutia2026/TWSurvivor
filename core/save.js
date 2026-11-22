@@ -83,9 +83,11 @@ function addOutExpAndSeed(expGain, seedGain) {
 function switchCharacterVariant(charId, variantId) {
   if (pendingAlloc) { alert('請先按下「✅ 確認配點」或「↩️ 取消微調」後再切換角色！'); return; }
   const ch = CHARACTERS[charId];
-  if (!ch || !ch.playable) return;
-  const vid = (variantId && ch.variants[variantId]) ? variantId : ch.defaultVariant;
+  if (!ch || !ch.playable || !ch.variants) return;
+  const fallbackVid = Object.keys(ch.variants)[0];
+  const vid = (variantId && ch.variants[variantId]) ? variantId : (ch.variants[ch.defaultVariant] ? ch.defaultVariant : fallbackVid);
   const vData = ch.variants[vid];
+  if (!vData) return;
   const oldW = saveData.equip.weapon;
   if (oldW) {
     const dupBase = oldW.reqLv === 1 && oldW.rarity === 'white' && !(oldW.affixes && oldW.affixes.length) && saveData.bag.some(b => b.tplId === oldW.tplId && b.rarity === 'white');
@@ -503,12 +505,34 @@ function renderLobby() {
 function startBattle() {
   if (pendingAlloc) { alert('請先按下「✅ 確認配點」或「↩️ 取消微調」後再出發冒險！'); return; }
   const d = getDerivedCombatStats(), w = saveData.equip.weapon || { name: '徒手', type: 'longsword', startSkill: 'senku' }, ch = getCurrentCharData();
-  const sigSkill = typeof getWeaponSignatureSkill === 'function' ? getWeaponSignatureSkill(w) : (w.startSkill || 'senku');
+
+  // 從 EQUIP_TEMPLATES 反查並補齊真實武器子類型（解決舊存檔 w.type === 'weapon' 的問題）
+  if (typeof EQUIP_TEMPLATES !== 'undefined') {
+    const tpl = EQUIP_TEMPLATES.find(t => (w.tplId && t.tplId === w.tplId) || t.name === w.name);
+    if (tpl && tpl.subType) { w.subType = tpl.subType; w.type = tpl.subType; }
+  }
+  const realWType = (w.subType && w.subType !== 'weapon') ? w.subType : ((w.type && w.type !== 'weapon') ? w.type : 'longsword');
+  w.type = realWType;
+
+  let sigSkill = typeof getWeaponSignatureSkill === 'function' ? getWeaponSignatureSkill(w) : w.startSkill;
+  if (saveData.charId === 'tichiel') {
+    if (realWType === 'mace' && !w.customStartSkill) sigSkill = 'armorbreak';
+    else if (realWType === 'staff' && !w.customStartSkill) sigSkill = 'holylight';
+    else if (realWType === 'wand' && !w.customStartSkill) {
+      sigSkill = w.wandElem === 'ice' ? 'ice1' : (w.wandElem === 'thunder' ? 'thunder1' : 'fire1');
+    }
+  }
+  if (!sigSkill) sigSkill = 'senku';
   if (typeof EQUIPPED_WEAPON !== 'undefined') { EQUIPPED_WEAPON.name = w.name; EQUIPPED_WEAPON.startSkill = sigSkill; }
   if (typeof ACTIVE_SKILLS !== 'undefined' && typeof getActiveSkillPool === 'function') {
     for (const k of Object.keys(ACTIVE_SKILLS)) delete ACTIVE_SKILLS[k];
-    Object.assign(ACTIVE_SKILLS, getActiveSkillPool());
+    const nextPool = getActiveSkillPool();
+    if (typeof GLOBAL_SKILL_POOL !== 'undefined' && GLOBAL_SKILL_POOL[sigSkill] && !nextPool[sigSkill]) {
+      nextPool[sigSkill] = { ...GLOBAL_SKILL_POOL[sigSkill], timer: 0.2 };
+    }
+    Object.assign(ACTIVE_SKILLS, nextPool);
   }
+
   const hudName = document.getElementById('hudCharName'), hudWep = document.getElementById('weaponText');
   if (hudName) hudName.textContent = ch.name; if (hudWep) hudWep.textContent = w.name;
   if (typeof player !== 'undefined') {

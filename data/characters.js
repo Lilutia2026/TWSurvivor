@@ -30,7 +30,7 @@ const CHARACTERS = {
 
   tichiel: {
     id: 'tichiel', name: '蒂琪愛兒．朱斯彼昂', title: '天真爛漫的聖女', color: '#f472b6', playable: true,
-    defaultVariant: 'wand_fire',
+    defaultVariant: 'wand',
     equipTags: ['all', 'robe', 'crystal', 'wand', 'staff', 'mace'],
     skillTags: ['tichiel_magic', 'staff_mace', 'tichiel_unique'],
     resonances: {
@@ -40,9 +40,9 @@ const CHARACTERS = {
       holy:      { polyMult: [2.60, 3.20, 3.90, 4.60, 5.40], hammerMult: [3.00, 3.70, 4.50, 5.20, 6.00], waveRadiusBonus: [0, 0.10, 0.20, 0.30, 0.40] }
     },
     variants: {
-      wand:  { wName: '法杖', archetype: 'I',      initHp: 170, defaultTpl: 'w_wand_0', baseStats: { S: 1, H: 1, I: 5, DEF: 1, MR: 3, DEX: 1, AGI: 2 } },
-      staff: { wName: '權杖', archetype: 'MR',     initHp: 185, defaultTpl: 'w_stf_0',  baseStats: { S: 1, H: 1, I: 3, DEF: 2, MR: 5, DEX: 1, AGI: 1 } },
-      mace:  { wName: '釘錘', archetype: 'DEF+MR', initHp: 215, defaultTpl: 'w_mace_0', baseStats: { S: 1, H: 3, I: 2, DEF: 4, MR: 3, DEX: 1, AGI: 1 } }
+      wand:  { wName: '法杖', archetype: 'I',     initHp: 170, defaultTpl: 'w_wand_0', baseStats: { S: 1, H: 1, I: 5, DEF: 1, MR: 3, DEX: 1, AGI: 2 } },
+      staff: { wName: '權杖', archetype: 'MR',    initHp: 185, defaultTpl: 'w_stf_0',  baseStats: { S: 1, H: 1, I: 3, DEF: 2, MR: 5, DEX: 1, AGI: 1 } },
+      mace:  { wName: '釘錘', archetype: 'DEF+H', initHp: 215, defaultTpl: 'w_mace_0', baseStats: { S: 1, H: 3, I: 2, DEF: 4, MR: 3, DEX: 1, AGI: 1 } }
     }
 
   },

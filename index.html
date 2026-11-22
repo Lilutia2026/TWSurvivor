@@ -56,7 +56,7 @@
       <div id="stage-player-summary" style="font-size:13px;color:#cbd5e1;margin-bottom:14px;"></div>
       <div id="stage-cards-container"></div>
       <div style="margin-top:16px;">
-          <button onclick="launchSelectedStage()" style="width:100%;padding:12px;font-size:16px;font-weight:bold;background:#16a34a;color:#fff;border:none;border-radius:8px;cursor:pointer;">⚔️ 正式出發冒險</button>
+          <button onclick="launchSelectedStage()" style="width:100%;padding:12px;font-size:16px;font-weight:bold;background:#16a34a;color:#fff;border:none;border-radius:8px;cursor:pointer;">⚔️ 正式出征</button>
       </div>
   </div>
 </div>
@@ -174,13 +174,13 @@
       <script src="systems/ui_battle.js"></script>
   
       <!-- ==================== 4. 局內核心戰鬥與存檔引擎 (core/) ==================== -->
+      <script src="core/save.js"></script>
       <script src="core/resonance.js"></script>
       <script src="core/combat.js"></script>
       <script src="core/skill_exec.js"></script>
       <script src="core/render.js"></script>
       <script src="core/sandbox.js"></script>
       <script src="core/game.js"></script>
-      <script src="core/save.js"></script>
   
       <!-- ==================== 5. 局外城鎮、選角、選關與獨立 NPC (town/) ==================== -->
       <script src="town/town.js"></script>
@@ -192,14 +192,10 @@
       <script src="town/NPC/npc_hannah.js"></script> 
       <script>
         window.addEventListener('load', () => {
-            // 隱藏舊版大廳容器與測試場浮動按鈕，統一走新選角與卡雷德市集流程
-            const oldLobby = document.getElementById('lobby');
+            const oldLobby = document.getElementById('lobbyModal');
             if (oldLobby) oldLobby.style.display = 'none';
-            document.querySelectorAll('button').forEach(btn => {
-                if (btn.textContent && btn.textContent.includes('木樁測試場')) {
-                    btn.style.display = 'none';
-                }
-            });
+            const sbBtn = document.getElementById('btnEnterSandbox');
+            if (sbBtn) sbBtn.style.display = 'none';
             if (typeof openLoginSelectScreen === 'function') {
                 openLoginSelectScreen();
             }

@@ -52,8 +52,9 @@ function getEffectiveMagReducePct(cs) {
 // 【前端標籤中文化對照字典】底層使用英文代碼，前端自動渲染為繁體中文
 const BEHAVIOR_TAG_CN = {
   melee: '近戰', ranged: '遠程', projectile: '射彈',
-  aoe: '範圍', zone: '領域', physical: '物理', magic: '魔法'
+  aoe: '範圍', zone: '領域', physical: '物理', magic: '魔法', knockback: '擊退'
 };
+
 const ELEMENT_TAG_CN = {
   fire: '火系', ice: '冰系', lightning: '雷系', wind: '風系',
   holy: '聖光', armor_break: '破甲', dark: '暗影', none: '無屬性'
@@ -72,6 +73,7 @@ function getLocalizedSkillTags(sk) {
 
 upgradeClassicHud();
 
+window.EQUIPPED_WEAPON = window.EQUIPPED_WEAPON || { name: '學徒長劍', startSkill: 'senku' };
 const ownedSkills = { [EQUIPPED_WEAPON.startSkill]: { lv: 1, evolved: false, disabled: false } };
 const ownedPassives = {};
 let enemies = [], slashes = [], projectiles = [], enemyProjectiles = [], lightnings = [], zones = [], damageTexts = [], gems = [], chests = [];
@@ -142,6 +144,26 @@ function update(dt) {
 
   zones = zones.filter(z => {
     z.life -= dt; z.tickTimer -= dt;
+    if (z.kind === 'spiral_hammer') {
+      z.x = player.x;
+      z.y = player.y;
+      z.spinAngle = (z.spinAngle || 0) + dt * 11.5;
+      if (z.tickTimer <= 0) {
+        z.tickTimer = 0.30;
+        damageArea(z.x, z.y, z.radius, 0, Math.PI * 2, z.dmg, z.kbPower, {
+          element: 'none',
+          isPhysSkill: true,
+          isStrike: true,
+          hasKnockback: true,
+          onTargetHit: (e) => {
+            if (Array.isArray(z.statusTags) && z.statusTags.length > 0) {
+              applyStatusTagsOnHit(e, z.statusTags, spellBase, cs, { isMelee: true });
+            }
+          }
+        });
+      }
+      return z.life > 0;
+    }
     if (z.kind === 'thunder2') {
       z.x = player.x; z.y = player.y;
       z.elapsed = (z.elapsed || 0) + dt;
@@ -232,6 +254,50 @@ function update(dt) {
 
   const spawnedProjectiles = [];
   projectiles = projectiles.filter(p => {
+    if (p.isDivinePrayer) {
+      if (p.hoverTimer > 0) {
+        p.hoverTimer -= dt;
+        p.offY -= 24 * dt;
+        p.x = player.x + p.offX;
+        p.y = player.y + p.offY;
+        if (p.hoverTimer <= 0) {
+          p.startX = p.x;
+          p.startY = p.y;
+          if (p.targetObj && !p.targetObj.isDead) {
+            p.targetX = p.targetObj.x;
+            p.targetY = p.targetObj.y;
+          }
+          const dist = Math.hypot(p.targetX - p.startX, p.targetY - p.startY);
+          p.flightDur = Math.max(0.28, Math.min(0.65, dist / 640));
+          p.flightTime = 0;
+        }
+        return true;
+      }
+      if (p.targetObj && !p.targetObj.isDead) {
+        p.targetX = p.targetObj.x;
+        p.targetY = p.targetObj.y;
+      }
+      p.flightTime += dt;
+      const t = Math.min(1, p.flightTime / (p.flightDur || 0.4));
+      const baseX = p.startX + (p.targetX - p.startX) * t;
+      const baseY = p.startY + (p.targetY - p.startY) * t - Math.sin(t * Math.PI) * 58;
+      const pathAng = Math.atan2(p.targetY - p.startY, p.targetX - p.startX);
+      const perpX = -Math.sin(pathAng), perpY = Math.cos(pathAng);
+      const sway = Math.sin(t * Math.PI * 2) * 22 * (1 - t) * (p.waveSign || 1);
+      p.x = baseX + perpX * sway;
+      p.y = baseY + perpY * sway;
+      if (t >= 1) {
+        slashes.push({ type: 'holywave', x: p.targetX, y: p.targetY, range: p.boomRadius, arc: Math.PI * 2, life: 0.20, maxLife: 0.20 });
+        damageArea(p.targetX, p.targetY, p.boomRadius, 0, Math.PI * 2, p.dmg, 0, {
+          element: 'holy',
+          onTargetHit: (target) => {
+            applyStatusTagsOnHit(target, 'holy', spellBase, cs, { isMelee: false });
+          }
+        });
+        return false;
+      }
+      return true;
+    }
     if (p.isMeteor) {
       p.elapsed += dt;
       const prog = Math.min(1, p.elapsed / p.fallDur);
@@ -522,7 +588,7 @@ enemies.push({ x: player.x + Math.cos(ang) * 380, y: player.y + Math.sin(ang) * 
 showBanner(isFinal ? '⚠️ 20分鐘最終決戰！暗黑魔王降臨！' : (isMega ? '👑 狂暴大首領登場！擊敗掉落【金色超武寶箱】！' : '⚔️ 精英魔物出現！擊敗掉落【白銀幸運寶箱】！'));
 }
 
-renderLobby();
+if (typeof renderLobby === 'function') renderLobby();
 let lastT = performance.now();
 function loop(now) { const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now; update(dt); draw(); requestAnimationFrame(loop); }
 requestAnimationFrame(loop);

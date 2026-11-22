@@ -125,6 +125,8 @@ const SANDBOX_STATE = {
       alert('請先按下「✅ 確認配點」或「↩️ 取消微調」後再進入測試場！');
       return;
     }
+    if (typeof leaveTownClad === 'function') leaveTownClad();
+
     // 先借用 startBattle 初始化角色素質、裝備與起始技能，再切換為純淨沙盒狀態
     if (typeof startBattle === 'function') startBattle();
     resetSandboxState(true);

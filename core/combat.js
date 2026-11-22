@@ -68,7 +68,10 @@ function getSkillRawDmg(id, lv, evolved) {
         const blessMult = 1 + (ownedPassives.blessing || 0) * 0.03;
         const angelMult = ownedPassives.angelWish ? 0.90 : 1.0;
         const evoMult = (evolved && !sk.isSuperWeapon) ? 1.45 : 1.0;
-        return ((sk.baseDmg + Math.max(0, lv - 1) * sk.perLv) + statPower + defBonus) * player.dmgMult * dmgTypeMult * dualMasteryMult * blessMult * angelMult * evoMult;
+        const rawBase = Array.isArray(sk.dmgCurve)
+          ? sk.dmgCurve[Math.min(sk.dmgCurve.length - 1, Math.max(0, lv - 1))]
+          : (sk.baseDmg + Math.max(0, lv - 1) * sk.perLv);
+        return (rawBase + statPower + defBonus) * player.dmgMult * dmgTypeMult * dualMasteryMult * blessMult * angelMult * evoMult;
       }   
   
   function getSpellBase() {
@@ -266,7 +269,7 @@ function getSkillRawDmg(id, lv, evolved) {
         const baseDropChance = 0.015 * (player.dropRateMult || 1.0);
         if (!e.isDummy && (e.isFinalBoss || e.isMegaBoss || e.isElite || Math.random() < baseDropChance)) {
           const dropCount = e.isFinalBoss ? 3 : (e.isMegaBoss ? 2 : 1);
-          const rar = e.isFinalBoss ? 'legendary' : (e.isMegaBoss ? 'epic' : (e.isElite ? 'rare' : 'common'));
+          const rar = e.isFinalBoss ? 'gold' : (e.isMegaBoss ? 'purple' : (e.isElite ? 'blue' : 'green'));
           for (let d = 0; d < dropCount; d++) {
             const dropItem = typeof createUnidentifiedDrop === 'function' ? createUnidentifiedDrop(rar, saveData.outLv + 10, null, (e.isFinalBoss || e.isMegaBoss) && d === 0) : null;
             if (dropItem) lootBags.push({ x: e.x + (d * 24 - 12), y: e.y, item: dropItem, color: RARITIES[rar].color, rarName: RARITIES[rar].name });
@@ -292,25 +295,30 @@ function getSkillRawDmg(id, lv, evolved) {
           while (diff > Math.PI) diff -= Math.PI * 2; while (diff < -Math.PI) diff += Math.PI * 2;
           if (arc >= Math.PI * 1.9 || Math.abs(diff) <= arc / 2) {
             hitCount++;
-            const rawKb = (typeof opts.kbRange === 'object' && opts.kbRange)
-              ? (opts.kbRange.min + Math.random() * (opts.kbRange.max - opts.kbRange.min))
-              : kb;
-            const kbFinal = rawKb * kbMult;
-            const allowDummyKb = e.isDummy && typeof SANDBOX_STATE !== 'undefined' && SANDBOX_STATE.active && SANDBOX_STATE.dummyKnockback;
-            const res = (e.isDummy && !allowDummyKb) ? 0 : ((e.isElite || e.isMegaBoss || e.isFinalBoss) ? 0.15 : 1);
-            const ang = Math.atan2(dy, dx), pushDist = kbFinal * res;
-            e.x += Math.cos(ang) * pushDist; e.y += Math.sin(ang) * pushDist;
+            let pushDist = 0;
+            if (opts.hasKnockback) {
+              const rawKb = (typeof opts.kbRange === 'object' && opts.kbRange)
+                ? (opts.kbRange.min + Math.random() * (opts.kbRange.max - opts.kbRange.min))
+                : kb;
+              const kbFinal = rawKb * kbMult;
+              const allowDummyKb = e.isDummy && typeof SANDBOX_STATE !== 'undefined' && SANDBOX_STATE.active && SANDBOX_STATE.dummyKnockback;
+              const res = (e.isDummy && !allowDummyKb) ? 0 : ((e.isElite || e.isMegaBoss || e.isFinalBoss) ? 0.15 : 1);
+              const ang = Math.atan2(dy, dx);
+              pushDist = kbFinal * res;
+              e.x += Math.cos(ang) * pushDist;
+              e.y += Math.sin(ang) * pushDist;
+            }
             if (opts.onTargetHit) opts.onTargetHit(e);
             const finalBaseDmg = (typeof opts.dmgModFn === 'function') ? (baseDmg * (opts.dmgModFn(e) || 1)) : baseDmg;
             hitEnemy(i, finalBaseDmg, opts);
 
-            // 擊退撞擊二次傷害（每名被擊退目標單次揮擊最多觸發 1 次撞擊）
-            if (opts.slamRatio && pushDist > 2 && !slammedSet.has(e) && enemies[i] === e && !e.isDead) {
+            // 擊退物理動能撞擊公式：撞擊傷害 = 本次傷害 × (0.20 + 實際擊退距離 × 0.015)
+            if (opts.hasKnockback && pushDist > 2 && !slammedSet.has(e) && enemies[i] === e && !e.isDead) {
               for (let k = enemies.length - 1; k >= 0; k--) {
                 const other = enemies[k];
-                if (other !== e && !other.isDead && Math.hypot(other.x - e.x, other.y - e.y) <= e.radius + other.radius + 8) {
+                if (other !== e && !other.isDead && Math.hypot(other.x - e.x, other.y - e.y) <= e.radius + other.radius + 10) {
                   slammedSet.add(e);
-                  const slamDmg = finalBaseDmg * opts.slamRatio;
+                  const slamDmg = finalBaseDmg * (0.20 + pushDist * 0.015);
                   damageTexts.push({ x: other.x, y: other.y - other.radius - 12, txt: `💥撞擊`, color: '#fb923c', fontSize: 12, life: 0.50 });
                   hitEnemy(k, slamDmg, { element: opts.element || 'none', noCrit: true });
                   break;

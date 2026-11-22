@@ -44,6 +44,12 @@ const TICHIEL_SKILLS = {
     baseDmg: 28, perLv: 8, baseCd: 5.50, canEvolve: false,
     desc: '【白魔術・魔法・MR・範圍・領域】引導天界聖光柱轟擊並留下治癒光陣回復生命，機率附加【聖印】。'
   },
+  divinePrayer: {
+    name: '光之祈禱', icon: '🕊️', reqChar: ['tichiel'], skillTags: ['staff_mace'], reqWeaponTypes: ['staff', 'mace'],
+    statTags: ['MR'], type: 'magic', behaviorTags: ['ranged', 'projectile'], element: 'holy', statusTags: ['holy'],
+    baseCd: 2.2, baseDmg: 18, perLv: 4, dmgCurve: new Array(18, 22, 26, 30, 36, 42, 48, 56, 64, 74), maxLv: 10,
+    desc: '【白魔術・魔法・MR・遠程・射彈】召喚 2 顆聖光彈於周身浮空蓄勢，鎖定後以曲線軌跡俯衝貫穿目標並引發小範圍聖光爆破（機率附加聖印）。'
+  },
   holypoly: {
     name: '光之聚咒', icon: '🌟', reqChar: ['tichiel'], skillTags: ['staff_mace'], reqWeaponTypes: ['staff'], isSuperWeapon: true, evoFrom: 'radiance',
     type: 'magic', element: 'holy', statusTags: ['holy'], statTags: ['MR'], behaviorTags: ['aoe', 'zone'], maxLv: 3,
@@ -64,6 +70,12 @@ const TICHIEL_SKILLS = {
     type: 'physical', element: 'holy', statusTags: ['holy'], statTags: ['S', 'H'], behaviorTags: ['melee', 'aoe'], maxLv: 8,
     baseDmg: 26, perLv: 9, baseCd: 3.00, canEvolve: false,
     desc: '【戰錘技・物理・S+H・近戰・範圍】重錘垂直猛擊大地激起 360° 神聖震波將敵群定在原地並大幅提高聖印疊層效率。'
+  },
+  spiralHammer: {
+    name: '螺旋重錘', icon: '🌀', reqChar: ['tichiel'], skillTags: ['staff_mace'], reqWeaponTypes: ['mace', 'staff'],
+    statTags: ['S', 'H'], type: 'physical', behaviorTags: ['melee', 'aoe', 'knockback'], element: 'none', statusTags: ['armor_break'],
+    baseCd: 5.0, baseDmg: 18, perLv: 4, dmgCurve: new Array(18, 22, 26, 30, 36, 42, 48, 55, 62, 72), maxLv: 10,
+    desc: '【戰錘技・物理・S+H・近戰・範圍・擊退】掄起巨大光錘環繞自身旋轉 1.2s，每 0.3s 判定周遭傷害並強力擊退（撞擊後方敵人觸發額外物理撞擊傷害；持釘錘可附加破甲）。'
   },
   frenzyhammer: {
     name: '失意狂擊', icon: '💥', reqChar: ['tichiel'], skillTags: ['staff_mace'], reqWeaponTypes: ['mace'], isSuperWeapon: true, evoFrom: 'armorbreak',

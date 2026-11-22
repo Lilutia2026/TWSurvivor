@@ -20,7 +20,7 @@ const TOWN_CLAD_MAP = {
     name: '卡雷德自由市場',
     width: 1280,
     height: 820,
-    bgImage: 'assets/town_clad.png', // 預留美術背景圖路徑（載入失敗自動降級為向量佔位）
+    bgImage: '', // 待地圖美術定案後填入圖片路徑
     spawnPoint: { x: 640, y: 430 },  // 玩家進入市集的預設出生點
     // 可行走矩形邊界（後續替換精細地圖美術時可微調）
     walkBounds: { minX: 160, maxX: 1120, minY: 160, maxY: 680 },

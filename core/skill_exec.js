@@ -31,7 +31,10 @@ function getPassiveGainText(id, lv) {
   }
   
   function getSkillNextLvGain(id, sk, nextLv) {
-    const gains = [`基礎傷害 +${sk.perLv}`, '冷卻時間 -5%'];
+    const stepDmg = Array.isArray(sk.dmgCurve)
+      ? (sk.dmgCurve[Math.min(sk.dmgCurve.length - 1, nextLv - 1)] - sk.dmgCurve[Math.max(0, nextLv - 2)])
+      : sk.perLv;
+    const gains = [`基礎傷害 +${stepDmg}`];
     if (nextLv === 4) {
       if (id === 'aurorathrust') gains.push('突刺距離 +25%、光束寬度 +15%');
       if (id === 'renga') gains.push('升級為前方扇形 3 連斬、範圍 +15%');
@@ -74,7 +77,7 @@ function getPassiveGainText(id, lv) {
     if (id === 'holypoly') gains.push('聖光漩渦半徑擴大');
     if (id === 'ice2') gains.push('冰霧領域範圍 +6%');
     if (id === 'ice3' && nextLv === 6) gains.push('單次發射巨型寒冰球提升至 2 顆、散射冰彈威力提升至 60%');
-    if ((id === 'windblade' || id === 'firearrow' || id === 'thunder') && nextLv % 3 === 0) gains.push('投射／落雷數量 +1');
+    if ((id === 'windblade' || id === 'firearrow' || id === 'thunder') && nextLv % 3 === 0) gains.push('落雷數量 +1');
     if (id === 'armorbreak') {
       gains.push('扇形範圍 +4%');
       if (nextLv === 3) gains.push('扇形角度擴大至 126°、擊退力 +20%');
@@ -99,14 +102,23 @@ function getPassiveGainText(id, lv) {
     if (['enbu', 'radiance', 'ice2', 'thunder2', 'fire2', 'fire4', 'ice4', 'thunder4'].includes(id)) {
       gains.push('攻擊範圍擴大');
     }
+    if (id === 'divinePrayer') {
+      if (nextLv === 3 || nextLv === 6 || nextLv === 9) gains.push('基礎冷卻 -10%');
+      if (nextLv === 4 || nextLv === 7 || nextLv === 10) gains.push('追尾光彈數量 +1 顆');
+      if (nextLv === 8) gains.push('小範圍爆破半徑擴大');
+    }
+    if (id === 'spiralHammer') {
+      if (nextLv === 3 || nextLv === 7) gains.push('基礎冷卻 -10%');
+      if (nextLv === 3 || nextLv === 8) gains.push('判定半徑 +12%、擊退力道強化');
+      if (nextLv === 5) gains.push('持續時間延長至 1.5s、擊退力道強化');
+      if (nextLv === 10) gains.push('擊退力道最大化');
+    }
     return gains.join('、');
   }
   
   // 動態計算並彙整主動技能「目前等級」已累積的實際狀態敘述（供 Tooltip 與 ESC 面板顯示）
   function getSkillCurrentStatusText(id, sk, lv, isEvo) {
     const parts = [];
-    const cdRedPct = Math.round((1 - Math.pow(0.95, Math.max(0, lv - 1))) * 100);
-    if (cdRedPct > 0) parts.push(`技能冷卻 -${cdRedPct}%`);
     if (id === 'holylight' || id === 'fire1') parts.push(`單次發射 ${1 + Math.floor(lv / 2)} 發射彈`);
     if (id === 'radiance') {
       const radBonus = Math.round((lv - 1) * (50 / 9));
@@ -161,6 +173,18 @@ function getPassiveGainText(id, lv) {
       const healPct = Math.min(2.0, 0.8 + Math.floor((lv - 1) / 2) * 0.3).toFixed(1);
       parts.push(`光陣每秒回復 ${healPct}% 最大生命（殘留光陣無傷害）`);
     }
+    if (id === 'divinePrayer') {
+      const bolts = 2 + Math.floor((lv - 1) / 3);
+      const boomR = lv >= 8 ? 46 : 34;
+      parts.push(`單次召喚 ${bolts} 顆浮空曲線追尾光彈（落點引發 ${boomR}px 聖光爆破；若鎖定重複目標，後續光彈傷害降為 30%）`);
+    }
+
+    if (id === 'spiralHammer') {
+      const dur = lv >= 5 ? 1.5 : 1.2;
+      const radPct = (lv >= 3 ? 12 : 0) + (lv >= 8 ? 12 : 0);
+      const kbPct = lv >= 10 ? 110 : (lv >= 8 ? 80 : (lv >= 5 ? 50 : (lv >= 3 ? 25 : 0)));
+      parts.push(`旋轉持續 ${dur.toFixed(1)}s（每 0.3s 判定 1 次｜半徑 +${radPct}%｜擊退力 +${kbPct}%，撞怪觸發物理撞擊）`);
+    }
     if (id === 'aurorathrust') parts.push(`窄圓錐突刺（末端100%／前端70%）${lv >= 4 ? '｜突刺距離+25%' : ''}${lv >= 6 ? '｜暴率+12%' : ''}${lv >= 8 ? '｜穿透傷+20%' : ''}`);
     if (id === 'renga') parts.push(`扇形 ${lv >= 4 ? 3 : 2} 連劈砍${lv >= 6 ? '｜連擊+12%' : ''}${lv >= 8 ? '｜第3斬1.30x' : ''}`);
     if (id === 'senku') parts.push(`單次發射 ${lv >= 8 ? 2 : 1} 道穿透新月劍氣${lv >= 4 ? '｜射程+25%' : ''}`);
@@ -192,7 +216,7 @@ function triggerSkills(dt) {
     for (const [id, st] of Object.entries(ownedSkills)) {
       const sk = ACTIVE_SKILLS[id];
       if (!sk || st.disabled || ((sk.timer = (sk.timer || 0) - dt) > 0)) continue;
-      const cdFactor = getEffectiveCdMult(Math.pow(0.95, st.lv - 1));
+      const cdFactor = getEffectiveCdMult(1.0);
       const bTags = sk.behaviorTags || [];
       const sTags = Array.isArray(sk.statusTags) ? sk.statusTags : [];
       const isMeleeSkill = bTags.includes('melee') || bTags.includes('近戰');
@@ -403,21 +427,69 @@ function triggerSkills(dt) {
         const range = 145 * (1 + (st.lv - 1) * 0.04) * areaFactor;
         const arc = st.lv >= 3 ? 2.2 : 1.7;
         const kbMult = 1 + (st.lv >= 3 ? 0.20 : 0) + (st.lv >= 5 ? 0.20 : 0);
-        const slamRatio = st.lv >= 5 ? 0.65 : 0.45;
         const near = findTargetEnemy(range + 160, tMode);
         const aimAng = near ? Math.atan2(near.y - player.y, near.x - player.x) : player.facingAngle;
         slashes.push({ type: 'holywave', x: player.x, y: player.y, angle: aimAng, range, arc, life: 0.22 });
         damageArea(player.x, player.y, range, aimAng, arc, rawDmg, 18, {
           element: 'holy',
           isStrike: true,
+          hasKnockback: true,
           kbRange: { min: 15 * kbMult, max: 22 * kbMult },
-          slamRatio,
           bonusCritFn: (e) => (st.lv >= 8 && (e.armorBreakTimer || 0) > 0) ? 0.20 : 0,
           onTargetHit: (e) => {
             if (effTags.length > 0) applyStatusTagsOnHit(e, effTags, spellBase, cs, { isMelee: isMeleeSkill });
           }
         });
         sk.timer = sk.baseCd * cdFactor;
+      } else if (id === 'divinePrayer') {
+        const bolts = 2 + Math.floor((st.lv - 1) / 3) + bonusProj;
+        const boomR = (st.lv >= 8 ? 46 : 34) * player.areaMult;
+        const cdScale = 1 - Math.floor(st.lv / 3) * 0.10;
+        const mainTarget = findTargetEnemy(760, tMode);
+        const usedTargets = new Set();
+        for (let i = 0; i < bolts; i++) {
+          let targetObj = null;
+          if (i === 0 && mainTarget && !mainTarget.isDead) {
+            targetObj = mainTarget;
+          } else {
+            const avail = enemies.filter(cand => !cand.isDead && !usedTargets.has(cand) && Math.hypot(cand.x - player.x, cand.y - player.y) <= 760);
+            if (avail.length > 0) targetObj = avail[Math.floor(Math.random() * avail.length)];
+            else if (mainTarget && !mainTarget.isDead) targetObj = mainTarget;
+          }
+          const isDupLock = !!(targetObj && usedTargets.has(targetObj));
+          if (targetObj) usedTargets.add(targetObj);
+          const boltDmg = isDupLock ? (rawDmg * 0.30) : rawDmg;
+          const spreadAngle = -Math.PI * 0.8 + (bolts > 1 ? (i / (bolts - 1)) * Math.PI * 0.6 : Math.PI * 0.3);
+          const offX = Math.cos(spreadAngle) * 34;
+          const offY = Math.sin(spreadAngle) * 26 - 12;
+          projectiles.push({
+            type: 'holy', elem: 'holy', skillId: 'divinePrayer', isDivinePrayer: true,
+            statusTags: sTags, targetObj,
+            x: player.x + offX, y: player.y + offY, offX, offY,
+            hoverTimer: 0.40 + i * 0.06, flightTime: 0,
+            startX: player.x + offX, startY: player.y + offY,
+            targetX: targetObj ? targetObj.x : player.x + Math.cos(player.facingAngle) * 260,
+            targetY: targetObj ? targetObj.y : player.y + Math.sin(player.facingAngle) * 260,
+            waveSign: (i % 2 === 0 ? 1 : -1),
+            radius: 9, boomRadius: boomR,
+            dmg: boltDmg, pierce: 1, life: 2.2, hitSet: new Set()
+          });
+        }
+        sk.timer = sk.baseCd * cdScale * cdFactor;
+      } else if (id === 'spiralHammer') {
+        const wType = (typeof saveData !== 'undefined' && saveData.equip && saveData.equip.weapon) ? saveData.equip.weapon.type : '';
+        const effTags = (wType === 'mace') ? sTags : [];
+        const dur = st.lv >= 5 ? 1.50 : 1.20;
+        const radScale = 1 + (st.lv >= 3 ? 0.12 : 0) + (st.lv >= 8 ? 0.12 : 0);
+        const rad = 95 * radScale * areaFactor;
+        const kbPower = st.lv >= 10 ? 24.0 : (st.lv >= 8 ? 21.0 : (st.lv >= 5 ? 18.0 : (st.lv >= 3 ? 15.0 : 12.0)));
+        const cdScale = 1 - (st.lv >= 7 ? 0.20 : (st.lv >= 3 ? 0.10 : 0));
+        zones.push({
+          kind: 'spiral_hammer', statusTags: effTags, x: player.x, y: player.y,
+          radius: rad, life: dur, maxLife: dur, tickTimer: 0.01,
+          dmg: rawDmg, kbPower, spinAngle: player.facingAngle, lv: st.lv
+        });
+        sk.timer = sk.baseCd * cdScale * cdFactor;
       } else if (id === 'earthhammer') {
         const range = 135 * (1 + (st.lv - 1) * 0.03 + (st.lv >= 8 ? 0.10 : 0)) * areaFactor;
         const hammerCs = st.lv >= 3 ? { ...cs, statusChanceBonus: (cs.statusChanceBonus || 0) + 0.15 } : cs;
@@ -431,7 +503,7 @@ function triggerSkills(dt) {
             if (sTags.length > 0) applyStatusTagsOnHit(e, sTags, spellBase, hammerCs, { isMelee: isMeleeSkill });
           }
         });
-        sk.timer = sk.baseCd * getEffectiveCdMult(Math.pow(0.95, st.lv - 1) * extraCd);
+        sk.timer = sk.baseCd * getEffectiveCdMult(extraCd);
       } else if (id === 'frenzyhammer') {
         const lRes = typeof getResonanceParams === 'function' ? getResonanceParams('holy') : null;
         const burstMult = lRes ? lRes.hammerMult : 3.0;

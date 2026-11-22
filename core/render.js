@@ -12,7 +12,22 @@ function draw() {
     ctx.save(); ctx.translate(ox, oy);
     zones.forEach(z => {
       ctx.save();
-      if (z.kind === 'wind_vortex') {
+      if (z.kind === 'spiral_hammer') {
+        ctx.strokeStyle = 'rgba(251, 146, 60, 0.72)';
+        ctx.fillStyle = 'rgba(250, 204, 21, 0.10)';
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(z.x, z.y, z.radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        // 繪製旋轉光錘殘影與錘頭
+        const ang = z.spinAngle || 0;
+        const hx = z.x + Math.cos(ang) * (z.radius * 0.85);
+        const hy = z.y + Math.sin(ang) * (z.radius * 0.85);
+        ctx.strokeStyle = '#fde047'; ctx.lineWidth = 5;
+        ctx.beginPath(); ctx.moveTo(z.x, z.y); ctx.lineTo(hx, hy); ctx.stroke();
+        ctx.save(); ctx.translate(hx, hy); ctx.rotate(ang);
+        ctx.fillStyle = '#fef08a'; ctx.strokeStyle = '#ea580c'; ctx.lineWidth = 2.5;
+        ctx.fillRect(-10, -20, 20, 40); ctx.strokeRect(-10, -20, 20, 40);
+        ctx.restore();
+      } else if (z.kind === 'wind_vortex') {
         ctx.strokeStyle = 'rgba(52, 211, 153, 0.80)';
         ctx.fillStyle = 'rgba(16, 185, 129, 0.14)';
         ctx.lineWidth = 2.5;
@@ -64,6 +79,16 @@ function draw() {
     });
     if (typeof drawSandboxDummyOverlays === 'function') drawSandboxDummyOverlays(ctx);
     projectiles.forEach(p => {
+      if (p.isDivinePrayer) {
+        ctx.save();
+        ctx.fillStyle = 'rgba(254, 240, 138, 0.38)';
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.radius * 1.7, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#facc15'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.restore();
+        return;
+      }
       if (p.isMeteor) {
         ctx.save();
         const grad = ctx.createLinearGradient(p.x, p.y, p.x + 45, p.y - 135);
