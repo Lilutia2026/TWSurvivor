@@ -15,6 +15,13 @@ const MAX_PASSIVE_SKILLS = 7;
 let isPaused = true, gameOver = false, gameTime = 0, kills = 0;
 let bossSpawned = false, currentChoices = [], bannerTimer = 0, spawnTimer = 0.5;
 let lastEliteMin = 0, lastMegaBossMin = 0;
+let victoryVacuumActive = false, victoryVacuumTimer = 0;
+
+function triggerVictoryVacuum() {
+  victoryVacuumActive = true;
+  victoryVacuumTimer = 0;
+  showBanner('🎉 討伐成功！全區戰利品自動回收中...');
+}
 
 const player = {
   x: 0, y: 0, size: 28, baseSpeed: 235,
@@ -77,7 +84,7 @@ window.EQUIPPED_WEAPON = window.EQUIPPED_WEAPON || { name: '學徒長劍', start
 const ownedSkills = { [EQUIPPED_WEAPON.startSkill]: { lv: 1, evolved: false, disabled: false } };
 const ownedPassives = {};
 let enemies = [], slashes = [], projectiles = [], enemyProjectiles = [], lightnings = [], zones = [], damageTexts = [], gems = [], chests = [];
-let lootBags = [], runLoot = [], delayedActions = [];
+let lootBags = [], runLoot = [], seedBags = [], runSeed = 0, rerollCount = 0, delayedActions = [];
 const keys = {};
 window.addEventListener('keydown', e => {
   keys[e.code] = true;
@@ -128,7 +135,12 @@ function update(dt) {
     player.walkCycle += dt * 14;
   } else player.walkCycle = 0;
 
-  if (!isSandbox && (spawnTimer -= dt) <= 0) { spawnEnemy(); spawnTimer = Math.max(0.14, (0.85 - (gameTime / 60) * 0.035) / player.curseMult); }
+  if (!isSandbox && (spawnTimer -= dt) <= 0) {
+    spawnEnemy();
+    const curMins = gameTime / 60;
+    const baseCd = curMins < 3 ? 0.70 : (curMins < 8 ? 0.55 : (curMins < 15 ? 0.48 : 0.40));
+    spawnTimer = Math.max(0.20, baseCd / (player.curseMult || 1.0));
+  }
 
   if (delayedActions.length > 0) {
     delayedActions = delayedActions.filter(act => {
@@ -466,15 +478,37 @@ for (let i = enemies.length - 1; i >= 0; i--) {
   if (e.holySealTimer > 0 && (e.holySealTimer -= dt) <= 0) { e.holySealTimer = 0; e.holySeal = 0; }
   if (e.hitFlash > 0) e.hitFlash -= dt;
 
-  if (e.burnTimer > 0 && (e.burnTick += dt) >= 1.0) {
-    e.burnTimer -= 1.0; e.burnTick = 0;
-    hitEnemy(i, e.burnDps || spellBase * 0.90, { element: 'fire', isDot: true, noCrit: true });
-    if (!enemies[i]) continue;
+  if (e.burnTimer > 0) {
+    e.burnTick = (e.burnTick || 0) + dt;
+    if (e.burnTick >= 1.0) {
+      e.burnTimer = Math.max(0, e.burnTimer - 1.0);
+      e.burnTick = 0;
+      const bDmg = Math.max(1, Math.round(e.burnDps || spellBase * 0.90));
+      damageTexts.push({ x: e.x, y: e.y - e.radius - 8, txt: `🔥${bDmg}`, color: '#fb923c', fontSize: 13, life: 0.55 });
+      hitEnemy(i, bDmg, { element: 'fire', isDot: true, noCrit: true, hideText: true });
+      if (!enemies[i]) continue;
+    }
   }
-  if (e.windTimer > 0 && (e.windTick += dt) >= 0.5) {
-    e.windTimer -= 0.5; e.windTick = 0;
-    hitEnemy(i, e.windDps || spellBase * 0.36, { element: 'wind' });
-    if (!enemies[i]) continue;
+  if (e.windTimer > 0) {
+    e.windTick = (e.windTick || 0) + dt;
+    if (e.windTick >= 0.5) {
+      e.windTimer = Math.max(0, e.windTimer - 0.5);
+      e.windTick = 0;
+      const wDmg = Math.max(1, Math.round(e.windDps || spellBase * 0.36));
+      damageTexts.push({ x: e.x - 10, y: e.y - e.radius - 8, txt: `🍃${wDmg}`, color: '#6ee7b7', fontSize: 12, life: 0.50 });
+      hitEnemy(i, wDmg, { element: 'wind', isDot: true, noCrit: true, hideText: true });
+      if (!enemies[i]) continue;
+    }
+  }
+  if (e.darkTimer > 0 && (e.darkDps || 0) > 0) {
+    e.darkTick = (e.darkTick || 0) + dt;
+    if (e.darkTick >= 1.0) {
+      e.darkTick = 0;
+      const dDmg = Math.max(1, Math.round(e.darkDps));
+      damageTexts.push({ x: e.x + 10, y: e.y - e.radius - 8, txt: `🌑${dDmg}`, color: '#c084fc', fontSize: 12, life: 0.50 });
+      hitEnemy(i, dDmg, { element: 'dark', isDot: true, noCrit: true, hideText: true });
+      if (!enemies[i]) continue;
+    }
   }
 
   const canEnemyShoot = (e.isDummy && isSandbox && SANDBOX_STATE.dummyShoot)
@@ -483,7 +517,9 @@ for (let i = enemies.length - 1; i >= 0; i--) {
     e.shootCd = (e.shootCd !== undefined) ? (e.shootCd - dt) : (1.2 + Math.random() * 1.4);
     if (e.shootCd <= 0) {
       e.shootCd = e.isDummy ? 1.6 : (e.isFinalBoss ? 1.8 : (e.isMegaBoss ? 2.2 : 2.8));
-      const timeScale = isSandbox ? 1.0 : (1 + (gameTime / 60) * 0.12) * (player.curseMult || 1.0);
+      const runCfg = (!isSandbox && window.ACTIVE_STAGE_RUN) ? window.ACTIVE_STAGE_RUN : null;
+      const stageDmgScale = runCfg ? (1 + (runCfg.stage.tier - 1) * 0.65) * (runCfg.diff.dmgMult || 1.0) : 1.0;
+      const timeScale = isSandbox ? 1.0 : (1 + (gameTime / 60) * 0.12) * (player.curseMult || 1.0) * stageDmgScale;
       const atkMult = typeof getEnemyAtkFactor === 'function' ? getEnemyAtkFactor(e) : 1.0;
       const baseShotDmg = e.isDummy ? (e.isMegaBoss ? 30 : 18) : (e.isFinalBoss ? 55 : (e.isMegaBoss ? 38 : (e.isElite ? 26 : 16)));
       const sAng = Math.atan2(player.y - e.y, player.x - e.x);
@@ -505,8 +541,10 @@ for (let i = enemies.length - 1; i >= 0; i--) {
   if (Math.hypot(player.x - e.x, player.y - e.y) < player.size * 0.75 + e.radius) {
     if ((e.hitPlayerCd || 0) <= 0) {
       e.hitPlayerCd = 0.45;
+      const runCfg = (!isSandbox && window.ACTIVE_STAGE_RUN) ? window.ACTIVE_STAGE_RUN : null;
+      const stageDmgScale = runCfg ? (1 + (runCfg.stage.tier - 1) * 0.65) * (runCfg.diff.dmgMult || 1.0) : 1.0;
       const atkMult = typeof getEnemyAtkFactor === 'function' ? getEnemyAtkFactor(e) : 1.0;
-      const timeScale = isSandbox ? 1.0 : (1 + (gameTime / 60) * 0.12) * (player.curseMult || 1.0);
+      const timeScale = isSandbox ? 1.0 : (1 + (gameTime / 60) * 0.12) * (player.curseMult || 1.0) * stageDmgScale;
       const baseCrash = e.isDummy ? 6 : (e.isFinalBoss ? 95 : (e.isMegaBoss ? 65 : (e.isElite ? 38 : 18)));
       let taken = Math.max(1, Math.round(baseCrash * timeScale * atkMult * physRedMult));
       if (player.shield > 0) {
@@ -559,33 +597,134 @@ enemyProjectiles = enemyProjectiles.filter(ep => {
   return true;
 });
 
-gems = gems.filter(g => { const d = Math.hypot(player.x - g.x, player.y - g.y); if (d < player.pickupRange) { const a = Math.atan2(player.y - g.y, player.x - g.x); g.x += Math.cos(a) * 420 * dt; g.y += Math.sin(a) * 420 * dt; } if (d < 24) { if ((player.exp += g.val * (player.expMult || 1)) >= player.nextExp) { player.exp -= player.nextExp; player.lv++; player.nextExp = Math.round(player.nextExp * 1.35 + 3); levelUp(); } return false; } return true; });
-chests = chests.filter(c => Math.hypot(player.x - c.x, player.y - c.y) < 36 ? (openChest(c.kind || 'gold'), false) : true);
-lootBags = lootBags.filter(b => Math.hypot(player.x - b.x, player.y - b.y) < 36 ? (runLoot.push(b.item), showBanner(`📦 獲得 [未鑑定] ${b.rarName}裝備袋！`), false) : true);
+const vacSpeed = victoryVacuumActive ? 980 : 420;
+const vacRange = victoryVacuumActive ? 99999 : player.pickupRange;
+
+gems = gems.filter(g => {
+  const d = Math.hypot(player.x - g.x, player.y - g.y);
+  if (d < vacRange) { const a = Math.atan2(player.y - g.y, player.x - g.x); g.x += Math.cos(a) * vacSpeed * dt; g.y += Math.sin(a) * vacSpeed * dt; }
+  if (d < 24) {
+    if ((player.exp += g.val * (player.expMult || 1)) >= player.nextExp) {
+      player.exp -= player.nextExp;
+      player.lv++;
+      player.nextExp = player.lv <= 10
+        ? Math.round(player.nextExp * 1.12 + 3)
+        : (player.lv <= 30 ? (player.nextExp + 7) : (player.nextExp + 10));
+      levelUp();
+    }
+    return false;
+  }
+  return true;
+});
+
+chests = chests.filter(c => {
+  const d = Math.hypot(player.x - c.x, player.y - c.y);
+  if (d < vacRange) { const a = Math.atan2(player.y - c.y, player.x - c.x); c.x += Math.cos(a) * vacSpeed * dt; c.y += Math.sin(a) * vacSpeed * dt; }
+  if (d < 36) { openChest(c.kind || 'gold'); return false; }
+  return true;
+});
+
+seedBags = seedBags.filter(sb => {
+  const d = Math.hypot(player.x - sb.x, player.y - sb.y);
+  if (d < vacRange) { const a = Math.atan2(player.y - sb.y, player.x - sb.x); sb.x += Math.cos(a) * vacSpeed * dt; sb.y += Math.sin(a) * vacSpeed * dt; }
+  if (d < 26) {
+    runSeed += sb.val;
+    damageTexts.push({ x: player.x, y: player.y - 28, txt: `💰+${sb.val}`, color: '#fde047', fontSize: 12, life: 0.45 });
+    return false;
+  }
+  return true;
+});
+
+lootBags = lootBags.filter(b => {
+  const d = Math.hypot(player.x - b.x, player.y - b.y);
+  if (d < vacRange) { const a = Math.atan2(player.y - b.y, player.x - b.x); b.x += Math.cos(a) * vacSpeed * dt; b.y += Math.sin(a) * vacSpeed * dt; }
+  if (d < 36) {
+    runLoot.push(b.item);
+    showBanner(`📦 獲得 [未鑑定] ${b.rarName}裝備袋！`);
+    return false;
+  }
+  return true;
+});
+
 slashes = slashes.filter(s => (s.life -= dt) > 0); lightnings = lightnings.filter(l => (l.life -= dt) > 0); damageTexts = damageTexts.filter(t => { t.y -= 28 * dt; return (t.life -= dt) > 0; });
+
+// 全區磁吸掃場完成判定：確認場上所有寶石、金幣袋、裝備袋與寶箱皆已回收完畢後自動進入結算
+if (victoryVacuumActive && !isPaused && !gameOver) {
+  victoryVacuumTimer += dt;
+  if ((lootBags.length === 0 && gems.length === 0 && chests.length === 0 && seedBags.length === 0) || victoryVacuumTimer >= 6.0) {
+    victoryVacuumActive = false;
+    endGame(true);
+    return;
+  }
 }
+}
+
+const RANGED_MOB_RULES = {
+  '食人花': 0.35, // 第 1 階貝那茵森林：僅食人花滿 3 分鐘後有 35% 機率為遠程孢子怪，其餘全為近戰
+  '烏賊': 0.85    // 第 2 階耳語海岸：烏賊為遠程噴墨怪，其餘魚劍士兵／寄居蟹／鬼頭鯊／魚槍武士全為近戰
+};
 
 function spawnEnemy() {
-if (bossSpawned) return;
-const ang = Math.random() * Math.PI * 2, dist = Math.max(canvas.width, canvas.height) * 0.62, mins = gameTime / 60;
-const hp = (20 + mins * 8) * player.curseMult;
-const isRanged = mins >= 6 && Math.random() < 0.25;
-enemies.push({
-  x: player.x + Math.cos(ang) * dist, y: player.y + Math.sin(ang) * dist,
-  radius: isRanged ? 14 : 15, hp, maxHp: hp,
-  speed: (isRanged ? 75 : 95) * player.curseMult,
-  color: isRanged ? '#a855f7' : (mins >= 4 ? '#ef4444' : '#facc15'),
-  expValue: 1 + Math.floor(mins / 3),
-  isRanged, hitFlash: 0
-});
+  if (bossSpawned) return;
+  const MAX_ENEMIES_ON_SCREEN = 140;
+  if (enemies.length >= MAX_ENEMIES_ON_SCREEN) return;
+
+  const runCfg = window.ACTIVE_STAGE_RUN || null;
+  const st = runCfg ? runCfg.stage : null;
+  const diff = runCfg ? runCfg.diff : null;
+  const stageHpScale = (st ? (1 + (st.tier - 1) * 1.4) : 1.0) * (diff ? (diff.hpMult || 1.0) : 1.0);
+  const diffSpawnMult = diff ? (diff.spawnMult || 1.0) : 1.0;
+
+  const mins = gameTime / 60;
+  const baseBatch = mins < 3
+    ? (2 + Math.floor(Math.random() * 2))   // 0~3分：每次 2~3 隻
+    : (mins < 8
+      ? (3 + Math.floor(Math.random() * 2)) // 3~8分：每次 3~4 隻
+      : (mins < 15
+        ? (4 + Math.floor(Math.random() * 3)) // 8~15分：每次 4~6 隻
+        : (5 + Math.floor(Math.random() * 4)))); // 15~20分：每次 5~8 隻
+
+  const spawnCount = Math.min(MAX_ENEMIES_ON_SCREEN - enemies.length, Math.max(1, Math.round(baseBatch * diffSpawnMult)));
+
+  const mobPool = (st && Array.isArray(st.monsters) && st.monsters.length > 0) ? st.monsters : new Array('野怪');
+  const baseAng = Math.random() * Math.PI * 2;
+
+  for (let n = 0; n < spawnCount; n++) {
+    const ang = baseAng + (Math.random() - 0.5) * 0.85;
+    const dist = Math.max(canvas.width, canvas.height) * 0.62 + Math.random() * 60;
+    const hp = Math.round((20 + mins * 8) * player.curseMult * stageHpScale);
+    const mobName = mobPool[Math.floor(Math.random() * mobPool.length)];
+    const cleanName = mobName.replace(/^[^\u4e00-\u9fa5A-Za-z0-9]+/, '').trim();
+    const rangedChance = (mins >= 3 && RANGED_MOB_RULES[cleanName]) ? RANGED_MOB_RULES[cleanName] : 0;
+    const isRanged = rangedChance > 0 && Math.random() < rangedChance;
+
+    enemies.push({
+      x: player.x + Math.cos(ang) * dist, y: player.y + Math.sin(ang) * dist,
+      radius: isRanged ? 14 : 15, hp, maxHp: hp, name: mobName,
+      speed: (isRanged ? 75 : 95) * player.curseMult,
+      color: isRanged ? '#a855f7' : (mins >= 4 ? '#ef4444' : '#facc15'),
+      expValue: (3 + Math.floor(mins / 2)) * (st ? st.tier : 1),
+      isRanged, hitFlash: 0
+    });
+  }
 }
 
-function spawnEliteBoss(tier) {
-const ang = Math.random() * Math.PI * 2, mins = Math.max(1, gameTime / 60);
-const isFinal = tier === 'final', isMega = tier === 'mega';
-const hpVal = (isFinal ? 5500 : (isMega ? 950 + mins * 180 : 320 + mins * 110)) * player.curseMult;
-enemies.push({ x: player.x + Math.cos(ang) * 380, y: player.y + Math.sin(ang) * 380, radius: isFinal ? 50 : (isMega ? 38 : 28), hp: hpVal, maxHp: hpVal, speed: 82 * (1 + (player.curseMult - 1) * 0.5), color: isFinal ? '#9333ea' : (isMega ? '#dc2626' : '#f97316'), name: isFinal ? '暗黑魔王' : (isMega ? '狂暴首領' : '精英魔物'), expValue: isMega ? 25 : 12, isElite: tier === 'elite', isMegaBoss: isMega, isFinalBoss: isFinal, hitFlash: 0 });
-showBanner(isFinal ? '⚠️ 20分鐘最終決戰！暗黑魔王降臨！' : (isMega ? '👑 狂暴大首領登場！擊敗掉落【金色超武寶箱】！' : '⚔️ 精英魔物出現！擊敗掉落【白銀幸運寶箱】！'));
+  function spawnEliteBoss(tier) {
+  const runCfg = window.ACTIVE_STAGE_RUN || null;
+  const st = runCfg ? runCfg.stage : null;
+  const diff = runCfg ? runCfg.diff : null;
+  const stageHpScale = (st ? (1 + (st.tier - 1) * 1.4) : 1.0) * (diff ? (diff.hpMult || 1.0) : 1.0);
+  const ang = Math.random() * Math.PI * 2, mins = Math.max(1, gameTime / 60);
+  const isFinal = tier === 'final', isMega = tier === 'mega';
+  const hpVal = Math.round((isFinal ? 5500 : (isMega ? 950 + mins * 180 : 320 + mins * 110)) * player.curseMult * stageHpScale);
+  const finalBossName = st?.boss?.name || '果凍雞王';
+const mobCandidates = (st && Array.isArray(st.monsters) && st.monsters.length > 0)
+  ? st.monsters.map(m => m.replace(/^[^\u4e00-\u9fa5A-Za-z0-9]+/, '').trim()).filter(m => m && m !== finalBossName)
+  : ['魔物'];
+const pickedMob = mobCandidates[Math.floor(Math.random() * mobCandidates.length)] || '魔物';
+const bossName = isFinal ? finalBossName : `【菁英】${pickedMob}`;
+enemies.push({ x: player.x + Math.cos(ang) * 380, y: player.y + Math.sin(ang) * 380, radius: isFinal ? 50 : (isMega ? 38 : 28), hp: hpVal, maxHp: hpVal, speed: 82 * (1 + (player.curseMult - 1) * 0.5), color: isFinal ? '#9333ea' : (isMega ? '#dc2626' : '#f97316'), name: bossName, expValue: isMega ? 25 : 12, isElite: tier === 'elite', isMegaBoss: isMega, isFinalBoss: isFinal, hitFlash: 0 });
+if (isFinal) showBanner(`⚠️ ${bossName}出現了！`);
 }
 
 if (typeof renderLobby === 'function') renderLobby();

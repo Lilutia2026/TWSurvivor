@@ -60,9 +60,12 @@ function applyAutoLevelGrowth() {
 function checkLv15WingQuest() {
   if (saveData.outLv < 15 || saveData.wingQuestDone) return;
   saveData.wingQuestDone = true;
-  if (typeof identifyEquipItem === 'function') {
-    const wingItem = identifyEquipItem({ uid: Date.now(), tplId: 'bk_15', slot: 'back', rarity: 'green' });
-    if (wingItem) saveData.bag.push(wingItem);
+  if (typeof identifyEquipItem === 'function' && typeof EQUIP_TEMPLATES !== 'undefined' && Array.isArray(EQUIP_TEMPLATES)) {
+    const wingTpl = EQUIP_TEMPLATES.find(t => t.tplId === 'bk_15') || EQUIP_TEMPLATES.find(t => t.slot === 'back');
+    if (wingTpl) {
+      const wingItem = identifyEquipItem({ uid: Date.now(), tplId: wingTpl.tplId, slot: 'back', rarity: 'green' });
+      if (wingItem) saveData.bag.push(wingItem);
+    }
   }
 }
 
@@ -524,9 +527,15 @@ function renderLobby() {
   }
 }
 
-// 片段 C：startBattle() 內讀取武器本命技能改用 getWeaponSignatureSkill
-function startBattle() {
+// 片段 C：startBattle() 內讀取武器初始技能並綁定所選關卡與 4 階難度倍率
+function startBattle(stageId, diffKey) {
   if (pendingAlloc) { alert('請先按下「✅ 確認配點」或「↩️ 取消微調」後再出發冒險！'); return; }
+  const stList = (typeof STAGE_SELECT_LIST !== 'undefined' && Array.isArray(STAGE_SELECT_LIST)) ? STAGE_SELECT_LIST : [];
+  const diffMap = (typeof DIFFICULTY_MODIFIERS !== 'undefined') ? DIFFICULTY_MODIFIERS : {};
+  const chosenStage = stList.find(s => s.id === (stageId || saveData.currentStageId)) || stList[0] || { id: 'penine_forest', tier: 1, name: '貝那茵森林', minLv: 1, maxLv: 16, baseExpMult: 1.0, boss: { name: '果凍雞王' }, elites: ['【菁英】食人花', '【菁英】多多熊'], monsters: ['小花貓', '綠葉果凍雞', '葉精', '香菇', '食人花', '多多熊'] };
+  const chosenDiff = diffMap[diffKey || saveData.currentDifficultyKey] || diffMap.normal || { key: 'normal', name: '🟢 普通', hpMult: 1.0, dmgMult: 1.0, spawnMult: 1.0, expMult: 1.0, dropMult: 1.0 };
+  window.ACTIVE_STAGE_RUN = { stage: chosenStage, diff: chosenDiff };
+
   const d = getDerivedCombatStats(), w = saveData.equip.weapon || { name: '徒手', type: 'longsword', startSkill: 'senku' }, ch = getCurrentCharData();
 
   // 從 EQUIP_TEMPLATES 反查並補齊真實武器子類型（解決舊存檔 w.type === 'weapon' 的問題）
@@ -557,12 +566,12 @@ function startBattle() {
   }
 
   const hudName = document.getElementById('hudCharName'), hudWep = document.getElementById('weaponText');
-  if (hudName) hudName.textContent = ch.name; if (hudWep) hudWep.textContent = w.name;
+  if (hudName) hudName.textContent = `${ch.name}｜${chosenStage.name}(${chosenDiff.name.replace(/^[^\s]+\s/, '')})`; if (hudWep) hudWep.textContent = w.name;
   if (typeof player !== 'undefined') {
     player.maxHp = d.maxHp; player.hp = player.maxHp; player.regen = d.regen; player.baseSpeed = d.moveSpeed; player.pickupRange = d.pickupRange;
     player.cdMult = Math.max(0.35, 1 - (d.cdReduce || 0)); player.areaMult = 1.0; player.speedMult = 1.0; player.dmgMult = 1.0;
     player.bonusCritRate = 0; player.bonusDoubleHit = 0; player.superCritMult = 1.5; player.resonanceDmgMult = 1.0;
-    player.dropRateMult = 1.0; player.expMult = d.expBonusMult; player.curseMult = 1.0; player.seedMult = 1.0; player.angelUsed = false;
+    player.dropRateMult = chosenDiff.dropMult || 1.0; player.expMult = d.expBonusMult; player.curseMult = 1.0; player.seedMult = 1.0; player.angelUsed = false;
   }
   if (typeof ownedSkills !== 'undefined') {
     for (const k of Object.keys(ownedSkills)) delete ownedSkills[k];

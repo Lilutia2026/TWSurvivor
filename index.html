@@ -30,33 +30,37 @@
   </style>
 </head>
 <body>
-  <!-- ==================== 1. 登入與角色選擇頁面 (core/login.js) ==================== -->
+    <!-- ==================== 1. 登入與角色選擇頁面 (town/login.js) ==================== -->
 <div id="login-select-view" style="display:none;position:fixed;inset:0;background:#0f172a;z-index:900;flex-direction:column;align-items:center;justify-content:center;color:#f8fafc;">
   <h1 style="font-size:28px;color:#38bdf8;margin-bottom:6px;">⚔️ 《天翼之鍊倖存者》角色選擇大廳</h1>
-  <p style="font-size:13px;color:#94a3b8;margin-bottom:20px;">請選擇本次登入的角色，確認後將進入卡雷德自由市場</p>
+  <p style="font-size:13px;color:#94a3b8;margin-bottom:20px;">請選擇本次登入的角色，確認後將進入樹上精靈村・雷蒂亞</p>
   <div id="login-char-grid" style="display:flex;gap:14px;flex-wrap:wrap;justify-content:center;max-width:960px;"></div>
-  <button onclick="confirmEnterTownFromLogin()" style="margin-top:24px;padding:12px 36px;font-size:16px;font-weight:bold;background:#2563eb;color:#fff;border:none;border-radius:10px;cursor:pointer;box-shadow:0 4px 14px rgba(37,99,235,0.4);">
-      ✨ 進入卡雷德自由市場
+  <button onclick="confirmEnterTownFromLogin()" style="margin-top:24px;padding:12px 36px;font-size:16px;font-weight:bold;background:#15803d;color:#fff;border:none;border-radius:10px;cursor:pointer;box-shadow:0 4px 14px rgba(21,128,61,0.45);">
+      🌿 進入樹上精靈村・雷蒂亞
   </button>
 </div>
 
-<!-- ==================== 2. 卡雷德自由市場互動舞台 (core/town.js) ==================== -->
+<!-- ==================== 2. 樹上精靈村・雷蒂亞互動舞台 (town/town.js) ==================== -->
 <div id="town-clad-view" style="display:none;position:fixed;inset:0;background:#0b1120;z-index:850;flex-direction:column;align-items:center;justify-content:center;">
   <div id="town-header-status" style="width:100%;max-width:1280px;padding:10px 16px;background:#1e293b;border-bottom:1px solid #334155;color:#f8fafc;font-size:14px;display:flex;align-items:center;flex-wrap:wrap;"></div>
-  <canvas id="town-canvas" width="1280" height="820" style="width:100%;max-width:1280px;max-height:calc(100vh - 52px);background:#1e293b;border:1px solid #334155;cursor:pointer;"></canvas>
+  <canvas id="town-canvas" width="1280" height="820" style="width:100%;max-width:1280px;max-height:calc(100vh - 52px);background:#14281d;border:1px solid #334155;cursor:pointer;"></canvas>
 </div>
 
-<!-- ==================== 3. 傳送門：關卡出征新頁面 (core/stage_select.js) ==================== -->
-<div id="stage-select-view" style="display:none;position:fixed;inset:0;background:#0f172a;z-index:880;flex-direction:column;align-items:center;justify-content:center;color:#f8fafc;padding:20px;">
-  <div style="width:100%;max-width:680px;background:#1e293b;border:2px solid #38bdf8;border-radius:14px;padding:20px;">
+<!-- ==================== 3. 傳送門：雙欄關卡出征與難度選擇頁面 (town/stage_select.js) ==================== -->
+<div id="stage-select-view" style="display:none;position:fixed;inset:0;background:rgba(9,13,26,0.92);z-index:880;flex-direction:column;align-items:center;justify-content:center;color:#f8fafc;padding:16px;">
+  <div style="width:100%;max-width:980px;background:#1e293b;border:2px solid #38bdf8;border-radius:14px;padding:18px;box-shadow:0 12px 36px rgba(0,0,0,0.65);">
       <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #334155;padding-bottom:10px;margin-bottom:12px;">
-          <h2 style="margin:0;font-size:20px;color:#38bdf8;">🌌 卡雷德自由市場傳送門 — 關卡出征</h2>
-          <button onclick="closeStageSelectPage()" style="padding:5px 12px;background:#334155;color:#fff;border:none;border-radius:6px;cursor:pointer;">⬅ 返回卡雷德市集</button>
+          <div style="display:flex;align-items:center;gap:12px;">
+              <h2 style="margin:0;font-size:20px;color:#38bdf8;">🌌 雷蒂亞精靈傳送門 — 遠征地圖</h2>
+              <span id="stage-player-summary" style="font-size:13px;color:#cbd5e1;background:#0f172a;padding:4px 12px;border-radius:99px;border:1px solid #334155;"></span>
+          </div>
+          <button onclick="closeStageSelectPage()" style="padding:6px 14px;background:#334155;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:bold;">⬅ 返回雷蒂亞村莊</button>
       </div>
-      <div id="stage-player-summary" style="font-size:13px;color:#cbd5e1;margin-bottom:14px;"></div>
-      <div id="stage-cards-container"></div>
-      <div style="margin-top:16px;">
-          <button onclick="launchSelectedStage()" style="width:100%;padding:12px;font-size:16px;font-weight:bold;background:#16a34a;color:#fff;border:none;border-radius:8px;cursor:pointer;">⚔️ 正式出征</button>
+      <div style="display:flex;gap:16px;min-height:440px;max-height:74vh;">
+          <!-- 左側：關卡清單 -->
+          <div id="stage-cards-container" style="width:300px;flex-shrink:0;display:flex;flex-direction:column;gap:8px;overflow-y:auto;padding-right:4px;"></div>
+          <!-- 右側：關卡詳細情報與 4 階難度按鈕 -->
+          <div id="stage-detail-panel" style="flex:1;background:#0f172a;border:1px solid #334155;border-radius:12px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;overflow-y:auto;"></div>
       </div>
   </div>
 </div>
@@ -106,12 +110,17 @@
     </div>
   </div>
 
-  <!-- 升級選卡視窗 -->
-  <div id="levelModal" class="modal">
+   <!-- 升級選卡視窗 -->
+   <div id="levelModal" class="modal">
     <div class="panel" style="max-width:780px;">
       <h2 style="color:#fde047;text-align:center;">✨ 選擇強化</h2>
       <div id="modalSub" style="text-align:center;font-size:13px;color:#94a3b8;margin-top:4px;">點擊一張卡片，或按鍵盤 1 / 2 / 3</div>
       <div id="cardContainer" class="card-grid"></div>
+      <div style="text-align:center;margin-top:14px;">
+        <button id="rerollCardBtn" onclick="rerollUpgradeChoices()" style="padding:7px 18px;font-size:13px;font-weight:bold;background:#1e293b;color:#fde047;border:1.5px solid #eab308;border-radius:8px;cursor:pointer;">
+          🎲 刷新卡片（30 Seed｜剩餘 3 次）
+        </button>
+      </div>
     </div>
   </div>
 
@@ -148,7 +157,7 @@
       <!-- ==================== 1. 靜態資料庫 (data/) ==================== -->
       <script src="data/characters.js"></script>
       <script src="data/raw_tw_skills.js"></script>
-      <script src="data/town_clad.js"></script>
+      <script src="data/town_raidia.js"></script>
       <script src="data/weapons/item_weapon_swords.js"></script>
       <script src="data/weapons/item_weapon_heavy.js"></script>
       <script src="data/weapons/item_weapon_light.js"></script>
@@ -173,33 +182,37 @@
       <script src="systems/equip.js"></script>
       <script src="systems/ui_battle.js"></script>
   
-      <!-- ==================== 4. 局內核心戰鬥與存檔引擎 (core/) ==================== -->
-      <script src="core/save.js"></script>
-      <script src="core/resonance.js"></script>
-      <script src="core/combat.js"></script>
-      <script src="core/skill_exec.js"></script>
-      <script src="core/render.js"></script>
-      <script src="core/sandbox.js"></script>
-      <script src="core/game.js"></script>
-  
-      <!-- ==================== 5. 局外城鎮、選角、選關與獨立 NPC (town/) ==================== -->
+       <!-- ==================== 4. 局內核心戰鬥與存檔引擎 (core/) ==================== -->
+       <script src="core/audio.js"></script>
+       <script src="core/save.js"></script>
+       <script src="core/resonance.js"></script>
+       <script src="core/combat.js"></script>
+       <script src="core/skill_exec.js"></script>
+       <script src="core/render.js"></script>
+       <script src="core/sandbox.js"></script>
+       <script src="core/game.js"></script>
+   
+             <!-- ==================== 5. 局外城鎮、選角、選關與獨立 NPC (town/) ==================== -->
       <script src="town/town.js"></script>
       <script src="town/login.js"></script>
       <script src="town/stage_select.js"></script>
-      <script src="town/NPC/npc_pio.js"></script>
+      <script src="town/NPC/npc_aizuwen.js"></script>
       <script src="town/NPC/npc_kalipa.js"></script>
-      <script src="town/NPC/npc_bahari.js"></script>
-      <script src="town/NPC/npc_hannah.js"></script> 
-      <script>
-        window.addEventListener('load', () => {
-            const oldLobby = document.getElementById('lobbyModal');
-            if (oldLobby) oldLobby.style.display = 'none';
-            const sbBtn = document.getElementById('btnEnterSandbox');
-            if (sbBtn) sbBtn.style.display = 'none';
-            if (typeof openLoginSelectScreen === 'function') {
-                openLoginSelectScreen();
-            }
-        });
-    </script>
+      <script src="town/NPC/npc_qiedeluo.js"></script>
+      <script src="town/NPC/npc_feiya.js"></script> 
+       <script>
+         window.addEventListener('load', () => {
+             const oldLobby = document.getElementById('lobbyModal');
+             if (oldLobby) oldLobby.style.display = 'none';
+             const sbBtn = document.getElementById('btnEnterSandbox');
+             if (sbBtn) sbBtn.style.display = 'none';
+             if (typeof openLoginSelectScreen === 'function') {
+                 openLoginSelectScreen();
+             }
+             if (typeof AudioManager !== 'undefined') {
+    AudioManager.play('char_select');
+}
+         });
+     </script>
 </body>
 </html>

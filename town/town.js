@@ -14,12 +14,35 @@ const TOWN_STATE = {
     activeTarget: null,
     bgImg: null,
     bgLoaded: false,
-    roomCode: 'CLAD-' + Math.random().toString(36).substring(2, 6).toUpperCase(),
-    roomMembers: [] // 預留私人房主世界（1~4 人）同步接口
+    roomCode: 'RAID-' + Math.random().toString(36).substring(2, 6).toUpperCase(),
+    roomMembers: [], // 預留私人房主世界（1~4 人）同步接口
+    isNight: null,   // null = 自動同步真實時間（18:00~05:59 為星夜）；true/false = 手動切換
+    hasSpawned: false
 };
 
-// 初始化並進入卡雷德自由市場
-function enterTownClad() {
+// 取得目前雷蒂亞是否為星夜狀態
+function getRaidiaNightMode() {
+    if (typeof TOWN_STATE.isNight === 'boolean') return TOWN_STATE.isNight;
+    const h = new Date().getHours();
+    return h >= 18 || h < 6;
+}
+
+// 切換雷蒂亞白晝／星夜光影與對應 BGM（彩蛋互動）
+function toggleTownDayNight() {
+    TOWN_STATE.isNight = !getRaidiaNightMode();
+    applyRaidiaBgm();
+    if (typeof updateTownHeaderInfo === 'function') updateTownHeaderInfo();
+}
+
+// 依目前日夜狀態播放雷蒂亞專屬配樂
+function applyRaidiaBgm() {
+    if (typeof AudioManager === 'undefined') return;
+    const night = getRaidiaNightMode();
+    AudioManager.play(night ? 'raidia_night' : 'raidia_day');
+}
+
+// 初始化並進入樹上精靈村・雷蒂亞（keepPos = true 時保留按 F 互動當下座標）
+function enterTownClad(keepPos = false) {
     const townView = document.getElementById('town-clad-view');
     if (!townView) return;
 
@@ -30,8 +53,11 @@ function enterTownClad() {
 
     townView.style.display = 'flex';
     TOWN_STATE.active = true;
-    TOWN_STATE.player.x = TOWN_CLAD_MAP.spawnPoint.x;
-    TOWN_STATE.player.y = TOWN_CLAD_MAP.spawnPoint.y;
+    if (!keepPos || !TOWN_STATE.hasSpawned) {
+        TOWN_STATE.player.x = TOWN_CLAD_MAP.spawnPoint.x;
+        TOWN_STATE.player.y = TOWN_CLAD_MAP.spawnPoint.y;
+        TOWN_STATE.hasSpawned = true;
+    }
     TOWN_STATE.player.targetX = null;
     TOWN_STATE.player.targetY = null;
 
@@ -49,6 +75,7 @@ function enterTownClad() {
         TOWN_STATE.bgImg = img;
     }
 
+    applyRaidiaBgm();
     if (typeof updateTownHeaderInfo === 'function') updateTownHeaderInfo();
     if (TOWN_STATE.rafId) cancelAnimationFrame(TOWN_STATE.rafId);
     TOWN_STATE.lastTime = performance.now();
@@ -186,9 +213,34 @@ function updateTownPlayer(dt) {
         } else { p.targetX = p.targetY = null; p.walkTime = 0; }
     } else { p.walkTime = 0; }
 
-    const b = TOWN_CLAD_MAP.walkBounds;
-    p.x = Math.max(b.minX, Math.min(b.maxX, p.x));
-    p.y = Math.max(b.minY, Math.min(b.maxY, p.y));
+        // 樹上精靈村・雷蒂亞四段式精準行走區域判定（左廣場 ＋ 中央木橋 ＋ 右傳送高台 ＋ 北橋 ＋ 北側慶典高台）
+        const clampToRaidiaPlatforms = (px, py) => {
+            const zones = [
+                { minX: 110, maxX: 565,  minY: 165, maxY: 680 }, // 左區巨樹生活廣場
+                { minX: 545, maxX: 820,  minY: 345, maxY: 495 }, // 中央木棧道橋樑
+                { minX: 800, maxX: 1170, minY: 335, maxY: 675 }, // 右區冒險傳送高台
+                { minX: 950, maxX: 1050, minY: 220, maxY: 350 }, // 北側垂直木棧道
+                { minX: 785, maxX: 1195, minY: 75,  maxY: 225 }  // 北側樹冠慶典高台（活動NPC預留區）
+            ];   
+        // 若座標已在任一木頭平台內則直接允許通行
+        for (const z of zones) {
+            if (px >= z.minX && px <= z.maxX && py >= z.minY && py <= z.maxY) {
+                return { x: px, y: py };
+            }
+        }
+        // 若超出邊界（如橋樑上下方樹海），自動吸附回最近的有效木棧道邊緣
+        let best = { x: px, y: py }, minD = Infinity;
+        for (const z of zones) {
+            const cx = Math.max(z.minX, Math.min(z.maxX, px));
+            const cy = Math.max(z.minY, Math.min(z.maxY, py));
+            const d = Math.hypot(px - cx, py - cy);
+            if (d < minD) { minD = d; best = { x: cx, y: cy }; }
+        }
+        return best;
+    };
+    const clampedPos = clampToRaidiaPlatforms(p.x, p.y);
+    p.x = clampedPos.x;
+    p.y = clampedPos.y;
 
     let nearest = null, minDist = Infinity;
     for (const item of TOWN_CLAD_MAP.interactables) {
@@ -200,16 +252,94 @@ function updateTownPlayer(dt) {
 
 function drawTownScene() {
     const ctx = TOWN_STATE.ctx, W = TOWN_CLAD_MAP.width, H = TOWN_CLAD_MAP.height;
+    const isNight = getRaidiaNightMode();
     ctx.clearRect(0, 0, W, H);
-    if (TOWN_STATE.bgLoaded && TOWN_STATE.bgImg) ctx.drawImage(TOWN_STATE.bgImg, 0, 0, W, H);
-    else {
-        ctx.fillStyle = '#2d3748'; ctx.fillRect(0, 0, W, H);
-        const b = TOWN_CLAD_MAP.walkBounds;
-        ctx.fillStyle = '#d6b87c'; ctx.beginPath();
-        ctx.roundRect(b.minX - 30, b.minY - 30, (b.maxX - b.minX) + 60, (b.maxY - b.minY) + 60, 28);
-        ctx.fill(); ctx.strokeStyle = '#78350f'; ctx.lineWidth = 6; ctx.stroke();
-        ctx.fillStyle = 'rgba(120,53,15,0.28)'; ctx.font = 'bold 24px sans-serif'; ctx.textAlign = 'center';
-        ctx.fillText('卡雷德自由市場（WASD/點擊移動 ｜ 靠近 NPC 或傳送門按 [F] 互動）', W / 2, H / 2);
+
+    if (TOWN_STATE.bgLoaded && TOWN_STATE.bgImg) {
+        ctx.drawImage(TOWN_STATE.bgImg, 0, 0, W, H);
+    } else {
+        // 1. 樹海背景底色
+        ctx.fillStyle = isNight ? '#071318' : '#143322';
+        ctx.fillRect(0, 0, W, H);
+
+        // 2. 左區巨樹生活廣場平台
+        ctx.fillStyle = isNight ? '#5c3a21' : '#9a6338';
+        ctx.strokeStyle = '#451a03';
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.roundRect(80, 130, 500, 580, 48);
+        ctx.fill();
+        ctx.stroke();
+
+        // 3. 中央連接木棧道橋樑
+        ctx.fillStyle = isNight ? '#6b4426' : '#b47846';
+        ctx.beginPath();
+        ctx.roundRect(560, 320, 260, 190, 12);
+        ctx.fill();
+        ctx.stroke();
+        // 木板紋路
+        ctx.strokeStyle = 'rgba(69,26,3,0.45)';
+        ctx.lineWidth = 2;
+        for (let bx = 585; bx <= 800; bx += 28) {
+            ctx.beginPath(); ctx.moveTo(bx, 324); ctx.lineTo(bx, 506); ctx.stroke();
+        }
+
+                       // 4. 右區冒險傳送高台（下移讓出上方空間給慶典高台）
+        ctx.fillStyle = isNight ? '#5c3a21' : '#9a6338';
+        ctx.strokeStyle = '#451a03';
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.roundRect(800, 310, 400, 390, 44);
+        ctx.fill();
+        ctx.stroke();
+
+        // 4.1 北側連接垂直木棧道（連接右區傳送高台與上方慶典高台）
+        ctx.fillStyle = isNight ? '#6b4426' : '#b47846';
+        ctx.beginPath();
+        ctx.roundRect(930, 225, 140, 100, 10);
+        ctx.fill();
+        ctx.stroke();
+        ctx.strokeStyle = 'rgba(69,26,3,0.45)';
+        ctx.lineWidth = 2;
+        for (let by = 242; by <= 310; by += 22) {
+            ctx.beginPath(); ctx.moveTo(934, by); ctx.lineTo(1066, by); ctx.stroke();
+        }
+
+        // 4.2 北側「樹冠慶典高台」（未來活動 NPC、任務告示牌與公會使者專區）
+        ctx.fillStyle = isNight ? '#5c3a21' : '#9a6338';
+        ctx.strokeStyle = '#451a03';
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.roundRect(760, 48, 460, 190, 36);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = isNight ? 'rgba(254,240,138,0.28)' : 'rgba(255,255,255,0.32)';
+        ctx.font = 'bold 14px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('🎪 樹冠慶典高台（活動 NPC・任務・公會預留區）', 990, 145);
+
+        // 4.5 橋頭兩端「雷蒂亞精靈燈籠」（橫橋兩端＋北橋兩端共 4 盞）
+        const lanterns = [
+            { x: 822, y: 345 },
+            { x: 822, y: 515 },
+            { x: 915, y: 230 },
+            { x: 1085, y: 230 }
+        ];
+        for (const ln of lanterns) {
+            ctx.fillStyle = '#451a03';
+            ctx.fillRect(ln.x - 3, ln.y - 34, 6, 34);
+            ctx.beginPath(); ctx.arc(ln.x, ln.y, 7, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = isNight ? '#fef08a' : '#f59e0b';
+            ctx.strokeStyle = '#78350f';
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.roundRect(ln.x - 8, ln.y - 46, 16, 18, 5); ctx.fill(); ctx.stroke();
+        }
+
+              // 頂部操作提示文字（靠左上方樹海空白處避免遮擋慶典高台）
+              ctx.fillStyle = isNight ? 'rgba(254,240,138,0.28)' : 'rgba(255,255,255,0.32)';
+              ctx.font = 'bold 14px sans-serif';
+              ctx.textAlign = 'left';
+              ctx.fillText('🌿 樹上精靈村・雷蒂亞（WASD／左鍵移動 ｜ 靠近 NPC、水晶或傳送門按 [F] 互動）', 88, 95);     
     }
 
     const list = TOWN_CLAD_MAP.interactables.map(d => ({ kind: 'item', y: d.y, data: d }));
@@ -229,9 +359,20 @@ function drawTownScene() {
         } else {
             const it = ent.data, hi = TOWN_STATE.activeTarget?.id === it.id;
             ctx.beginPath(); ctx.arc(it.x, it.y, it.radius, 0, Math.PI * 2);
-            ctx.fillStyle = hi ? 'rgba(250,204,21,0.2)' : 'rgba(255,255,255,0.06)'; ctx.fill();
+            ctx.fillStyle = hi ? 'rgba(250,204,21,0.22)' : 'rgba(255,255,255,0.06)'; ctx.fill();
             ctx.strokeStyle = hi ? '#facc15' : 'rgba(255,255,255,0.25)'; ctx.lineWidth = hi ? 2.5 : 1; ctx.stroke();
-            ctx.fillStyle = it.color; ctx.beginPath(); ctx.roundRect(it.x - 16, it.y - 44, 32, 46, 8); ctx.fill();
+
+            if (it.type === 'crystal') {
+                // 時間精靈水晶菱形外觀
+                ctx.fillStyle = isNight ? '#38bdf8' : '#fde047';
+                ctx.beginPath();
+                ctx.moveTo(it.x, it.y - 48); ctx.lineTo(it.x + 16, it.y - 24);
+                ctx.lineTo(it.x, it.y); ctx.lineTo(it.x - 16, it.y - 24);
+                ctx.closePath(); ctx.fill();
+            } else {
+                ctx.fillStyle = it.color; ctx.beginPath(); ctx.roundRect(it.x - 16, it.y - 44, 32, 46, 8); ctx.fill();
+            }
+
             ctx.textAlign = 'center'; ctx.font = 'bold 13px sans-serif'; ctx.fillStyle = '#fef08a';
             ctx.fillText(it.subtitle, it.x, it.y - 68);
             ctx.font = 'bold 15px sans-serif'; ctx.fillStyle = '#fff'; ctx.fillText(it.name, it.x, it.y - 52);
@@ -242,6 +383,39 @@ function drawTownScene() {
             }
         }
     }
+
+      // 5. 【星夜光影與暖色精靈光暈】夜晚蓋上柔和靛藍夜幕，並為玩家、NPC、水晶與傳送門點亮暖光
+      if (isNight) {
+        ctx.save();
+        ctx.fillStyle = 'rgba(8, 15, 38, 0.42)';
+        ctx.fillRect(0, 0, W, H);
+
+        ctx.globalCompositeOperation = 'lighter';
+        const lanternCoords = [
+            { x: 822, y: 308 }, { x: 822, y: 478 },
+            { x: 915, y: 193 }, { x: 1085, y: 193 }
+        ];
+        const lights = [
+            { x: TOWN_STATE.player.x, y: TOWN_STATE.player.y - 20, r: 145, c: 'rgba(253, 224, 71, 0.22)' },
+            ...lanternCoords.flatMap(lt => [
+                { x: lt.x, y: lt.y, r: 135, c: 'rgba(251, 191, 36, 0.38)' },
+                { x: lt.x, y: lt.y, r: 50,  c: 'rgba(254, 249, 195, 0.52)' }
+            ]),
+            ...TOWN_CLAD_MAP.interactables.map(it => ({
+                x: it.x, y: it.y - 20,
+                r: it.type === 'portal' ? 170 : 130,
+                c: it.type === 'portal' ? 'rgba(56, 189, 248, 0.26)' : 'rgba(253, 224, 71, 0.20)'
+            }))
+        ];
+        for (const lt of lights) {
+            const grad = ctx.createRadialGradient(lt.x, lt.y, 8, lt.x, lt.y, lt.r);
+            grad.addColorStop(0, lt.c);
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = grad;
+            ctx.beginPath(); ctx.arc(lt.x, lt.y, lt.r, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.restore();
+    }
 }
 
 function updateTownHeaderInfo() {
@@ -251,17 +425,20 @@ function updateTownHeaderInfo() {
     const lv = saveData.outLv || 1;
     const seedVal = saveData.seed ?? 0;
     const mailLen = Array.isArray(saveData.mailbox) ? saveData.mailbox.length : 0;
-    const btnCss = 'margin-left:8px;padding:4px 10px;border-radius:6px;background:#0f172a;color:#e2e8f0;border:1px solid #475569;cursor:pointer;font-size:13px;';
+    const isNight = getRaidiaNightMode();
+    const bgmOn = typeof AudioManager !== 'undefined' ? AudioManager.enabled : true;
+    const btnCss = 'margin-left:6px;padding:4px 9px;border-radius:6px;background:#0f172a;color:#e2e8f0;border:1px solid #475569;cursor:pointer;font-size:12px;';
     el.innerHTML = `<span>👤 <b>${cName}</b> (LV.${lv})</span>` +
-        `<span style="margin-left:12px;">💰 Seed：<b>${seedVal.toLocaleString()}</b></span>` +
-        `<span style="margin-left:12px;">🏠 房間碼：<b>${TOWN_STATE.roomCode}</b></span>` +
+        `<span style="margin-left:10px;">💰 <b>${seedVal.toLocaleString()}</b></span>` +
+        `<button onclick="toggleTownDayNight()" title="點擊切換雷蒂亞白晝／星夜光影與BGM" style="${btnCss}border-color:${isNight ? '#818cf8' : '#facc15'};color:${isNight ? '#c7d2fe' : '#fde047'};">${isNight ? '🌙 雷蒂亞・星夜' : '☀️ 雷蒂亞・白晝'}</button>` +
+        `<button onclick="if(typeof AudioManager!=='undefined'){AudioManager.toggle();updateTownHeaderInfo();}" style="${btnCss}border-color:#34d399;color:${bgmOn ? '#6ee7b7' : '#94a3b8'};">${bgmOn ? '🔊 BGM:開' : '🔇 BGM:關'}</button>` +
         `<button onclick="toggleTownShortcutModal('bag')" style="${btnCss}border-color:#38bdf8;color:#38bdf8;">🎒 背包 [I]</button>` +
         `<button onclick="toggleTownShortcutModal('stats')" style="${btnCss}border-color:#facc15;color:#facc15;">📊 素質 [C]</button>` +
         `<button onclick="toggleTownShortcutModal('party')" style="${btnCss}border-color:#4ade80;color:#4ade80;">👥 組隊 [P]</button>` +
         `<button onclick="openTownMailbox()" style="${btnCss}border-color:#f59e0b;color:#fbbf24;">📬 信箱 (${mailLen})</button>` +
-        `<button onclick="openTownCardPoolModal()" style="${btnCss}border-color:#a855f7;background:#581c87;color:#f3e8ff;">🃏 卡池預覽</button>` +
-        `<button onclick="openDevLobbyModal()" style="${btnCss}border-color:#0284c7;background:#0369a1;color:#fff;">🧪 測試大廳</button>` +
-        `<button onclick="logoutToCharacterSelect()" style="${btnCss}">🚪 切換角色</button>`;
+        `<button onclick="openTownCardPoolModal()" style="${btnCss}border-color:#a855f7;background:#581c87;color:#f3e8ff;">🃏 卡池</button>` +
+        `<button onclick="openDevLobbyModal()" style="${btnCss}border-color:#0284c7;background:#0369a1;color:#fff;">🧪 測試</button>` +
+        `<button onclick="logoutToCharacterSelect()" style="${btnCss}">🚪 登出</button>`;
 }
 
 // 臨時功能：預覽當前角色與武器配置在局內可抽到的完整主動／被動卡池
@@ -337,17 +514,59 @@ function openTownBagModal() {
             ${it ? `<button onclick="if(typeof hideLobbyTooltip==='function')hideLobbyTooltip();unequipSlot('${sk}');openTownBagModal();" style="padding:2px 6px;background:#475569;color:#fff;border:none;border-radius:4px;cursor:pointer;">卸下</button>` : ''}
         </div>`;
     }).join('');
-    const bagHtml = bag.length === 0 ? '<div style="color:#64748b;font-size:12px;">背包目前為空</div>' : bag.map(it => {
+    if (typeof repairBrokenIdentifiedItems === 'function') repairBrokenIdentifiedItems();
+
+    const rarRank = { gold: 5, purple: 4, blue: 3, green: 2, white: 1 };
+    const getSortPriority = (it) => {
+        if (!it || it.identified === false) return 3; // 第三順位：未鑑定
+        const chk = typeof canEquipItem === 'function' ? canEquipItem(it) : { ok: true };
+        if (chk.ok) return 1; // 第一順位：自己可穿戴置頂
+        if (chk.reason && chk.reason.includes('需要角色等級')) return 2; // 第二順位：本職但等級未到
+        return 4; // 第四順位：別職不可穿戴
+    };
+    const sortedBag = [...bag].sort((a, b) => {
+        const pa = getSortPriority(a), pb = getSortPriority(b);
+        if (pa !== pb) return pa - pb;
+        const lvDiff = (b.reqLv || 0) - (a.reqLv || 0);
+        if (lvDiff !== 0) return lvDiff;
+        return (rarRank[b.rarity] || 0) - (rarRank[a.rarity] || 0);
+    });
+
+    const bagHtml = sortedBag.length === 0 ? '<div style="color:#64748b;font-size:12px;">背包目前為空</div>' : sortedBag.map(it => {
         const rCol = (typeof RARITIES !== 'undefined' && RARITIES[it.rarity]) ? RARITIES[it.rarity].color : '#f8fafc';
-        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;background:#0f172a;border-left:3px solid ${rCol};border-radius:5px;margin-bottom:4px;font-size:12px;"
+        const sLabel = slotNames[it.slot] || '神秘';
+        const wearCheck = (it.identified !== false && typeof canEquipItem === 'function')
+            ? canEquipItem(it)
+            : { ok: it.identified !== false, reason: '' };
+
+            const sellPrice = typeof getEquipSellPrice === 'function' ? getEquipSellPrice(it) : 15;
+            const sellBtnHtml = `<button onclick="sellBagItemByUid(${it.uid})" title="直接商店回收換取 ${sellPrice} Seed" style="padding:2px 6px;background:#78350f;color:#fde047;border:1px solid #b45309;border-radius:4px;font-size:11px;cursor:pointer;">賣 ${sellPrice}</button>`;
+    
+            let primaryBtnHtml = '';
+            if (it.identified === false) {
+                primaryBtnHtml = '<span style="color:#c084fc;font-size:11px;margin-right:2px;">需鑑定</span>';
+            } else if (wearCheck.ok) {
+                primaryBtnHtml = `<button onclick="if(typeof hideLobbyTooltip==='function')hideLobbyTooltip();equipFromBag(${it.uid});openTownBagModal();" style="padding:2px 8px;background:#22c55e;color:#052e16;font-weight:bold;border:none;border-radius:4px;cursor:pointer;">穿戴</button>`;
+            } else if (wearCheck.reason && wearCheck.reason.includes('需要角色等級')) {
+                primaryBtnHtml = `<button disabled title="${wearCheck.reason}" style="padding:2px 6px;background:#334155;color:#fca5a5;border:1px solid #475569;border-radius:4px;font-size:11px;cursor:not-allowed;">LV.${it.reqLv || 1}可穿</button>`;
+            } else {
+                primaryBtnHtml = `<button disabled title="${wearCheck.reason || '不可穿戴'}" style="padding:2px 6px;background:#1e293b;color:#64748b;border:1px solid #334155;border-radius:4px;font-size:11px;cursor:not-allowed;">不可穿戴</button>`;
+            }
+            const actionHtml = `<div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">${primaryBtnHtml}${sellBtnHtml}</div>`;   
+        const itemTitle = it.identified === false
+            ? `❓ [未鑑定] 神秘${sLabel}`
+            : `${it.name || '未知裝備'} (LV.${it.reqLv || 1})${it.tradable === false ? ' 🔒' : ''}`;
+
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;background:#0f172a;border-left:3px solid ${rCol};border-radius:5px;margin-bottom:4px;font-size:12px;${(!wearCheck.ok && it.identified !== false) ? 'opacity:0.78;' : ''}"
             ${it.identified !== false ? `onmouseenter="if(typeof showLobbyEquipTooltip==='function')showLobbyEquipTooltip(event,'bag','${it.uid}')" onmousemove="if(typeof moveLobbyTooltip==='function')moveLobbyTooltip(event)" onmouseleave="if(typeof hideLobbyTooltip==='function')hideLobbyTooltip()"` : ''}>
-            <span style="color:${rCol};">${it.identified === false ? '❓ [未鑑定] 神秘裝備' : `${it.name} (LV.${it.reqLv || 1})`}</span>
-            ${it.identified !== false ? `<button onclick="if(typeof hideLobbyTooltip==='function')hideLobbyTooltip();equipFromBag(${it.uid});openTownBagModal();" style="padding:2px 8px;background:#22c55e;color:#052e16;font-weight:bold;border:none;border-radius:4px;cursor:pointer;">穿戴</button>` : '<span style="color:#c084fc;">請找皮奧鑑定</span>'}
+            <span style="color:${rCol};">${itemTitle}</span>
+            ${actionHtml}
         </div>`;
     }).join('');
+
     openNpcModalShell('🎒 隨身背包與即時紙娃娃 [I]', '按 I 或 ESC 關閉（移上裝備可查看屬性）', '#38bdf8', `
-        <div style="display:grid;grid-template-columns:1.1fr 1fr;gap:12px;">
-            <div style="background:#1e293b;padding:10px;border-radius:8px;max-height:360px;overflow-y:auto;">
+        <div style="display:grid;grid-template-columns:1.1fr 1fr;gap:12px;align-items:stretch;">
+            <div style="background:#1e293b;padding:10px;border-radius:8px;">
                 <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #334155;">
                     <canvas id="paperDollCanvas" width="76" height="92" style="background:#0f172a;border:1.5px solid #38bdf8;border-radius:8px;flex-shrink:0;"></canvas>
                     <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:11px;">
@@ -359,11 +578,29 @@ function openTownBagModal() {
                 </div>
                 ${eqHtml}
             </div>
-            <div style="background:#1e293b;padding:10px;border-radius:8px;max-height:360px;overflow-y:auto;"><div style="font-weight:bold;color:#4ade80;margin-bottom:6px;">📦 背包清單 (${bag.length})</div>${bagHtml}</div>
+            <div style="background:#1e293b;padding:10px;border-radius:8px;max-height:426px;overflow-y:auto;"><div style="font-weight:bold;color:#4ade80;margin-bottom:6px;">📦 背包清單 (${bag.length})</div>${bagHtml}</div>
         </div>`);
     const box = document.getElementById('npc-modal-box');
     if (box) box.style.maxWidth = '860px';
     if (typeof renderPaperDoll === 'function') renderPaperDoll();
+}
+
+// 隨身背包單件商店回收出售（支援已鑑定與未鑑定裝備）
+function sellBagItemByUid(uid) {
+    if (!Array.isArray(saveData.bag)) return;
+    const idx = saveData.bag.findIndex(it => it && it.uid === uid);
+    if (idx === -1) return;
+    const target = saveData.bag[idx];
+    if (target.rarity === 'gold' && target.identified !== false) {
+        if (!confirm(`確定要出售金色傳說裝備【${target.name}】嗎？`)) return;
+    }
+    const gain = typeof getEquipSellPrice === 'function' ? getEquipSellPrice(target) : 15;
+    saveData.bag.splice(idx, 1);
+    saveData.seed = (saveData.seed || 0) + gain;
+    if (typeof hideLobbyTooltip === 'function') hideLobbyTooltip();
+    if (typeof writeSave === 'function') writeSave();
+    if (typeof updateTownHeaderInfo === 'function') updateTownHeaderInfo();
+    openTownBagModal();
 }
 
 // [C] 角色素質與配點視窗（右側同步顯示完整即時戰鬥面板總覽）

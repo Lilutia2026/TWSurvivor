@@ -254,31 +254,118 @@ function getSkillRawDmg(id, lv, evolved) {
         if (e.darkTimer > 0) {
           zones.push({ kind: 'dark_pool', x: e.x, y: e.y, radius: 75 * player.areaMult, life: typeof DARK_ZONE_DUR !== 'undefined' ? DARK_ZONE_DUR : 2.0, tickTimer: 0.5, dmg: e.darkDps || getSpellBase() * 0.32, lv: 1 });
         }
-        if (e.isFinalBoss) { endGame(true); return; }
         const nobleLv = ownedPassives.nobleFortune || 0;
-        if (nobleLv > 0 && (e.isMegaBoss || e.isElite) && typeof saveData !== 'undefined') {
-          const bonusSeed = Math.round((e.isMegaBoss ? 30 : 12) * nobleLv * 0.20);
+        if (nobleLv > 0 && (e.isFinalBoss || e.isMegaBoss || e.isElite) && typeof saveData !== 'undefined') {
+          const bonusSeed = Math.round((e.isFinalBoss ? 60 : (e.isMegaBoss ? 30 : 12)) * nobleLv * 0.20);
           if (bonusSeed > 0) {
             saveData.seed = (saveData.seed || 0) + bonusSeed;
             damageTexts.push({ x: e.x, y: e.y - e.radius - 14, txt: `💰+${bonusSeed} Seed`, color: '#fde047', fontSize: 12, life: 0.65 });
           }
         }
-        if (e.isMegaBoss) chests.push({ x: e.x, y: e.y, kind: 'gold' });
-        else if (e.isElite) chests.push({ x: e.x, y: e.y, kind: 'silver' });
-    
-        const baseDropChance = 0.015 * (player.dropRateMult || 1.0);
-        if (!e.isDummy && (e.isFinalBoss || e.isMegaBoss || e.isElite || Math.random() < baseDropChance)) {
+               // 已捨棄寶箱機制，超武昇華改由升級三選一金色昇華卡觸發
+
+        // 讀取當前關卡、難度與防炸魚等級補正
+        const runCfg = window.ACTIVE_STAGE_RUN || null;
+        const st = runCfg ? runCfg.stage : (typeof STAGE_SELECT_LIST !== 'undefined' ? STAGE_SELECT_LIST.at(0) : { id: 'penine_forest', tier: 1, minLv: 1, maxLv: 16, baseDropRate: 0.025 });
+        const diff = runCfg ? runCfg.diff : { key: 'normal', name: '🟢 普通', dropMult: 1.0 };
+        const playerLv = (typeof saveData !== 'undefined' && saveData.outLv) ? saveData.outLv : 1;
+        const gapInfo = typeof getStageLevelGapInfo === 'function' ? getStageLevelGapInfo(playerLv, st) : { dropRateMult: 1.0, maxRarIdx: 4 };
+        const lvRange = typeof getStageDropLvRange === 'function' ? getStageDropLvRange(st) : { minLv: 0, maxLv: st.maxLv || 16 };
+
+        const stageDropBase = st.baseDropRate || 0.025;
+        const mobDropChance = stageDropBase * (diff.dropMult || 1.0) * (gapInfo.dropRateMult ?? 1.0) * (player.dropRateMult || 1.0);
+        const enemyTier = e.isFinalBoss ? 'final' : (e.isMegaBoss ? 'mega' : (e.isElite ? 'elite' : 'mob'));
+
+        if (!e.isDummy && (e.isFinalBoss || e.isMegaBoss || e.isElite || Math.random() < mobDropChance)) {
           const dropCount = e.isFinalBoss ? 3 : (e.isMegaBoss ? 2 : 1);
-          const rar = e.isFinalBoss ? 'gold' : (e.isMegaBoss ? 'purple' : (e.isElite ? 'blue' : 'green'));
           for (let d = 0; d < dropCount; d++) {
-            const dropItem = typeof createUnidentifiedDrop === 'function' ? createUnidentifiedDrop(rar, saveData.outLv + 10, null, (e.isFinalBoss || e.isMegaBoss) && d === 0) : null;
-            if (dropItem) lootBags.push({ x: e.x + (d * 24 - 12), y: e.y, item: dropItem, color: RARITIES[rar].color, rarName: RARITIES[rar].name });
+            const rar = typeof rollStageDropRarity === 'function'
+              ? rollStageDropRarity(enemyTier, diff.key, gapInfo.maxRarIdx ?? 4)
+              : 'green';
+            const forceSelf = (e.isFinalBoss || e.isMegaBoss) && d === 0;
+            const dropItem = typeof createUnidentifiedDrop === 'function'
+              ? createUnidentifiedDrop(rar, lvRange.maxLv, null, forceSelf, lvRange.minLv)
+              : null;
+            if (dropItem) {
+              const ang = (Math.PI * 2 * d) / dropCount + Math.random() * 0.4;
+              const spread = dropCount > 1 ? 26 : 0;
+              lootBags.push({
+                x: e.x + Math.cos(ang) * spread,
+                y: e.y + Math.sin(ang) * spread,
+                item: dropItem,
+                color: RARITIES[rar].color,
+                rarName: RARITIES[rar].name
+              });
+            }
           }
         }
-        gems.push({ x: e.x, y: e.y, val: e.expValue });
-        const curIdx = enemies.indexOf(e);
+
+        // 【首通成就金裝】每個關卡 × 4 難度各自獨立，首次通關額外必掉 1 件本職金色傳說裝備
+        if (e.isFinalBoss && typeof saveData !== 'undefined') {
+          saveData.stageFirstClears = saveData.stageFirstClears || {};
+          const clearKey = `${st.id}_${diff.key}`;
+          if (!saveData.stageFirstClears[clearKey]) {
+            saveData.stageFirstClears[clearKey] = true;
+            if (typeof writeSave === 'function') writeSave();
+            const firstClearGold = typeof createUnidentifiedDrop === 'function'
+              ? createUnidentifiedDrop('gold', lvRange.maxLv, null, true, lvRange.minLv)
+              : null;
+            if (firstClearGold) {
+              lootBags.push({
+                x: e.x,
+                y: e.y - 28,
+                item: firstClearGold,
+                color: RARITIES.gold.color,
+                rarName: '首通傳說'
+              });
+            }
+            showBanner(`🏆 達成【${st.name}（${diff.name}）】首次通關！獲得首通金色傳說寶箱！`);
+          }
+
+          // 【預留窗口】BOSS 專屬合成素材掉落接口（後續實裝消耗品／素材系統後啟用）
+          if (st.boss && Array.isArray(st.boss.exclusiveDrops) && st.boss.exclusiveDrops.length > 0) {
+            for (const mat of st.boss.exclusiveDrops) {
+              if (Math.random() < (mat.chance || 0)) {
+                // TODO：後續串接 saveData.materials 堆疊入庫與飄字提示
+              }
+            }
+          }
+        }
+
+                // 局內 Seed 錢袋掉落（普通怪 12% 機率 3~6；菁英/首領/最終 BOSS 100% 必掉）
+                if (!e.isDummy && typeof seedBags !== 'undefined') {
+                  const tierMult = st.tier || 1;
+                  const diffSeedMult = diff.dropMult || 1.0;
+                  const playerSeedMult = player.seedMult || 1.0;
+                  if (e.isFinalBoss || e.isMegaBoss || e.isElite || Math.random() < 0.12) {
+                    const baseSeed = e.isFinalBoss
+                      ? (250 + Math.floor(Math.random() * 151))
+                      : (e.isMegaBoss ? (80 + Math.floor(Math.random() * 41))
+                      : (e.isElite ? (25 + Math.floor(Math.random() * 16))
+                      : (3 + Math.floor(Math.random() * 4))));
+                    const finalSeedVal = Math.max(1, Math.round(baseSeed * tierMult * diffSeedMult * playerSeedMult));
+                    seedBags.push({
+                      x: e.x + (Math.random() * 20 - 10),
+                      y: e.y + (Math.random() * 20 - 10),
+                      val: finalSeedVal,
+                      isBig: !!(e.isFinalBoss || e.isMegaBoss || e.isElite)
+                    });
+                  }
+                }
+        
+                gems.push({ x: e.x, y: e.y, val: e.expValue });
+                const curIdx = enemies.indexOf(e);       
         if (curIdx !== -1) enemies.splice(curIdx, 1);
         if (!e.isDummy) kills++;
+
+        // 擊敗最終 BOSS 後清空場上殘怪，並啟動「全區磁吸掃場 ➔ 自動結算」
+        if (e.isFinalBoss) {
+          enemies = [];
+          enemyProjectiles = [];
+          if (typeof triggerVictoryVacuum === 'function') triggerVictoryVacuum();
+          else endGame(true);
+          return;
+        }
       }
     }
     

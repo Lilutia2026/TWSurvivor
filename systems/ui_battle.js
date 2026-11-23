@@ -63,19 +63,52 @@ function upgradeClassicHud() {
       if (skObj.canEvolve && skObj.reqPassive) passiveToSkillMap[skObj.reqPassive] = skObj.name;
     }
   
+    const curW = (typeof saveData !== 'undefined' && saveData.equip) ? saveData.equip.weapon : null;
+    const curWType = curW ? curW.type : null;
+    const curCharId = (typeof saveData !== 'undefined' && saveData.charId) ? saveData.charId : 'lucien';
+    const sigSkill = typeof getWeaponSignatureSkill === 'function' ? getWeaponSignatureSkill(curW) : (curW ? curW.startSkill : null);
+    const isSwordType = new Array('longsword', 'blade', 'rapier', 'tachi', 'greatsword').includes(curWType);
+
     for (const [k, sk] of Object.entries(ACTIVE_SKILLS)) {
       if (sk.isSuperWeapon && !ownedSkills[k]) continue;
       if (hasAngel && (k === 'fire4' || k === 'ice4')) continue;
       if (sk.reqSkill && (!ownedSkills[sk.reqSkill] || ownedSkills[sk.reqSkill].lv < (sk.reqSkillLv || 2))) continue;
       const o = ownedSkills[k], maxL = sk.maxLv || 10;
+
+      // 【方案 A：唯一超武昇華】達 LV.10 滿級 ＋ 擁有對應專屬被動 ＋ 符合武器條件時，高權重進入三選一卡池
+      if (o && !o.disabled && !o.evolved && o.lv >= maxL && sk.canEvolve && sk.reqPassive && ownedPassives[sk.reqPassive]) {
+        const charEvo = (sk.evoByChar && sk.evoByChar[curCharId]) ? sk.evoByChar[curCharId] : null;
+        const targetEvoId = charEvo ? charEvo.evoSkillId : sk.evoSkillId;
+        const evoSk = targetEvoId ? (ACTIVE_SKILLS[targetEvoId] || (typeof GLOBAL_SKILL_POOL !== 'undefined' ? GLOBAL_SKILL_POOL[targetEvoId] : null)) : null;
+        const allowedWeapons = (evoSk && Array.isArray(evoSk.reqWeaponTypes)) ? evoSk.reqWeaponTypes
+          : (Array.isArray(sk.reqWeaponTypes) ? sk.reqWeaponTypes : (sk.reqWeaponType ? new Array(sk.reqWeaponType) : null));
+        const weaponOk = !allowedWeapons || !curWType || allowedWeapons.includes(curWType);
+        const swordOk = !isSwordType || !sigSkill || k === sigSkill;
+        if (weaponOk && swordOk) {
+          const titleName = charEvo ? charEvo.evoName : (sk.evoName || sk.name);
+          const cleanDesc = (evoSk && evoSk.desc) ? evoSk.desc : (sk.evoDesc || sk.desc);
+          pool.push({
+            kind: 'evolve',
+            id: k,
+            targetEvoId,
+            weight: 8.5,
+            title: `<span style="color:#facc15;">🌟 技能昇華【${titleName}】</span>`,
+            desc: `<strong style="color:#fde047;">★ 超武覺醒：</strong>${cleanDesc}`,
+            tag: '唯一超武昇華'
+          });
+          continue;
+        }
+      }
+
       if (o && !o.disabled && o.lv < maxL) {
         const nextLv = o.lv + 1;
         const gainStr = getSkillNextLvGain(k, sk, nextLv);
-        pool.push({ kind: 'skill', id: k, weight: 2.5, title: `${sk.name} LV.${o.lv} → LV.${nextLv}`, desc: `<strong style="color:#4ade80;">▲ 本次升級獲得：${gainStr}</strong>`, tag: '主動技能強化' });
+        pool.push({ kind: 'skill', id: k, weight: 3.0, title: `${sk.name} LV.${o.lv} → LV.${nextLv}`, desc: `<strong style="color:#4ade80;">▲ 本次升級獲得：${gainStr}</strong>`, tag: '主動技能強化' });
       } else if (!o && Object.keys(ownedSkills).length < MAX_ACTIVE_SKILLS) {
-        pool.push({ kind: 'skill', id: k, weight: 1.0, title: `【新技能】${sk.name}（LV.1）`, desc: sk.desc, tag: '習得新主動技' });
+        pool.push({ kind: 'skill', id: k, weight: 2.2, title: `【新技能】${sk.name}（LV.1）`, desc: sk.desc, tag: '習得新主動技' });
       }
     }
+
     for (const [k, p] of Object.entries(activePassives)) {
       if (k === 'angelWish' && (ownedSkills.fire4 || ownedSkills.fire5 || ownedSkills.ice4 || ownedSkills.ice5)) continue;
       const lv = ownedPassives[k] || 0, maxP = p.maxLv || 5;
@@ -88,7 +121,7 @@ function upgradeClassicHud() {
         const stepText = getPassiveGainText(k, 1) || p.desc;
         const pDesc = lv > 0 ? `<strong style="color:#4ade80;">▲ ${stepText}</strong>` : stepText;
         const titleColor = isCharUnique ? `<span style="color:#e9d5ff;">${p.name}</span>` : p.name;
-        pool.push({ kind: 'passive', id: k, weight: lv > 0 ? 2.5 : 1.0, title: lv > 0 ? `${titleColor} LV.${lv} → LV.${lv + 1}` : `【新輔助】${titleColor}`, desc: pDesc, tag: pTag });
+        pool.push({ kind: 'passive', id: k, weight: lv > 0 ? 2.0 : 1.0, title: lv > 0 ? `${titleColor} LV.${lv} → LV.${lv + 1}` : `【新輔助】${titleColor}`, desc: pDesc, tag: pTag });
       }
     }
     if (!pool.length) {
@@ -96,17 +129,76 @@ function upgradeClassicHud() {
         { kind: 'heal', title: '💚 女神聖光祝福（回復 40% 生命）', desc: '<strong style="color:#4ade80;">▲ 立即恢復 40% 最大生命值</strong>', tag: '生存補給' },
         { kind: 'seed', title: '💰 黃金種子袋（獲得 +50 Seed）', desc: '<strong style="color:#fde047;">▲ 局外錢包 Seed +50</strong>', tag: '資源農裝' }
       ];
+      updateRerollButtonState(false);
       renderChoiceModal(`目前等級 LV.${player.lv}（全技能滿級突破獎勵）｜ 按 1 / 2 選擇`);
       return;
     }
-    currentChoices = []; const tempPool = [...pool];
+
+    // 加權隨機抽取 3 張不重複卡片
+    currentChoices = [];
+    const tempPool = [...pool];
     while (currentChoices.length < 3 && tempPool.length > 0) {
-      const pick = Math.floor(Math.random() * tempPool.length);
-      currentChoices.push(tempPool[pick]); tempPool.splice(pick, 1);
+      const totalWeight = tempPool.reduce((sum, item) => sum + (item.weight || 1.0), 0);
+      let r = Math.random() * totalWeight;
+      let pickedIdx = 0;
+      for (let i = 0; i < tempPool.length; i++) {
+        r -= (tempPool[i].weight || 1.0);
+        if (r <= 0) { pickedIdx = i; break; }
+      }
+      currentChoices.push(tempPool[pickedIdx]);
+      tempPool.splice(pickedIdx, 1);
     }
+    updateRerollButtonState(true);
     renderChoiceModal(`目前等級 LV.${player.lv} ｜ 技能欄 ${Object.keys(ownedSkills).length}/${MAX_ACTIVE_SKILLS} 主動・${Object.keys(ownedPassives).length}/${MAX_PASSIVE_SKILLS} 被動`);
   }
-  
+
+  function updateRerollButtonState(show) {
+    const btn = document.getElementById('rerollCardBtn');
+    if (!btn) return;
+    if (!show) { btn.style.display = 'none'; return; }
+    btn.style.display = 'inline-block';
+    const maxReroll = 3;
+    const used = typeof rerollCount !== 'undefined' ? rerollCount : 0;
+    const left = Math.max(0, maxReroll - used);
+    const costs = new Array(30, 60, 120);
+    const cost = costs[used] || 120;
+    const totalAvailSeed = (typeof runSeed !== 'undefined' ? runSeed : 0) + ((typeof saveData !== 'undefined' && saveData.seed) ? saveData.seed : 0);
+    if (left <= 0) {
+      btn.disabled = true;
+      btn.style.opacity = '0.45';
+      btn.textContent = '🎲 刷新次數已用盡 (0/3)';
+    } else if (totalAvailSeed < cost) {
+      btn.disabled = true;
+      btn.style.opacity = '0.45';
+      btn.textContent = `🎲 刷新卡片（需 ${cost} Seed・餘額不足）`;
+    } else {
+      btn.disabled = false;
+      btn.style.opacity = '1';
+      btn.textContent = `🎲 刷新卡片（${cost} Seed｜剩餘 ${left} 次）`;
+    }
+  }
+
+  function rerollUpgradeChoices() {
+    const maxReroll = 3;
+    if (typeof rerollCount === 'undefined') window.rerollCount = 0;
+    if (rerollCount >= maxReroll) return;
+    const costs = new Array(30, 60, 120);
+    const cost = costs[rerollCount] || 120;
+    const curRunSeed = typeof runSeed !== 'undefined' ? runSeed : 0;
+    const curOutSeed = (typeof saveData !== 'undefined' && saveData.seed) ? saveData.seed : 0;
+    if (curRunSeed + curOutSeed < cost) return;
+
+    if (curRunSeed >= cost) {
+      runSeed -= cost;
+    } else {
+      const rem = cost - curRunSeed;
+      runSeed = 0;
+      if (typeof saveData !== 'undefined') { saveData.seed -= rem; if (typeof writeSave === 'function') writeSave(); }
+    }
+    rerollCount++;
+    levelUp();
+  }
+
   function selectUpgrade(idx) {
     const c = currentChoices[idx]; if (!c) return;
     if (c.kind === 'evolve') {
@@ -196,6 +288,7 @@ function upgradeClassicHud() {
         const cleanDesc = (evoSk && evoSk.desc) ? evoSk.desc : (sk.evoDesc || sk.desc);
         return { kind: 'evolve', id, targetEvoId, title: `🌟 技能昇華【${titleName}】`, desc: cleanDesc, tag: '唯一超武昇華' };
       });
+      updateRerollButtonState(false);
       renderChoiceModal('📦 開啟金色昇華寶箱！請選擇要昇華的技能（按 1 / 2 / 3）');
       return;
     }
@@ -362,12 +455,37 @@ function togglePause() {
   
   function endGame(win) {
     gameOver = true;
-    const expGain = kills * 2 + Math.floor(gameTime / 5) + (win ? 250 : 0);
-    const seedGain = Math.round((kills * 3 + (win ? 400 : 0)) * (player.seedMult || 1.0));
-    if (typeof addOutExpAndSeed === 'function') addOutExpAndSeed(expGain, seedGain);
+    const runCfg = window.ACTIVE_STAGE_RUN || null;
+    const st = runCfg ? runCfg.stage : { name: '貝那茵森林', tier: 1, minLv: 1, maxLv: 16, baseExpMult: 1.0, boss: { name: '果凍雞王' } };
+    const diff = runCfg ? runCfg.diff : { name: '🟢 普通', expMult: 1.0, dropMult: 1.0 };
+    const playerLv = (typeof saveData !== 'undefined' && saveData.outLv) ? saveData.outLv : 1;
+    const gapInfo = (typeof getStageLevelGapInfo === 'function')
+      ? getStageLevelGapInfo(playerLv, st)
+      : { mult: 1.0, label: '✅ 適性關卡 EXP 100%', color: '#4ade80' };
+
+      const survMins = Math.floor(gameTime / 60);
+    const milestoneBonus = win ? 250 : 0;
+    const rawScore = survMins * 40 + kills * 1 + milestoneBonus;
+    const winRatio = win ? 1.0 : 0.7;
+    const totalMult = (st.baseExpMult || 1.0) * (diff.expMult || 1.0) * (gapInfo.mult || 1.0) * winRatio;
+    const expGain = Math.max(1, Math.floor(rawScore * totalMult));
+
+    // 純目標制結算獎金（完全移除 kills 加成，公平對待所有流派）＋ 局內拾取 runSeed（陣亡撤退也 100% 帶回）
+    const pickedSeed = Math.max(0, Math.round(typeof runSeed !== 'undefined' ? runSeed : 0));
+    const clearBonusSeed = Math.round((survMins * 15 + (win ? 300 : 0)) * (st.tier || 1) * (diff.dropMult || 1.0) * (player.seedMult || 1.0));
+    const totalSeedGain = pickedSeed + clearBonusSeed;
+
+    if (typeof addOutExpAndSeed === 'function') addOutExpAndSeed(expGain, totalSeedGain);
     if (runLoot.length > 0 && typeof saveData !== 'undefined') { saveData.bag.push(...runLoot); writeSave(); }
-    document.getElementById('endTitle').textContent = win ? '🎉 20分鐘天翼覺醒・討伐成功！' : '💀 天翼斷裂';
-    document.getElementById('endSummary').innerHTML = `存活時間：${document.getElementById('timeText').textContent} ｜ 總擊殺：${kills} ｜ 最高等級：LV.${player.lv}<br><span style="color:#fde047;">💰 結算獲得：局外經驗 +${expGain} ｜ Seed +${seedGain}（已自動存檔）</span>`;
+
+    const bossTitle = st.boss?.name || '關卡首領';
+    document.getElementById('endTitle').textContent = win
+      ? `🎉 【${st.name}】討伐成功・擊敗${bossTitle}！`
+      : `💀 撤退返回樹上精靈村・雷蒂亞`;
+    document.getElementById('endSummary').innerHTML =
+      `出征獵場：<b>${st.name}</b>（${diff.name}） ｜ <span style="color:${gapInfo.color};font-weight:bold;">${gapInfo.label}</span><br>` +
+      `存活時間：${document.getElementById('timeText').textContent} ｜ 總擊殺：${kills} ｜ 局內最高：LV.${player.lv} ｜ 勝負係數：${win ? '100%' : '70%'}<br>` +
+      `<span style="color:#fde047;font-weight:bold;">💰 結算獲得：局外經驗 +${expGain.toLocaleString()} ｜ 總計 Seed +${totalSeedGain.toLocaleString()}</span><br>` +
+      `<span style="font-size:12px;color:#cbd5e1;">（局內拾取 ${pickedSeed.toLocaleString()} Seed ＋ 目標結算獎金 ${clearBonusSeed.toLocaleString()} Seed｜已自動存檔）</span>`;
     document.getElementById('endModal').style.display = 'flex';
   }
-  

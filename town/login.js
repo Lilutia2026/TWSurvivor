@@ -12,7 +12,8 @@ function openLoginSelectScreen() {
     const loginView = document.getElementById('login-select-view');
     if (!loginView) return;
     loginView.style.display = 'flex';
-    renderLoginCharacterCards();
+if (typeof AudioManager !== 'undefined') AudioManager.play('char_select');
+renderLoginCharacterCards();
 }
 
 function logoutToCharacterSelect() {

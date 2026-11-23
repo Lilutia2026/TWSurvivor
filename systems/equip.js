@@ -82,17 +82,67 @@ function getItemCategoryTag(it) {
   return it.equipTag || 'all';
 }
 
-// 生成未鑑定裝備（僅掉落 LV.62 以下常駐裝，嚴格排除翅膀 back、活動裝 isEvent 與合成專屬裝 craft）
-function createUnidentifiedDrop(rarity = 'white', maxLv = CURRENT_DROP_MAX_LV, targetSlots = null, forceSelfChar = false) {
+// 關卡與難度稀有度權重抽籤（日常最終 BOSS 金裝 20% 起跳；並套用防炸魚最高稀有度上限）
+const RARITY_ORDER = new Array('white', 'green', 'blue', 'purple', 'gold');
+const STAGE_RARITY_TABLES = {
+  normal: {
+    mob:   new Array(58, 33, 8, 1, 0),
+    elite: new Array(0, 35, 52, 12, 1),
+    mega:  new Array(0, 0, 55, 40, 5),
+    final: new Array(0, 0, 20, 60, 20)
+  },
+  hard: {
+    mob:   new Array(45, 38, 14, 3, 0),
+    elite: new Array(0, 20, 55, 22, 3),
+    mega:  new Array(0, 0, 40, 50, 10),
+    final: new Array(0, 0, 10, 65, 25)
+  },
+  nightmare: {
+    mob:   new Array(32, 42, 20, 5.5, 0.5),
+    elite: new Array(0, 10, 45, 38, 7),
+    mega:  new Array(0, 0, 25, 60, 15),
+    final: new Array(0, 0, 0, 70, 30)
+  },
+  hell: {
+    mob:   new Array(20, 40, 30, 9, 1),
+    elite: new Array(0, 0, 38, 50, 12),
+    mega:  new Array(0, 0, 15, 65, 20),
+    final: new Array(0, 0, 0, 65, 35)
+  }
+};
+
+function rollStageDropRarity(enemyTier = 'mob', diffKey = 'normal', maxRarIdx = 4) {
+  const table = STAGE_RARITY_TABLES[diffKey] || STAGE_RARITY_TABLES.normal;
+  const weights = table[enemyTier] || table.mob;
+  const total = weights.reduce((a, b) => a + b, 0);
+  let r = Math.random() * total;
+  let pickedIdx = 0;
+  for (let i = 0; i < weights.length; i++) {
+    r -= weights[i];
+    if (r <= 0) { pickedIdx = i; break; }
+  }
+  const cappedIdx = Math.min(pickedIdx, Math.max(0, maxRarIdx));
+  return RARITY_ORDER[cappedIdx] || 'white';
+}
+
+// 生成未鑑定裝備（支援 minLv ~ maxLv 關卡區間鎖，嚴格排除翅膀、活動裝與合成專屬裝）
+function createUnidentifiedDrop(rarity = 'white', maxLv = CURRENT_DROP_MAX_LV, targetSlots = null, forceSelfChar = false, minLv = 0) {
   const curCharData = typeof getCurrentCharData === 'function' ? getCurrentCharData() : { id: 'lucien', equipTags: ['all'] };
   const charTags = curCharData.equipTags || ['all'];
   const effectiveMaxLv = Math.min(maxLv || CURRENT_DROP_MAX_LV, CURRENT_DROP_MAX_LV);
+  const effectiveMinLv = Math.max(0, Math.min(minLv || 0, effectiveMaxLv));
   let candidates = EQUIP_TEMPLATES.filter(t =>
+    t.reqLv >= effectiveMinLv &&
     t.reqLv <= effectiveMaxLv &&
     !t.isWing &&
     !t.isEvent &&
     (!t.obtain || t.obtain === 'drop')
   );
+  if (candidates.length === 0) {
+    candidates = EQUIP_TEMPLATES.filter(t =>
+      t.reqLv <= effectiveMaxLv && !t.isWing && !t.isEvent && (!t.obtain || t.obtain === 'drop')
+    );
+  }
   if (targetSlots && targetSlots.length > 0) {
     const f = candidates.filter(t => targetSlots.includes(t.slot));
     if (f.length > 0) candidates = f;

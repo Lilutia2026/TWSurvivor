@@ -61,12 +61,55 @@ function draw() {
       ctx.restore();
     });
     gems.forEach(g => { ctx.fillStyle = '#38bdf8'; ctx.beginPath(); ctx.arc(g.x, g.y, 5, 0, Math.PI * 2); ctx.fill(); });
+    if (Array.isArray(seedBags)) {
+      seedBags.forEach(sb => {
+        const r = sb.isBig ? 8 : 5.5;
+        ctx.fillStyle = '#facc15';
+        ctx.beginPath(); ctx.arc(sb.x, sb.y, r, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#fef08a'; ctx.lineWidth = 1.5; ctx.stroke();
+      });
+    }
     chests.forEach(c => { const isS = c.kind === 'silver'; ctx.fillStyle = isS ? '#e2e8f0' : '#facc15'; ctx.fillRect(c.x - 14, c.y - 11, 28, 22); ctx.strokeStyle = isS ? '#38bdf8' : '#fff'; ctx.lineWidth = 2; ctx.strokeRect(c.x - 14, c.y - 11, 28, 22); });
     lootBags.forEach(b => { ctx.fillStyle = b.color; ctx.fillRect(b.x - 11, b.y - 11, 22, 22); });
     enemies.forEach(e => {
-      ctx.fillStyle = e.hitFlash > 0 ? '#fff' : (e.freezeTimer > 0 ? '#7dd3fc' : e.color);
+      // 聖印金色光環（1~3層）
+      if ((e.holySeal || 0) > 0) {
+        ctx.save();
+        ctx.strokeStyle = e.holySeal >= 3 ? 'rgba(250, 204, 21, 0.95)' : 'rgba(254, 240, 138, 0.55)';
+        ctx.lineWidth = e.holySeal >= 3 ? 3 : 1.8;
+        ctx.beginPath(); ctx.arc(e.x, e.y, e.radius + 5, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
+      }
+
+      ctx.fillStyle = e.hitFlash > 0 ? '#fff' : (e.freezeTimer > 0 ? '#7dd3fc' : ((e.chillStacks || 0) > 0 ? '#bae6fd' : e.color));
       ctx.beginPath(); ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = e.shockTimer > 0 ? '#fde047' : (e.burnTimer > 0 ? '#fb923c' : (e.darkTimer > 0 ? '#c084fc' : '#0f172a')); ctx.lineWidth = 2.5; ctx.stroke();
+
+      // 怪物頭頂異常狀態與層數徽章（聖印 1~3、冰緩 1~2 / 凍結、點燃、感電、破甲、暗蝕、鎌鼬）
+      const badges = [];
+      if ((e.holySeal || 0) > 0) badges.push(e.holySeal >= 3 ? '🌟×3' : `✨×${e.holySeal}`);
+      if (e.freezeTimer > 0) badges.push('🧊凍結');
+      else if ((e.chillStacks || 0) > 0) badges.push(`❄️×${e.chillStacks}`);
+      if (e.burnTimer > 0) badges.push('🔥');
+      if (e.shockTimer > 0) badges.push('⚡');
+      if (e.armorBreakTimer > 0) badges.push('💔');
+      if (e.darkTimer > 0) badges.push('🌑');
+      if (e.windTimer > 0) badges.push('🍃');
+
+      if (badges.length > 0) {
+        ctx.save();
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#fef08a';
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 3;
+        const badgeStr = badges.join(' ');
+        const byTop = e.y - e.radius - 7;
+        ctx.strokeText(badgeStr, e.x, byTop);
+        ctx.fillText(badgeStr, e.x, byTop);
+        ctx.restore();
+      }
+
       if (e.isDummy) {
         const bw = 64, bh = 6, pct = Math.max(0, Math.min(1, e.hp / (e.maxHp || 1)));
         const by = e.y + e.radius + 22;
