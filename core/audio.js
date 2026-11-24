@@ -55,19 +55,25 @@ const AudioManager = {
         window.addEventListener('pointerdown', unlock);
         window.addEventListener('keydown', unlock);
 
-        // 【摸魚保護機制】視窗失焦或切換分頁時瞬間靜音並自動凍結局內戰鬥
-        const onHide = () => {
-            this.isBlurred = true;
-            this._pausePlayback();
-            if (typeof isPaused !== 'undefined' && typeof gameRunning !== 'undefined' && gameRunning && !isPaused) {
-                if (typeof togglePause === 'function') togglePause();
-            }
-        };
-        const onShow = () => {
-            this.isBlurred = false;
-            if (this.enabled && this.currentTrack) this._resumePlayback();
-        };
-        window.addEventListener('blur', onHide);
+               // 【摸魚保護機制】視窗失焦或切換分頁時瞬間靜音並自動凍結局內戰鬥
+               const onHide = () => {
+                this.isBlurred = true;
+                this._pausePlayback();
+                const isVisible = (id) => {
+                    const el = document.getElementById(id);
+                    return el && el.style.display !== 'none' && el.style.display !== '';
+                };
+                const inNonBattleScreen = isVisible('login-select-view') || isVisible('town-clad-view')
+                    || isVisible('stage-select-view') || isVisible('lobbyModal') || isVisible('levelModal');
+                if (!inNonBattleScreen && typeof isPaused !== 'undefined' && typeof gameOver !== 'undefined' && !isPaused && !gameOver) {
+                    if (typeof togglePause === 'function') togglePause();
+                }
+            };
+            const onShow = () => {
+                this.isBlurred = false;
+                if (this.enabled && this.currentTrack) this._resumePlayback();
+            };
+        window.addEventListener('blur', onHide);   
         window.addEventListener('focus', onShow);
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) onHide();

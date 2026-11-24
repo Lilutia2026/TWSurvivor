@@ -29,84 +29,58 @@ function getEquipSellPrice(it) {
     return prices[it.rarity] ?? 25;
 }
 
-// 樹上精靈村・雷蒂亞：左右雙樹屋平台 ＋ 中央木棧道橋樑無縫配置
+// 樹上精靈村・雷蒂亞：原版 DTX_1312 (1600×1200) 精靈村木棧道無縫配置
 const TOWN_CLAD_MAP = {
     id: 'raidia_tree_village',
     name: '樹上精靈村・雷蒂亞',
-    width: 1280,
-    height: 820,
-    bgImage: '', // 後續放入 assets/maps/raidia_day.png 時自動載入
-    spawnPoint: { x: 430, y: 430 },  // 玩家進入雷蒂亞左區中央廣場的預設出生點
-    // 可行走矩形邊界（涵蓋左區生活廣場、中央木棧道橋樑、右區冒險高台）
-    walkBounds: { minX: 110, maxX: 1170, minY: 160, maxY: 680 },
+    width: 1600,
+    height: 1200,
+    bgImage: 'assets/maps/raidia_day.png', // 對應原版 DTX_1312 完整底圖
+    spawnPoint: { x: 972, y: 578 },        // 玩家進入雷蒂亞中央廣場的預設出生點
+    walkBounds: { minX: 0, maxX: 1590, minY: 241, maxY: 916 },
+    walkablePolygon: [
+        {x:937,y:247},{x:1032,y:342},{x:1074,y:340},{x:1125,y:371},{x:1172,y:398},{x:1256,y:413},{x:1294,y:432},{x:1360,y:448},{x:1380,y:452},{x:1468,y:484},
+        {x:1590,y:515},{x:1577,y:549},{x:1561,y:571},{x:1548,y:589},{x:1532,y:614},{x:1521,y:635},{x:1502,y:656},{x:1483,y:685},{x:1465,y:711},{x:1444,y:729},
+        {x:1424,y:754},{x:1399,y:776},{x:1379,y:795},{x:1362,y:816},{x:1335,y:831},{x:1304,y:841},{x:1282,y:852},{x:1252,y:862},{x:1224,y:875},{x:1188,y:883},
+        {x:1151,y:895},{x:1113,y:906},{x:1078,y:911},{x:1041,y:915},{x:1005,y:916},{x:974,y:916},{x:938,y:909},{x:903,y:905},{x:867,y:895},{x:830,y:878},
+        {x:813,y:865},{x:743,y:909},{x:602,y:835},{x:575,y:852},{x:543,y:859},{x:521,y:865},{x:495,y:871},{x:466,y:880},{x:436,y:877},{x:407,y:877},
+        {x:370,y:870},{x:342,y:866},{x:305,y:860},{x:284,y:851},{x:261,y:841},{x:230,y:831},{x:198,y:822},{x:174,y:808},{x:149,y:795},{x:128,y:783},
+        {x:103,y:767},{x:80,y:752},{x:55,y:736},{x:32,y:725},{x:19,y:714},{x:10,y:693},{x:8,y:664},{x:20,y:625},{x:57,y:591},{x:67,y:580},
+        {x:43,y:558},{x:16,y:544},{x:0,y:520},{x:0,y:482},{x:0,y:462},{x:8,y:427},{x:41,y:414},{x:87,y:401},{x:137,y:440},{x:169,y:467},
+        {x:189,y:488},{x:216,y:473},{x:235,y:473},{x:251,y:473},{x:270,y:471},{x:281,y:470},{x:292,y:466},{x:308,y:465},{x:318,y:462},{x:335,y:461},
+        {x:348,y:455},{x:368,y:452},{x:384,y:440},{x:409,y:431},{x:418,y:423},{x:426,y:412},{x:444,y:401},{x:452,y:392},{x:464,y:398},{x:483,y:411},
+        {x:497,y:419},{x:512,y:427},{x:531,y:436},{x:542,y:445},{x:540,y:463},{x:537,y:478},{x:527,y:493},{x:519,y:498},{x:507,y:509},{x:494,y:520},
+        {x:475,y:538},{x:461,y:541},{x:437,y:547},{x:415,y:550},{x:400,y:556},{x:393,y:566},{x:382,y:573},{x:367,y:582},{x:348,y:591},{x:334,y:594},
+        {x:308,y:594},{x:284,y:594},{x:268,y:593},{x:250,y:594},{x:252,y:602},{x:249,y:621},{x:246,y:644},{x:248,y:660},{x:255,y:674},{x:258,y:679},
+        {x:266,y:677},{x:268,y:675},{x:271,y:665},{x:272,y:660},{x:269,y:655},{x:287,y:654},{x:300,y:655},{x:309,y:656},{x:317,y:655},{x:329,y:654},
+        {x:366,y:651},{x:384,y:638},{x:399,y:630},{x:411,y:620},{x:430,y:612},{x:449,y:607},{x:478,y:599},{x:506,y:592},{x:525,y:579},{x:542,y:573},
+        {x:563,y:561},{x:590,y:541},{x:591,y:523},{x:591,y:508},{x:590,y:489},{x:587,y:471},{x:579,y:457},{x:603,y:437},{x:616,y:423},{x:620,y:406},
+        {x:620,y:383},{x:637,y:379},{x:653,y:369},{x:666,y:359},{x:673,y:347},{x:681,y:328},{x:677,y:314},{x:700,y:310},{x:725,y:300},{x:732,y:290},
+        {x:747,y:277},{x:758,y:267},{x:766,y:248},{x:769,y:241},{x:778,y:246},{x:793,y:250},{x:800,y:252},{x:815,y:254},{x:844,y:252},{x:850,y:248},
+        {x:857,y:246},{x:861,y:246},{x:868,y:249},{x:878,y:250},{x:887,y:253},{x:902,y:254},{x:903,y:255},{x:920,y:257},{x:929,y:254}
+    ],
+
+    // 中央精靈雕像圓形障礙（已精準對齊右側雕像底座中心）
+    obstacles: [
+        { x: 1085, y: 475, radius: 62 }
+    ],
+
+    // 星夜精靈燈籠暖光光暈座標
+    lanternCoords: [
+        { x: 870, y: 406, radius: 130 },
+        { x: 784, y: 582, radius: 130 },
+        { x: 1063, y: 730, radius: 130 },
+        { x: 1215, y: 599, radius: 130 },
+        { x: 738, y: 830, radius: 130 }
+    ],
+
     // 互動目標清單（靠近互動半徑內按 F 鍵或滑鼠點擊互動）
     interactables: [
-        {
-            id: 'npc_aizuwen',
-            type: 'npc',
-            name: '愛祖文',
-            subtitle: '🔮 青木魔法店・鑑定',
-            x: 220,
-            y: 280,
-            radius: 72,
-            color: '#c084fc',
-            handler: 'openNpcAizuwen' // 連動至 town/NPC/npc_aizuwen.js
-        },
-        {
-            id: 'npc_feiya',
-            type: 'npc',
-            name: '菲雅',
-            subtitle: '⚖️ 青木魔法店・拍賣',
-            x: 420,
-            y: 240,
-            radius: 72,
-            color: '#facc15',
-            handler: 'openNpcFeiya' // 連動至 town/NPC/npc_feiya.js
-        },
-        {
-            id: 'npc_qiedeluo',
-            type: 'npc',
-            name: '挈德羅',
-            subtitle: '⚒️ 雷蒂亞武器店',
-            x: 210,
-            y: 570,
-            radius: 72,
-            color: '#fb923c',
-            handler: 'openNpcQiedeluo' // 連動至 town/NPC/npc_qiedeluo.js
-        },
-        {
-            id: 'npc_kalipa',
-            type: 'npc',
-            name: '卡麗帕',
-            subtitle: '🏦 庫洛集散銀行',
-            x: 440,
-            y: 600,
-            radius: 72,
-            color: '#4ade80',
-            handler: 'openNpcKalipa' // 連動至 town/NPC/npc_kalipa.js
-        },
-        {
-                id: 'time_crystal',
-                type: 'crystal',
-                name: '時間精靈水晶',
-                subtitle: '☀️/🌙 切換日夜光影',
-                x: 375,
-                y: 430,
-                radius: 70,
-                color: '#67e8f9',
-                handler: 'toggleTownDayNight' // 切換白晝／星夜光影與對應 BGM
-            },   
-            {
-                id: 'portal_stage',
-                type: 'portal',
-                name: '雷蒂亞精靈傳送門',
-                subtitle: '🌌 冒險關卡出征',
-                x: 1000,
-                y: 505,       
-            radius: 85,
-            color: '#38bdf8',
-            handler: 'openStageSelectPage' // 連動至 town/stage_select.js
-        }
+        { id: 'npc_aizuwen', type: 'npc', name: '愛祖文', subtitle: '🔮 青木魔法店・鑑定', x: 871, y: 405, radius: 72, color: '#c084fc', handler: 'openNpcAizuwen' },
+        { id: 'npc_feiya', type: 'npc', name: '菲雅', subtitle: '⚖️ 青木魔法店・拍賣', x: 787, y: 572, radius: 72, color: '#facc15', handler: 'openNpcFeiya' },
+        { id: 'npc_qiedeluo', type: 'npc', name: '挈德羅', subtitle: '⚒️ 雷蒂亞武器店', x: 1206, y: 598, radius: 72, color: '#fb923c', handler: 'openNpcQiedeluo' },
+        { id: 'npc_kalipa', type: 'npc', name: '卡麗帕', subtitle: '🏦 庫洛集散銀行', x: 1062, y: 723, radius: 72, color: '#4ade80', handler: 'openNpcKalipa' },
+        { id: 'portal_stage', type: 'portal', name: '雷蒂亞精靈傳送門', subtitle: '🌌 冒險關卡出征', x: 746, y: 838, radius: 85, color: '#38bdf8', handler: 'openStageSelectPage' }
     ]
 };
 

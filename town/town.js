@@ -8,7 +8,10 @@ const TOWN_STATE = {
     ctx: null,
     rafId: null,
     lastTime: 0,
-    player: { x: 640, y: 430, speed: 240, flipX: false, walkTime: 0, targetX: null, targetY: null },
+    player: { x: 996, y: 586, speed: 240, flipX: false, walkTime: 0, targetX: null, targetY: null },
+    camX: 356,
+    camY: 176,
+    zoom: 1,
     keys: {},
     isMouseDown: false,
     activeTarget: null,
@@ -53,19 +56,46 @@ function enterTownClad(keepPos = false) {
 
     townView.style.display = 'flex';
     TOWN_STATE.active = true;
-    if (!keepPos || !TOWN_STATE.hasSpawned) {
-        TOWN_STATE.player.x = TOWN_CLAD_MAP.spawnPoint.x;
-        TOWN_STATE.player.y = TOWN_CLAD_MAP.spawnPoint.y;
-        TOWN_STATE.hasSpawned = true;
-    }
-    TOWN_STATE.player.targetX = null;
-    TOWN_STATE.player.targetY = null;
-
     if (!TOWN_STATE.canvas) {
         TOWN_STATE.canvas = document.getElementById('town-canvas');
         TOWN_STATE.ctx = TOWN_STATE.canvas.getContext('2d');
         bindTownEvents();
     }
+
+       // 1. 滿版無邊框容器設定
+       const wrap = TOWN_STATE.canvas.parentElement;
+       if (wrap) {
+           wrap.style.flex = '1';
+           wrap.style.minHeight = '0';
+           wrap.style.width = '100%';
+           wrap.style.overflow = 'hidden';
+       }
+       TOWN_STATE.canvas.style.width = '100%';
+       TOWN_STATE.canvas.style.height = '100%';
+       TOWN_STATE.canvas.style.maxWidth = 'none';
+       TOWN_STATE.canvas.style.maxHeight = 'none';
+       TOWN_STATE.canvas.style.border = 'none';
+       TOWN_STATE.canvas.style.borderRadius = '0';
+   
+       // 2. 動態貼合視窗實際像素 ＋ 維持原版 640px 視野距離感
+       syncTownViewportSize();
+       if (!TOWN_STATE._resizeBound) {
+           TOWN_STATE._resizeBound = true;
+           window.addEventListener('resize', () => { if (TOWN_STATE.active) syncTownViewportSize(); });
+       }
+   
+       if (!keepPos || !TOWN_STATE.hasSpawned) {
+           TOWN_STATE.player.x = TOWN_CLAD_MAP.spawnPoint.x;
+           TOWN_STATE.player.y = TOWN_CLAD_MAP.spawnPoint.y;
+           TOWN_STATE.hasSpawned = true;
+           const visW = TOWN_STATE.canvas.width / TOWN_STATE.zoom;
+           const visH = TOWN_STATE.canvas.height / TOWN_STATE.zoom;
+           TOWN_STATE.camX = Math.max(0, Math.min(TOWN_CLAD_MAP.width - visW, TOWN_STATE.player.x - visW / 2));
+           TOWN_STATE.camY = Math.max(0, Math.min(TOWN_CLAD_MAP.height - visH, TOWN_STATE.player.y - visH / 2));
+       }
+   
+    TOWN_STATE.player.targetX = null;
+    TOWN_STATE.player.targetY = null; 
 
     if (!TOWN_STATE.bgImg && TOWN_CLAD_MAP.bgImage) {
         const img = new Image();
@@ -110,6 +140,18 @@ function triggerTownInteractable(target) {
 // ============================================================================
 // 《TW倖存者》卡雷德自由市場 (core/town.js) [2/2] - 銜接於 triggerTownInteractable 之後
 // ============================================================================
+function syncTownViewportSize() {
+    if (!TOWN_STATE.canvas) return;
+    const header = document.getElementById('town-header-status')?.parentElement;
+    if (header) header.style.flexShrink = '0';
+    const rect = TOWN_STATE.canvas.getBoundingClientRect();
+    const w = Math.round(rect.width) || window.innerWidth;
+    const h = Math.round(rect.height) || (window.innerHeight - 52);
+    TOWN_STATE.canvas.width = w;
+    TOWN_STATE.canvas.height = h;
+    // 鎖定垂直視野約 650 單位：半螢幕時 zoom≈1.0，全螢幕時 zoom≈1.48，永遠保留鏡頭探索感
+    TOWN_STATE.zoom = Math.max(1, h / 650);
+}
 
 function bindTownEvents() {
     window.addEventListener('keydown', (e) => {
@@ -144,10 +186,13 @@ function bindTownEvents() {
 
     window.addEventListener('keyup', (e) => { TOWN_STATE.keys[e.key.toLowerCase()] = false; });
 
-    const setMoveTargetFromMouse = (e) => {
+    const recordTownMousePos = (e) => {
         const rect = TOWN_STATE.canvas.getBoundingClientRect();
-        const mx = (e.clientX - rect.left) * (TOWN_CLAD_MAP.width / rect.width);
-        const my = (e.clientY - rect.top) * (TOWN_CLAD_MAP.height / rect.height);
+        TOWN_STATE.mouseScreenX = e.clientX - rect.left;
+        TOWN_STATE.mouseScreenY = e.clientY - rect.top;
+        const z = TOWN_STATE.zoom || 1;
+        const mx = TOWN_STATE.mouseScreenX / z + TOWN_STATE.camX;
+        const my = TOWN_STATE.mouseScreenY / z + TOWN_STATE.camY;
         const b = TOWN_CLAD_MAP.walkBounds;
         TOWN_STATE.player.targetX = Math.max(b.minX, Math.min(b.maxX, mx));
         TOWN_STATE.player.targetY = Math.max(b.minY, Math.min(b.maxY, my));
@@ -156,8 +201,8 @@ function bindTownEvents() {
 
     TOWN_STATE.canvas.addEventListener('mousedown', (e) => {
         if (e.button !== 0 || !TOWN_STATE.active || isAnyTownModalOpen()) return;
-        const { mx, my } = setMoveTargetFromMouse(e);
-        // 若直接點擊距離內之 NPC 或傳送門則立即開啟互動
+        e.preventDefault();
+        const { mx, my } = recordTownMousePos(e);
         for (const item of TOWN_CLAD_MAP.interactables) {
             if (Math.hypot(mx - item.x, my - item.y) <= 45 &&
                 Math.hypot(TOWN_STATE.player.x - item.x, TOWN_STATE.player.y - item.y) <= item.radius) {
@@ -172,13 +217,19 @@ function bindTownEvents() {
     });
 
     window.addEventListener('mousemove', (e) => {
-        if (!TOWN_STATE.isMouseDown || !TOWN_STATE.active || isAnyTownModalOpen()) return;
-        setMoveTargetFromMouse(e);
+        if (!TOWN_STATE.isMouseDown) return;
+        if ((e.buttons & 1) === 0 || !TOWN_STATE.active || isAnyTownModalOpen()) {
+            TOWN_STATE.isMouseDown = false;
+            return;
+        }
+        recordTownMousePos(e);
     });
 
     window.addEventListener('mouseup', (e) => {
         if (e.button === 0) TOWN_STATE.isMouseDown = false;
     });
+
+    window.addEventListener('blur', () => { TOWN_STATE.isMouseDown = false; });
 }
 
 function townLoop(now) {
@@ -196,51 +247,93 @@ function updateTownPlayer(dt) {
     let dx = (k['d'] || k['arrowright'] ? 1 : 0) - (k['a'] || k['arrowleft'] ? 1 : 0);
     let dy = (k['s'] || k['arrowdown'] ? 1 : 0) - (k['w'] || k['arrowup'] ? 1 : 0);
 
+    let nextX = p.x, nextY = p.y;
+    p.vx = 0; p.vy = 0;
+    if (TOWN_STATE.isMouseDown && TOWN_STATE.mouseScreenX !== undefined) {
+        const z = TOWN_STATE.zoom || 1;
+        const b = TOWN_CLAD_MAP.walkBounds;
+        p.targetX = Math.max(b.minX, Math.min(b.maxX, TOWN_STATE.mouseScreenX / z + TOWN_STATE.camX));
+        p.targetY = Math.max(b.minY, Math.min(b.maxY, TOWN_STATE.mouseScreenY / z + TOWN_STATE.camY));
+    }
     if (dx !== 0 || dy !== 0) {
+        TOWN_STATE.isMouseDown = false;
         const len = Math.hypot(dx, dy);
-        p.x += (dx / len) * p.speed * dt;
-        p.y += (dy / len) * p.speed * dt;
+        p.vx = dx / len; p.vy = dy / len;
+        nextX += p.vx * p.speed * dt;
+        nextY += p.vy * p.speed * dt;
         if (dx !== 0) p.flipX = dx < 0;
         p.walkTime += dt * 10;
     } else if (p.targetX !== null && p.targetY !== null) {
         const dist = Math.hypot(p.targetX - p.x, p.targetY - p.y);
         if (dist > 6) {
-            const vx = (p.targetX - p.x) / dist;
-            p.x += vx * p.speed * dt;
-            p.y += ((p.targetY - p.y) / dist) * p.speed * dt;
-            if (Math.abs(vx) > 0.05) p.flipX = vx < 0;
+            p.vx = (p.targetX - p.x) / dist;
+            p.vy = (p.targetY - p.y) / dist;
+            nextX += p.vx * p.speed * dt;
+            nextY += p.vy * p.speed * dt;
+            if (Math.abs(p.vx) > 0.05) p.flipX = p.vx < 0;
             p.walkTime += dt * 10;
-        } else { p.targetX = p.targetY = null; p.walkTime = 0; }
+        } else {
+            if (!TOWN_STATE.isMouseDown) { p.targetX = p.targetY = null; }
+            p.walkTime = 0;
+        }
     } else { p.walkTime = 0; }
 
-        // 樹上精靈村・雷蒂亞四段式精準行走區域判定（左廣場 ＋ 中央木橋 ＋ 右傳送高台 ＋ 北橋 ＋ 北側慶典高台）
-        const clampToRaidiaPlatforms = (px, py) => {
-            const zones = [
-                { minX: 110, maxX: 565,  minY: 165, maxY: 680 }, // 左區巨樹生活廣場
-                { minX: 545, maxX: 820,  minY: 345, maxY: 495 }, // 中央木棧道橋樑
-                { minX: 800, maxX: 1170, minY: 335, maxY: 675 }, // 右區冒險傳送高台
-                { minX: 950, maxX: 1050, minY: 220, maxY: 350 }, // 北側垂直木棧道
-                { minX: 785, maxX: 1195, minY: 75,  maxY: 225 }  // 北側樹冠慶典高台（活動NPC預留區）
-            ];   
-        // 若座標已在任一木頭平台內則直接允許通行
-        for (const z of zones) {
-            if (px >= z.minX && px <= z.maxX && py >= z.minY && py <= z.maxY) {
-                return { x: px, y: py };
+           // 樹上精靈村・雷蒂亞 15 頂點多邊形木棧道碰撞 ＋ 中央雕像圓形障礙判定
+    const isPointInRaidiaPoly = (px, py) => {
+        const poly = TOWN_CLAD_MAP.walkablePolygon;
+        if (!Array.isArray(poly) || poly.length < 3) return true;
+        let inside = false;
+        for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+            const xi = poly[i].x, yi = poly[i].y;
+            const xj = poly[j].x, yj = poly[j].y;
+            const intersect = ((yi > py) !== (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi + 0.00001) + xi);
+            if (intersect) inside = !inside;
+        }
+        return inside;
+    };
+
+    const resolveRaidiaCollision = (nx, ny) => {
+        let fx = p.x, fy = p.y;
+        // 分軸滑動檢測：沿木棧道懸崖邊緣移動時可平滑滑行不卡死
+        if (isPointInRaidiaPoly(nx, fy)) fx = nx;
+        if (isPointInRaidiaPoly(fx, ny)) fy = ny;
+
+        // 中央精靈雕像圓形碰撞推開
+        if (Array.isArray(TOWN_CLAD_MAP.obstacles)) {
+            for (const ob of TOWN_CLAD_MAP.obstacles) {
+                const dist = Math.hypot(fx - ob.x, fy - ob.y);
+                if (dist < ob.radius && dist > 0.001) {
+                    const pushX = ob.x + ((fx - ob.x) / dist) * ob.radius;
+                    const pushY = ob.y + ((fy - ob.y) / dist) * ob.radius;
+                    if (isPointInRaidiaPoly(pushX, pushY)) { fx = pushX; fy = pushY; }
+                }
             }
         }
-        // 若超出邊界（如橋樑上下方樹海），自動吸附回最近的有效木棧道邊緣
-        let best = { x: px, y: py }, minD = Infinity;
-        for (const z of zones) {
-            const cx = Math.max(z.minX, Math.min(z.maxX, px));
-            const cy = Math.max(z.minY, Math.min(z.maxY, py));
-            const d = Math.hypot(px - cx, py - cy);
-            if (d < minD) { minD = d; best = { x: cx, y: cy }; }
-        }
-        return best;
+        return { x: fx, y: fy };
     };
-    const clampedPos = clampToRaidiaPlatforms(p.x, p.y);
-    p.x = clampedPos.x;
-    p.y = clampedPos.y;
+
+    const resolvedPos = resolveRaidiaCollision(nextX, nextY);
+    if (isPointInRaidiaPoly(resolvedPos.x, resolvedPos.y)) {
+        p.x = resolvedPos.x;
+        p.y = resolvedPos.y;
+    } else {
+        // 萬一因視窗卡頓或誤點出界，自動拉回最近的安全出生點
+        p.x = TOWN_CLAD_MAP.spawnPoint.x;
+        p.y = TOWN_CLAD_MAP.spawnPoint.y;
+        p.targetX = null;
+        p.targetY = null;
+    }
+
+    // 原版平滑鏡頭跟隨角色（含縮放倍率換算 ＋ 地圖四邊界夾緊）
+    const z = TOWN_STATE.zoom || 1;
+    const viewW = (TOWN_STATE.canvas ? TOWN_STATE.canvas.width : 960) / z;
+    const viewH = (TOWN_STATE.canvas ? TOWN_STATE.canvas.height : 640) / z;
+    const maxCamX = Math.max(0, TOWN_CLAD_MAP.width - viewW);
+    const maxCamY = Math.max(0, TOWN_CLAD_MAP.height - viewH);
+    const targetCamX = Math.max(0, Math.min(maxCamX, p.x - viewW / 2));
+    const targetCamY = Math.max(0, Math.min(maxCamY, p.y - viewH / 2));
+    TOWN_STATE.camX += (targetCamX - TOWN_STATE.camX) * Math.min(1, dt * 10);
+    TOWN_STATE.camY += (targetCamY - TOWN_STATE.camY) * Math.min(1, dt * 10);
 
     let nearest = null, minDist = Infinity;
     for (const item of TOWN_CLAD_MAP.interactables) {
@@ -252,8 +345,15 @@ function updateTownPlayer(dt) {
 
 function drawTownScene() {
     const ctx = TOWN_STATE.ctx, W = TOWN_CLAD_MAP.width, H = TOWN_CLAD_MAP.height;
+    const viewW = TOWN_STATE.canvas.width, viewH = TOWN_STATE.canvas.height;
+    const z = TOWN_STATE.zoom || 1;
     const isNight = getRaidiaNightMode();
-    ctx.clearRect(0, 0, W, H);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.clearRect(0, 0, viewW, viewH);
+    ctx.save();
+    ctx.scale(z, z);
+    ctx.translate(-TOWN_STATE.camX, -TOWN_STATE.camY);
 
     if (TOWN_STATE.bgLoaded && TOWN_STATE.bgImg) {
         ctx.drawImage(TOWN_STATE.bgImg, 0, 0, W, H);
@@ -349,29 +449,34 @@ function drawTownScene() {
     for (const ent of list) {
         if (ent.kind === 'player') {
             const p = ent.data, bob = Math.abs(Math.sin(p.walkTime)) * 4;
-            const cObj = (typeof CHARACTERS !== 'undefined' && saveData?.charId) ? CHARACTERS[saveData.charId] : null;
+            const charId = saveData?.charId || 'lucien';
+            const cObj = (typeof CHARACTERS !== 'undefined') ? CHARACTERS[charId] : null;
             const charColor = (cObj && cObj.color) ? cObj.color : '#3b82f6';
-            ctx.fillStyle = charColor; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
-            ctx.beginPath(); ctx.roundRect(p.x - 15, p.y - 44 - bob, 30, 44, 8); ctx.fill(); ctx.stroke();
+            const isMoving = p.walkTime > 0;
+
+            if (typeof SpriteAnimManager !== 'undefined') {
+                p.dirInfo = SpriteAnimManager.resolveDir8(p.vx || 0, p.vy || 0, p.dirInfo?.dir8 || 'down');
+            }
+            const drewSprite = (typeof SpriteAnimManager !== 'undefined') &&
+                SpriteAnimManager.drawCharacter(ctx, charId, p.x, p.y, { isMoving, dirInfo: p.dirInfo, scale: 0.92 });
+
+            if (!drewSprite) {
+                ctx.fillStyle = charColor; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.roundRect(p.x - 15, p.y - 44 - bob, 30, 44, 8); ctx.fill(); ctx.stroke();
+            }
+            const nameOffsetY = drewSprite ? 82 : (54 + bob);
             ctx.textAlign = 'center'; ctx.font = 'bold 14px sans-serif'; ctx.fillStyle = charColor;
+            ctx.strokeStyle = 'rgba(15, 23, 42, 0.85)'; ctx.lineWidth = 3;
             const pName = saveData?.charName || (cObj && cObj.name) || '冒險者';
-            ctx.fillText(pName, p.x, p.y - 54 - bob);
+            ctx.strokeText(pName, p.x, p.y - nameOffsetY);
+            ctx.fillText(pName, p.x, p.y - nameOffsetY);
         } else {
             const it = ent.data, hi = TOWN_STATE.activeTarget?.id === it.id;
             ctx.beginPath(); ctx.arc(it.x, it.y, it.radius, 0, Math.PI * 2);
             ctx.fillStyle = hi ? 'rgba(250,204,21,0.22)' : 'rgba(255,255,255,0.06)'; ctx.fill();
             ctx.strokeStyle = hi ? '#facc15' : 'rgba(255,255,255,0.25)'; ctx.lineWidth = hi ? 2.5 : 1; ctx.stroke();
 
-            if (it.type === 'crystal') {
-                // 時間精靈水晶菱形外觀
-                ctx.fillStyle = isNight ? '#38bdf8' : '#fde047';
-                ctx.beginPath();
-                ctx.moveTo(it.x, it.y - 48); ctx.lineTo(it.x + 16, it.y - 24);
-                ctx.lineTo(it.x, it.y); ctx.lineTo(it.x - 16, it.y - 24);
-                ctx.closePath(); ctx.fill();
-            } else {
-                ctx.fillStyle = it.color; ctx.beginPath(); ctx.roundRect(it.x - 16, it.y - 44, 32, 46, 8); ctx.fill();
-            }
+            ctx.fillStyle = it.color; ctx.beginPath(); ctx.roundRect(it.x - 16, it.y - 44, 32, 46, 8); ctx.fill();
 
             ctx.textAlign = 'center'; ctx.font = 'bold 13px sans-serif'; ctx.fillStyle = '#fef08a';
             ctx.fillText(it.subtitle, it.x, it.y - 68);
@@ -384,27 +489,24 @@ function drawTownScene() {
         }
     }
 
-      // 5. 【星夜光影與暖色精靈光暈】夜晚蓋上柔和靛藍夜幕，並為玩家、NPC、水晶與傳送門點亮暖光
-      if (isNight) {
+    // 5. 【星夜光影與暖色精靈光暈】讀取 TOWN_CLAD_MAP.lanternCoords 渲染 1600×1200 精靈燈籠暖光
+    if (isNight) {
         ctx.save();
-        ctx.fillStyle = 'rgba(8, 15, 38, 0.42)';
+        ctx.fillStyle = 'rgba(8, 15, 38, 0.48)';
         ctx.fillRect(0, 0, W, H);
 
         ctx.globalCompositeOperation = 'lighter';
-        const lanternCoords = [
-            { x: 822, y: 308 }, { x: 822, y: 478 },
-            { x: 915, y: 193 }, { x: 1085, y: 193 }
-        ];
+        const lanterns = Array.isArray(TOWN_CLAD_MAP.lanternCoords) ? TOWN_CLAD_MAP.lanternCoords : [];
         const lights = [
             { x: TOWN_STATE.player.x, y: TOWN_STATE.player.y - 20, r: 145, c: 'rgba(253, 224, 71, 0.22)' },
-            ...lanternCoords.flatMap(lt => [
-                { x: lt.x, y: lt.y, r: 135, c: 'rgba(251, 191, 36, 0.38)' },
-                { x: lt.x, y: lt.y, r: 50,  c: 'rgba(254, 249, 195, 0.52)' }
+            ...lanterns.flatMap(lt => [
+                { x: lt.x, y: lt.y, r: lt.radius || 130, c: 'rgba(251, 191, 36, 0.36)' },
+                { x: lt.x, y: lt.y, r: Math.round((lt.radius || 130) * 0.38), c: 'rgba(254, 249, 195, 0.50)' }
             ]),
             ...TOWN_CLAD_MAP.interactables.map(it => ({
                 x: it.x, y: it.y - 20,
-                r: it.type === 'portal' ? 170 : 130,
-                c: it.type === 'portal' ? 'rgba(56, 189, 248, 0.26)' : 'rgba(253, 224, 71, 0.20)'
+                r: it.type === 'portal' ? 165 : 120,
+                c: it.type === 'portal' ? 'rgba(56, 189, 248, 0.26)' : 'rgba(253, 224, 71, 0.16)'
             }))
         ];
         for (const lt of lights) {
@@ -416,6 +518,7 @@ function drawTownScene() {
         }
         ctx.restore();
     }
+    ctx.restore();
 }
 
 function updateTownHeaderInfo() {

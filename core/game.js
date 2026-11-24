@@ -85,6 +85,7 @@ const ownedSkills = { [EQUIPPED_WEAPON.startSkill]: { lv: 1, evolved: false, dis
 const ownedPassives = {};
 let enemies = [], slashes = [], projectiles = [], enemyProjectiles = [], lightnings = [], zones = [], damageTexts = [], gems = [], chests = [];
 let lootBags = [], runLoot = [], seedBags = [], runSeed = 0, rerollCount = 0, delayedActions = [];
+let fieldItems = [], fieldMagnetTimer = 0;
 const keys = {};
 window.addEventListener('keydown', e => {
   keys[e.code] = true;
@@ -106,7 +107,37 @@ window.addEventListener('keydown', e => {
   }
 });
 window.addEventListener('keyup', e => { keys[e.code] = false; });
-// [第 2 段：update() 主更新前半段 — 時間軸、移動、領域與玩家射彈（接續第 75 行至第 175 行）]
+
+let isMouseMoving = false;
+let mouseScreenX = 0, mouseScreenY = 0;
+let battleClickTarget = null;
+
+function recordBattleMousePos(e) {
+  const rect = canvas.getBoundingClientRect();
+  mouseScreenX = e.clientX - rect.left;
+  mouseScreenY = e.clientY - rect.top;
+  battleClickTarget = {
+    x: player.x + (mouseScreenX - canvas.width / 2),
+    y: player.y + (mouseScreenY - canvas.height / 2)
+  };
+}
+
+canvas.addEventListener('mousedown', e => {
+  if (e.button !== 0 || isPaused || gameOver) return;
+  e.preventDefault();
+  isMouseMoving = true;
+  recordBattleMousePos(e);
+});
+window.addEventListener('mousemove', e => {
+  if (!isMouseMoving) return;
+  if ((e.buttons & 1) === 0 || isPaused || gameOver) { isMouseMoving = false; return; }
+  recordBattleMousePos(e);
+});
+window.addEventListener('mouseup', e => {
+  if (e.button === 0) isMouseMoving = false; // 放開左鍵只結束長按追蹤，保留最後點擊位置讓角色走完
+});
+window.addEventListener('blur', () => { isMouseMoving = false; });
+
 function update(dt) {
   if (isPaused || gameOver) return;
   gameTime += dt; if (bannerTimer > 0 && (bannerTimer -= dt) <= 0) document.getElementById('banner').style.display = 'none';
@@ -125,7 +156,15 @@ function update(dt) {
 
   let mx = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0);
   let my = (keys.KeyS || keys.ArrowDown ? 1 : 0) - (keys.KeyW || keys.ArrowUp ? 1 : 0);
+  if (isMouseMoving) {
+    battleClickTarget = {
+      x: player.x + (mouseScreenX - canvas.width / 2),
+      y: player.y + (mouseScreenY - canvas.height / 2)
+    };
+  }
   if (mx || my) {
+    isMouseMoving = false;
+    battleClickTarget = null;
     const l = Math.hypot(mx, my);
     player.x += (mx / l) * player.baseSpeed * player.speedMult * dt;
     player.y += (my / l) * player.baseSpeed * player.speedMult * dt;
@@ -133,6 +172,21 @@ function update(dt) {
     if (!enemies.length) player.facingAngle = player.lastMoveAngle;
     if (mx) player.flipX = mx > 0 ? 1 : -1;
     player.walkCycle += dt * 14;
+  } else if (battleClickTarget) {
+    const dx = battleClickTarget.x - player.x, dy = battleClickTarget.y - player.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 8) {
+      const vx = dx / dist, vy = dy / dist;
+      player.x += vx * player.baseSpeed * player.speedMult * dt;
+      player.y += vy * player.baseSpeed * player.speedMult * dt;
+      player.lastMoveAngle = Math.atan2(vy, vx);
+      if (!enemies.length) player.facingAngle = player.lastMoveAngle;
+      if (Math.abs(vx) > 0.05) player.flipX = vx > 0 ? 1 : -1;
+      player.walkCycle += dt * 14;
+    } else {
+      if (!isMouseMoving) battleClickTarget = null;
+      player.walkCycle = 0;
+    }
   } else player.walkCycle = 0;
 
   if (!isSandbox && (spawnTimer -= dt) <= 0) {
@@ -338,14 +392,14 @@ function update(dt) {
       if (prog >= 1) {
         if (p.targetObj && !p.targetObj.isDead) {
           const tIdx = enemies.indexOf(p.targetObj);
-          if (tIdx !== -1 && Math.hypot(p.targetObj.x - p.targetX, p.targetObj.y - p.targetY) <= p.radius + p.targetObj.radius + 24) {
+          if (tIdx !== -1 && Math.hypot(p.targetObj.x - p.targetX, p.targetObj.y - p.targetY) <= p.radius + p.targetObj.radius + 20) {
             applyStatusTagsOnHit(p.targetObj, 'fire', spellBase, cs, { isMelee: false });
-            hitEnemy(tIdx, p.dmg * 0.65, { element: 'fire' });
+            hitEnemy(tIdx, p.dmg * 0.35, { element: 'fire' });
           }
         }
-        const boomR = 90 * player.areaMult;
+        const boomR = 78 * player.areaMult;
         slashes.push({ type: 'fireboom', x: p.targetX, y: p.targetY, range: boomR, arc: Math.PI * 2, life: 0.22 });
-        damageArea(p.targetX, p.targetY, boomR, 0, Math.PI * 2, p.dmg, 14, {
+        damageArea(p.targetX, p.targetY, boomR, 0, Math.PI * 2, p.dmg, 12, {
           element: 'fire',
           onTargetHit: (target) => applyStatusTagsOnHit(target, 'fire', spellBase, cs, { isMelee: false })
         });
@@ -359,7 +413,7 @@ function update(dt) {
       const t = enemies[Math.floor(Math.random() * enemies.length)];
       const a = Math.atan2(t.y - p.y, t.x - p.x);
       const ice1St = ownedSkills.ice1 || { lv: 1, evolved: false };
-      const scatterMult = (p.lv || 1) >= 6 ? 0.60 : 0.45;
+      const scatterMult = (p.lv || 1) >= 4 ? 0.60 : 0.45;
       const ice1Dmg = getSkillRawDmg('ice1', ice1St.lv, ice1St.evolved) * scatterMult;
       const ice1Pierce = 2 + Math.floor(ice1St.lv / 2);
       spawnedProjectiles.push({
@@ -397,8 +451,8 @@ for (let j = enemies.length - 1; j >= 0; j--) {
     }
     if (p.skillId === 'thunder3') {
       const bLv = p.lv || 1;
-      const arcCount = bLv >= 5 ? 2 : 1;
-      const arcJumps = bLv >= 9 ? 3 : 2;
+      const arcCount = bLv >= 4 ? 2 : 1;
+      const arcJumps = bLv >= 5 ? 3 : 2;
       const usedStarts = new Set([e]);
       for (let aIdx = 0; aIdx < arcCount; aIdx++) {
         let firstTarget = null, minFirstD = 240;
@@ -597,8 +651,42 @@ enemyProjectiles = enemyProjectiles.filter(ep => {
   return true;
 });
 
-const vacSpeed = victoryVacuumActive ? 980 : 420;
-const vacRange = victoryVacuumActive ? 99999 : player.pickupRange;
+if (fieldMagnetTimer > 0) fieldMagnetTimer -= dt;
+const isGlobalMagnet = victoryVacuumActive || fieldMagnetTimer > 0;
+const vacSpeed = isGlobalMagnet ? 980 : 420;
+const vacRange = isGlobalMagnet ? 99999 : player.pickupRange;
+
+fieldItems = fieldItems.filter(fi => {
+  if ((fi.life -= dt) <= 0) return false;
+  const dx = player.x - fi.x, dy = player.y - fi.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist < vacRange && dist > 1) {
+    fi.x += (dx / dist) * vacSpeed * dt;
+    fi.y += (dy / dist) * vacSpeed * dt;
+  }
+  if (dist <= 34) {
+    if (fi.kind === 'potion') {
+      const healAmt = Math.max(1, Math.round(player.maxHp * 0.10));
+      player.hp = Math.min(player.maxHp, player.hp + healAmt);
+      damageTexts.push({ x: player.x, y: player.y - 34, txt: `🧪+${healAmt} HP`, color: '#4ade80', fontSize: 15, life: 0.75 });
+    } else if (fi.kind === 'magnet') {
+      fieldMagnetTimer = 4.0;
+    } else if (fi.kind === 'bomb') {
+      slashes.push({ type: 'fireboom', x: player.x, y: player.y, range: Math.max(canvas.width, canvas.height) * 0.65, arc: Math.PI * 2, life: 0.45 });
+      for (let i = enemies.length - 1; i >= 0; i--) {
+        const m = enemies[i];
+        if (!m || m.isDummy) continue;
+        if (Math.hypot(m.x - player.x, m.y - player.y) <= Math.max(canvas.width, canvas.height) * 0.72) {
+          const isBossType = m.isElite || m.isMegaBoss || m.isFinalBoss;
+          const bombDmg = isBossType ? Math.max(120, Math.round(m.maxHp * 0.25)) : (m.hp + 999);
+          hitEnemy(i, bombDmg, { element: 'fire', noCrit: true });
+        }
+      }
+    }
+    return false;
+  }
+  return true;
+});
 
 gems = gems.filter(g => {
   const d = Math.hypot(player.x - g.x, player.y - g.y);

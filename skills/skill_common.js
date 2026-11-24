@@ -30,7 +30,8 @@ const COMMON_PASSIVES = {
   manaShield: { name: '💠 魔力護盾',     skillTags: ['common'], maxLv: 5, desc: '每 12 秒生成 15% 最大生命護盾（每級護盾 +5%、冷卻 -1 秒）' },
   thorns:     { name: '🌵 荊棘反甲',     skillTags: ['common'], maxLv: 5, desc: '受碰撞時對該敵人反彈 DEF×150% 傷害並擊退（每級 +50%）' },
   greed:      { name: '💰 貪婪祝福',     skillTags: ['common'], maxLv: 5, desc: '每級結算獲得 Seed 貨幣 +15%（滿級 +75%）' },
-  curse:      { name: '💀 暗黑詛咒',     skillTags: ['common'], maxLv: 5, desc: '每級怪物生命、移速與刷怪頻率 +10%（滿級 +50%）' }
+  curse:      { name: '💀 暗黑詛咒',     skillTags: ['common'], maxLv: 5, desc: '每級怪物生命、移速與刷怪頻率 +10%（滿級 +50%）' },
+  magnet:     { name: '🧲 強力磁鐵',     skillTags: ['common'], maxLv: 5, desc: '每級拾取範圍 +20%（滿級 +100%）' }
 };
 registerGlobalPassives(COMMON_PASSIVES);
 

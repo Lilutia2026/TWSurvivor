@@ -25,7 +25,10 @@ function getPassiveGainText(id, lv) {
       mageTalent: `無視怪物減傷抗性 +${3 * lv}%`,
       lightWall:  `物理減傷率 +${3 * lv}%`,
       magicShield:`魔法減傷率 +${3 * lv}%`,
-      angelWish:  `賦予 1 次原地滿血復活與全屏淨化（代價：傷害 -10%、移速 -10%）`
+      angelWish:  `賦予 1 次原地滿血復活與全屏淨化（代價：傷害 -10%、移速 -10%）`,
+      greed:      `結算獲得 Seed 貨幣 +${15 * lv}%`,
+      curse:      `怪物生命、移速與刷怪頻率 +${10 * lv}%`,
+      magnet:     `拾取範圍 +${20 * lv}%`
     };
     return map[id] || '';
   }
@@ -76,7 +79,8 @@ function getPassiveGainText(id, lv) {
     if (id === 'thunder5') gains.push('落雷道數 +1 道、雷擊範圍擴大');
     if (id === 'holypoly') gains.push('聖光漩渦半徑擴大');
     if (id === 'ice2') gains.push('冰霧領域範圍 +6%');
-    if (id === 'ice3' && nextLv === 6) gains.push('單次發射巨型寒冰球提升至 2 顆、散射冰彈威力提升至 60%');
+    if (id === 'ice3' && nextLv === 4) gains.push('單次發射巨型寒冰球提升至 2 顆、散射冰彈威力提升至 60%');
+    if (id === 'thunder3' && nextLv === 4) gains.push('撞擊引動連鎖電弧提升至 2 條');
     if ((id === 'windblade' || id === 'firearrow' || id === 'thunder') && nextLv % 3 === 0) gains.push('落雷數量 +1');
     if (id === 'armorbreak') {
       gains.push('扇形範圍 +4%');
@@ -129,17 +133,18 @@ function getPassiveGainText(id, lv) {
     if (id === 'ice1') parts.push(`單次投射 ${1 + Math.floor(lv / 4)} 發（每發可彈跳 ${1 + Math.floor(lv / 2)} 次）`);
     if (id === 'ice2') parts.push(`領域範圍 +${(lv - 1) * 6}%｜基礎凍結觸發率 15%（受 MR 加成）`);
     if (id === 'fire2') parts.push(`單次投射 ${1 + Math.floor(lv / 3)} 發`);
-    if (id === 'ice3') parts.push(`單次投射 ${lv >= 6 ? 2 : 1} 顆巨型寒冰球（每 0.60s 散射 ${lv >= 6 ? 60 : 45}% 威力彈跳冰彈）`);
+    if (id === 'ice3') parts.push(`單次投射 ${lv >= 4 ? 2 : 1} 顆巨型寒冰球（每 0.60s 散射 ${lv >= 4 ? 60 : 45}% 威力彈跳冰彈）`);
     if (id === 'fire4' || id === 'ice4') parts.push(`單次召喚 ${1 + Math.floor(lv / 3)} 顆隕石`);
     if (id === 'thunder1') parts.push(`單次落下 ${3 + Math.floor(lv / 2)} 道單體落雷`);
     if (id === 'thunder2') parts.push(`雙段電環極限半徑 +${(lv - 1) * 5}%（0.7s 擴散／0.3s 回縮）`);
     if (id === 'thunder3') {
       const balls = 1 + Math.floor(lv / 4);
       const bounces = 1 + Math.floor(lv / 4);
-      const arcs = lv >= 5 ? 2 : 1;
-      const jumps = lv >= 9 ? 3 : 2;
+      const arcs = lv >= 4 ? 2 : 1;
+      const jumps = lv >= 5 ? 3 : 2;
       parts.push(`單次投射 ${balls} 顆（彈跳 ${bounces} 次｜撞擊射出 ${arcs} 條連跳 ${jumps} 敵）`);
     }
+
     if (id === 'thunder4') parts.push(`單次落下 ${4 + Math.floor(lv / 2)} 道神雷`);
     if (id === 'thunder5') parts.push(`單次落下 ${4 + Math.floor(lv / 2)} 道紫霄神雷（附帶二次範圍電環）`);
     if (id === 'fire5') parts.push(`單次召喚 ${1 + Math.floor(lv / 2)} 顆天罰隕石（殘留灼燒火海）`);
@@ -562,7 +567,7 @@ function triggerSkills(dt) {
         const baseCount = (id === 'fire1' || id === 'fire5' || id === 'ice5') ? (1 + Math.floor(st.lv / 2))
           : (id === 'fire3' ? (4 + Math.floor(st.lv / 2))
           : ((id === 'ice1' || id === 'thunder3') ? (1 + Math.floor(st.lv / 4))
-          : (id === 'ice3' ? (st.lv >= 6 ? 2 : 1)
+          : (id === 'ice3' ? (st.lv >= 4 ? 2 : 1)
           : (id === 'thunder1' ? (3 + Math.floor(st.lv / 2))
           : ((id === 'thunder4' || id === 'thunder5') ? (4 + Math.floor(st.lv / 2)) : (1 + Math.floor(st.lv / 3)))))));
         const count = baseCount + bonusProj;
@@ -649,9 +654,9 @@ function triggerSkills(dt) {
               dmg: rawDmg, pierce: 1, life: fallDur + 0.1, hitSet: new Set()
             });
           } else {
-            const isOrb = id === 'ice3', isIceBounce = id === 'ice1', isThunderBall = id === 'thunder3';
-            const spd = isIceBounce ? 680 : (isThunderBall ? 620 : (isOrb ? 210 : 520));
-            const baseRad = isOrb ? 22 : (isThunderBall ? 14 : (id.endsWith('4') || id.endsWith('5') ? 26 : 11));
+            const isOrb = id === 'ice3', isIceBounce = id === 'ice1', isThunderBall = id === 'thunder3', isFireOrb = id === 'fire3';
+            const spd = isIceBounce ? 680 : (isThunderBall ? 620 : (isOrb ? 210 : (isFireOrb ? 420 : 520)));
+            const baseRad = isOrb ? 22 : (isFireOrb ? 18 : (isThunderBall ? 14 : (id.endsWith('4') || id.endsWith('5') ? 26 : 11)));
             const pierceCount = isOrb ? 99 : (isIceBounce ? (2 + Math.floor(st.lv / 2)) : (isThunderBall ? (2 + Math.floor(st.lv / 4)) : 1));
             projectiles.push({
               type: elem, elem, skillId: id, lv: st.lv, isBounce: isIceBounce || isThunderBall, speed: spd,

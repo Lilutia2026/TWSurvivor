@@ -71,6 +71,24 @@ function draw() {
     }
     chests.forEach(c => { const isS = c.kind === 'silver'; ctx.fillStyle = isS ? '#e2e8f0' : '#facc15'; ctx.fillRect(c.x - 14, c.y - 11, 28, 22); ctx.strokeStyle = isS ? '#38bdf8' : '#fff'; ctx.lineWidth = 2; ctx.strokeRect(c.x - 14, c.y - 11, 28, 22); });
     lootBags.forEach(b => { ctx.fillStyle = b.color; ctx.fillRect(b.x - 11, b.y - 11, 22, 22); });
+    if (Array.isArray(fieldItems)) {
+      const meta = {
+        potion:  { icon: '🧪', bg: 'rgba(34,197,94,0.32)',  stroke: '#4ade80' },
+        magnet:  { icon: '🧲', bg: 'rgba(56,189,248,0.32)', stroke: '#38bdf8' },
+        bomb:    { icon: '💣', bg: 'rgba(239,68,68,0.32)',  stroke: '#f87171' },
+        goldbag: { icon: '💰', bg: 'rgba(250,204,21,0.35)', stroke: '#facc15' }
+      };
+      fieldItems.forEach(fi => {
+        const m = meta[fi.kind] || meta.potion;
+        const pulse = 15 + Math.sin(gameTime * 6) * 2.5;
+        ctx.save();
+        ctx.fillStyle = m.bg; ctx.strokeStyle = m.stroke; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(fi.x, fi.y, pulse, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.font = '16px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(m.icon, fi.x, fi.y + 1);
+        ctx.restore();
+      });
+    }
     enemies.forEach(e => {
       // 聖印金色光環（1~3層）
       if ((e.holySeal || 0) > 0) {
@@ -181,6 +199,17 @@ function draw() {
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
+    ctx.restore();
+    return;
+  }
+  if (p.skillId === 'fire3') {
+    ctx.save();
+    ctx.fillStyle = 'rgba(234, 88, 12, 0.35)';
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.radius * 1.45, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fb923c';
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fef08a';
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.radius * 0.52, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
     return;
   }
@@ -324,12 +353,28 @@ lightnings.forEach(l => {
   ctx.restore();
 });
 
-const ch = typeof getCurrentCharData === 'function' ? getCurrentCharData() : { color: '#3b82f6' };
-ctx.save(); ctx.translate(player.x, player.y - Math.abs(Math.sin(player.walkCycle)) * 4);
-ctx.fillStyle = ch.color || '#3b82f6'; ctx.fillRect(-12, -16, 24, 30);
-ctx.fillStyle = '#fde047'; ctx.beginPath(); ctx.arc(0, -24, 11, 0, Math.PI * 2); ctx.fill();
-ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(10 * player.flipX, 0); ctx.lineTo(28 * player.flipX, -12); ctx.stroke();
-ctx.restore();
+const ch = typeof getCurrentCharData === 'function' ? getCurrentCharData() : { id: 'lucien', color: '#3b82f6' };
+const isBattleMoving = player.walkCycle > 0;
+if (typeof SpriteAnimManager !== 'undefined') {
+  const mvx = isBattleMoving ? Math.cos(player.lastMoveAngle || 0) : 0;
+  const mvy = isBattleMoving ? Math.sin(player.lastMoveAngle || 0) : 0;
+  player.dirInfo = SpriteAnimManager.resolveDir8(mvx, mvy, player.dirInfo?.dir8 || 'down');
+}
+const drewBattleSprite = (typeof SpriteAnimManager !== 'undefined') &&
+  SpriteAnimManager.drawCharacter(ctx, ch.id || 'lucien', player.x, player.y + 14, {
+    isMoving: isBattleMoving,
+    dirInfo: player.dirInfo,
+    scale: 0.92
+  });
+
+  if (!drewBattleSprite) {
+    ctx.save(); ctx.translate(player.x, player.y - Math.abs(Math.sin(player.walkCycle)) * 4);
+    ctx.fillStyle = ch.color || '#3b82f6'; ctx.fillRect(-12, -16, 24, 30);
+    ctx.fillStyle = '#fde047'; ctx.beginPath(); ctx.arc(0, -24, 11, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(10 * player.flipX, 0); ctx.lineTo(28 * player.flipX, -12); ctx.stroke();
+    ctx.restore();
+  }
+
 if (player.shield > 0) { ctx.strokeStyle = 'rgba(56,189,248,0.85)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(player.x, player.y - 6, 26, 0, Math.PI * 2); ctx.stroke(); }
 damageTexts.forEach(t => { ctx.fillStyle = t.color; ctx.font = `bold ${t.fontSize || 14}px sans-serif`; ctx.fillText(t.txt, t.x, t.y); });
 ctx.restore();

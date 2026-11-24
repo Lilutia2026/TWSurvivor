@@ -240,6 +240,7 @@ function upgradeClassicHud() {
       if (c.id === 'heal') player.regen += 1.2;
       if (c.id === 'greed') player.seedMult = (player.seedMult || 1.0) + 0.15;
       if (c.id === 'curse') player.curseMult = (player.curseMult || 1.0) + 0.10;
+      if (c.id === 'magnet') player.pickupRange = Math.round((player.pickupRange || 115) * 1.20);
     } else if (c.kind === 'seed') {
       if (typeof saveData !== 'undefined') { saveData.seed = (saveData.seed || 0) + 50; writeSave(); }
       showBanner('💰 獲得黃金種子袋！局外錢包 Seed +50！');
@@ -449,10 +450,20 @@ function togglePause() {
         <div class="status-sec"><h3>⚔️ 即時戰鬥面板總覽 <span style="font-size:11px;color:#94a3b8;font-weight:normal;">(移上查看說明)</span></h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:6px;">${combatGridHtml}</div></div>
         <div class="status-sec"><h3>🔥 主動技能欄（${Object.keys(ownedSkills).length}/${MAX_ACTIVE_SKILLS}）</h3><div style="display:flex;flex-direction:column;gap:6px;margin-top:6px;">${skillBadges}</div></div>
         <div class="status-sec"><h3>🔮 被動輔助欄（${Object.keys(ownedPassives).length}/${MAX_PASSIVE_SKILLS}）</h3><div style="display:flex;flex-direction:column;gap:6px;margin-top:6px;">${passiveBadges}</div></div>`;
-      modal.style.display = 'flex';
-    } else { modal.style.display = 'none'; isPaused = false; }
-  }
+        modal.style.display = 'flex';
+      } else { modal.style.display = 'none'; isPaused = false; }
+    }
   
+    function abandonBattle() {
+      if (gameOver) return;
+      if (!confirm('確定要放棄本次戰鬥並撤退嗎？\n（將保留局內已拾取的裝備與 Seed，並依目前進度結算 70% 經驗值）')) return;
+      hideSkillTooltip();
+      const pauseEl = document.getElementById('pauseModal');
+      if (pauseEl) pauseEl.style.display = 'none';
+      isPaused = false;
+      endGame(false);
+    }
+      
   function endGame(win) {
     gameOver = true;
     const runCfg = window.ACTIVE_STAGE_RUN || null;

@@ -354,7 +354,12 @@ function getSkillRawDmg(id, lv, evolved) {
                 }
         
                 gems.push({ x: e.x, y: e.y, val: e.expValue });
-                const curIdx = enemies.indexOf(e);       
+                if (!e.isDummy && typeof fieldItems !== 'undefined' && Math.random() < 0.016) {
+                  const itemKinds = ['potion', 'magnet', 'bomb', 'goldbag'];
+                  const pickedKind = itemKinds[Math.floor(Math.random() * itemKinds.length)];
+                  fieldItems.push({ x: e.x, y: e.y, kind: pickedKind, life: 45 });
+                }
+                const curIdx = enemies.indexOf(e);
         if (curIdx !== -1) enemies.splice(curIdx, 1);
         if (!e.isDummy) kills++;
 
@@ -368,7 +373,7 @@ function getSkillRawDmg(id, lv, evolved) {
         }
       }
     }
-    
+
     function damageArea(cx, cy, range, facing, arc, baseDmg, kb, opts = {}) {
       const cs = typeof getDerivedCombatStats === 'function' ? getDerivedCombatStats() : { knockbackMult: 1 };
       const kbMult = cs.knockbackMult || 1;
@@ -376,7 +381,9 @@ function getSkillRawDmg(id, lv, evolved) {
       const slammedSet = new Set();
       for (let i = enemies.length - 1; i >= 0; i--) {
         if (opts.maxTargets && hitCount >= opts.maxTargets) break;
-        const e = enemies[i], dx = e.x - cx, dy = e.y - cy;
+        const e = enemies[i];
+        if (!e || e.isDead) continue;
+        const dx = e.x - cx, dy = e.y - cy;
         if (Math.hypot(dx, dy) <= range + e.radius) {
           let diff = Math.atan2(dy, dx) - facing;
           while (diff > Math.PI) diff -= Math.PI * 2; while (diff < -Math.PI) diff += Math.PI * 2;
