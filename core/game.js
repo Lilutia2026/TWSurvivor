@@ -5,7 +5,14 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 function resize() {
-  canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+  const mobile = MobileControls.enabled;
+  const rect = mobile && document.documentElement.classList.contains('mobile-layout') ? canvas.getBoundingClientRect() : null;
+  const width = rect?.width || window.innerWidth;
+  const height = rect?.height || window.innerHeight;
+  // 小螢幕縮小畫面比例，保留至少 960 × 540 的世界視野供畫面內索敵使用。
+  const scale = mobile ? Math.min(1, width / 960, height / 540) : 1;
+  canvas.width = Math.round(width / scale);
+  canvas.height = Math.round(height / scale);
   if (battleSceneActive) draw();
 }
 window.addEventListener('resize', resize);
@@ -101,7 +108,7 @@ let lootBags = [], runLoot = [], seedBags = [], runSeed = 0, rerollCount = 0, de
 let fieldItems = [], fieldMagnetTimer = 0;
 const keys = {};
 window.addEventListener('keydown', e => {
-  if (!battleSceneActive) return;
+  if (!battleSceneActive || MobileControls.portrait) return;
   keys[e.code] = true;
   if (gameOver && e.code === 'KeyR') { returnFromBattleToTown(); return; }
   if (!gameOver && (e.code === 'Escape' || e.code === 'KeyP') && document.getElementById('levelModal').style.display !== 'flex') {
@@ -130,8 +137,8 @@ let battleClickTarget = null;
 
 function recordBattleMousePos(e) {
   const rect = canvas.getBoundingClientRect();
-  mouseScreenX = e.clientX - rect.left;
-  mouseScreenY = e.clientY - rect.top;
+  mouseScreenX = (e.clientX - rect.left) * canvas.width / rect.width;
+  mouseScreenY = (e.clientY - rect.top) * canvas.height / rect.height;
   battleClickTarget = {
     x: player.x + (mouseScreenX - canvas.width / 2),
     y: player.y + (mouseScreenY - canvas.height / 2)
@@ -139,7 +146,7 @@ function recordBattleMousePos(e) {
 }
 
 canvas.addEventListener('mousedown', e => {
-  if (e.button !== 0 || !battleSceneActive || isPaused || gameOver) return;
+  if (e.button !== 0 || e.sourceCapabilities?.firesTouchEvents || !battleSceneActive || isPaused || gameOver || MobileControls.portrait) return;
   e.preventDefault();
   isMouseMoving = true;
   recordBattleMousePos(e);
@@ -189,6 +196,12 @@ function update(dt) {
 
   let mx = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0);
   let my = (keys.KeyS || keys.ArrowDown ? 1 : 0) - (keys.KeyW || keys.ArrowUp ? 1 : 0);
+  const touch = MobileControls.movement;
+  if (touch.active) {
+    mx = touch.x; my = touch.y;
+    isMouseMoving = false;
+    battleClickTarget = null;
+  }
   if (isMouseMoving) {
     battleClickTarget = {
       x: player.x + (mouseScreenX - canvas.width / 2),
@@ -198,7 +211,7 @@ function update(dt) {
   if (mx || my) {
     isMouseMoving = false;
     battleClickTarget = null;
-    const l = Math.hypot(mx, my);
+    const l = touch.active ? 1 : Math.hypot(mx, my);
     player.x += (mx / l) * player.baseSpeed * player.speedMult * dt;
     player.y += (my / l) * player.baseSpeed * player.speedMult * dt;
     player.lastMoveAngle = Math.atan2(my, mx);
@@ -269,6 +282,7 @@ function cancelBattleFrame() {
 }
 
 function resetBattleRun() {
+  MobileControls.clear(true);
   cancelBattleFrame();
   battleSceneActive = false;
   isPaused = true;
@@ -304,6 +318,7 @@ function leaveBattleScene() {
 
 function setBattlePaused(paused) {
   isPaused = paused;
+  if (paused) MobileControls.clear(true);
   if (paused || !battleSceneActive || gameOver) {
     cancelBattleFrame();
     if (battleSceneActive && !updatingBattleFrame) draw();

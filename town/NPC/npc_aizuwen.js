@@ -6,6 +6,7 @@ function openNpcModalShell(title, subtitle, accentColor, bodyHtml) {
     const overlay = document.getElementById('npc-modal-overlay');
     const box = document.getElementById('npc-modal-box');
     if (!overlay || !box) return;
+    MobileControls.clear(true);
     box.style.borderColor = accentColor || '#facc15';
     box.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #334155;padding-bottom:10px;margin-bottom:12px;">

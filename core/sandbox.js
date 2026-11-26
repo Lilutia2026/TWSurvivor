@@ -128,6 +128,7 @@ const SANDBOX_STATE = {
     if (battleSceneActive || !startBattle(undefined, undefined, { sandbox: true })) return;
     leaveTownClad();
     resetSandboxState(true);
+    if (MobileControls.enabled) SANDBOX_STATE.panelCollapsed = true;
     spawnSandboxDummy('normal', 160, 0);
     renderSandboxPanel();
     updateSandboxHud();

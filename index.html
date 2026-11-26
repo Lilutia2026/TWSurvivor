@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>天翼之鍊倖存者</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: "Microsoft JhengHei", sans-serif; user-select: none; }
@@ -67,6 +67,7 @@
       .login-roster { grid-template-columns: repeat(4, minmax(0, 1fr)); }
     }
   </style>
+  <link rel="stylesheet" href="styles/mobile.css" />
 </head>
 <body>
     <!-- ==================== 1. 登入與角色選擇頁面 (town/login.js) ==================== -->
@@ -111,22 +112,23 @@
 <div id="town-clad-view" style="display:none;position:fixed;inset:0;background:#0b1120;z-index:850;flex-direction:column;align-items:center;justify-content:center;">
   <div id="town-header-status" style="width:100%;max-width:1280px;padding:10px 16px;background:#1e293b;border-bottom:1px solid #334155;color:#f8fafc;font-size:14px;display:flex;align-items:center;flex-wrap:wrap;"></div>
   <canvas id="town-canvas" width="1280" height="820" style="width:100%;max-width:1280px;max-height:calc(100vh - 52px);background:#14281d;border:1px solid #334155;cursor:pointer;"></canvas>
+  <button id="mobile-town-interact" class="mobile-action" type="button" hidden></button>
 </div>
 
 <!-- ==================== 3. 傳送門：雙欄關卡出征與難度選擇頁面 (town/stage_select.js) ==================== -->
 <div id="stage-select-view" style="display:none;position:fixed;inset:0;background:rgba(9,13,26,0.92);z-index:880;flex-direction:column;align-items:center;justify-content:center;color:#f8fafc;padding:16px;">
-  <div style="width:100%;max-width:980px;background:#1e293b;border:2px solid #38bdf8;border-radius:14px;padding:18px;box-shadow:0 12px 36px rgba(0,0,0,0.65);">
-      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #334155;padding-bottom:10px;margin-bottom:12px;">
-          <div style="display:flex;align-items:center;gap:12px;">
-              <h2 style="margin:0;font-size:20px;color:#38bdf8;">🌌 雷蒂亞精靈傳送門 — 遠征地圖</h2>
+  <div class="stage-shell" style="width:100%;max-width:980px;background:#1e293b;border:2px solid #38bdf8;border-radius:14px;padding:18px;box-shadow:0 12px 36px rgba(0,0,0,0.65);">
+      <div class="stage-header" style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #334155;padding-bottom:10px;margin-bottom:12px;">
+          <div class="stage-heading" style="display:flex;align-items:center;gap:12px;">
+              <h2 style="margin:0;font-size:20px;color:#38bdf8;">🌌 雷蒂亞精靈傳送門 <span class="stage-header-extra">— 遠征地圖</span></h2>
               <span id="stage-player-summary" style="font-size:13px;color:#cbd5e1;background:#0f172a;padding:4px 12px;border-radius:99px;border:1px solid #334155;"></span>
           </div>
           <div style="display:flex;gap:6px;align-items:center;">
               <button type="button" class="music-toggle" data-music-toggle onclick="AudioManager.toggle()">🔊 音樂開</button>
-              <button onclick="closeStageSelectPage()" style="padding:6px 14px;background:#334155;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:bold;">⬅ 返回雷蒂亞村莊</button>
+              <button class="stage-back" type="button" onclick="closeStageSelectPage()" style="padding:6px 14px;background:#334155;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:bold;">⬅ 返回雷蒂亞<span class="stage-header-extra">村莊</span></button>
           </div>
       </div>
-      <div style="display:flex;gap:16px;min-height:440px;max-height:74vh;">
+      <div class="stage-body" style="display:flex;gap:16px;min-height:440px;max-height:74vh;">
           <!-- 左側：關卡清單 -->
           <div id="stage-cards-container" style="width:300px;flex-shrink:0;display:flex;flex-direction:column;gap:8px;overflow-y:auto;padding-right:4px;"></div>
           <!-- 右側：關卡詳細情報與 4 階難度按鈕 -->
@@ -146,18 +148,19 @@
     <div class="hud-box" style="text-align:right;font-size:13px;line-height:1.5;">
       <div id="timeText" style="font-size:18px;font-weight:bold;color:#fde047;">00:00</div>
       <div>擊殺：<strong id="killText">0</strong> ｜ 連擊：<strong id="comboText">0</strong></div>
-      <div style="font-size:11px;color:#94a3b8;">[ESC/P]角色狀態 [L]升級 [B]精英王 [G]狂暴王 [T]+1分</div>
+      <div class="battle-keyboard-help" style="font-size:11px;color:#94a3b8;">[ESC/P]角色狀態 [L]升級 [B]精英王 [G]狂暴王 [T]+1分</div>
       <button type="button" class="music-toggle" data-music-toggle onclick="AudioManager.toggle()">🔊 音樂開</button>
+      <button id="mobile-battle-pause" class="mobile-action" type="button" onclick="togglePause()">暫停</button>
     </div>
   </div>
   <div id="banner"></div>
    <!-- 升級選卡視窗 -->
-   <div id="levelModal" class="modal">
+   <div id="levelModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="levelTitle">
     <div class="panel" style="max-width:780px;">
-      <h2 style="color:#fde047;text-align:center;">✨ 選擇強化</h2>
+      <h2 id="levelTitle" style="color:#fde047;text-align:center;">✨ 選擇強化</h2>
       <div id="modalSub" style="text-align:center;font-size:13px;color:#94a3b8;margin-top:4px;">點擊一張卡片，或按鍵盤 1 / 2 / 3</div>
       <div id="cardContainer" class="card-grid"></div>
-      <div style="text-align:center;margin-top:14px;">
+      <div class="level-actions" style="text-align:center;margin-top:14px;">
         <button id="rerollCardBtn" onclick="rerollUpgradeChoices()" style="padding:7px 18px;font-size:13px;font-weight:bold;background:#1e293b;color:#fde047;border:1.5px solid #eab308;border-radius:8px;cursor:pointer;">
           🎲 刷新卡片（30 Seed｜剩餘 3 次）
         </button>
@@ -170,16 +173,21 @@
     <div class="panel" style="max-width:860px;">
       <h2 style="color:#fde047;text-align:center;">⏸ 遊戲暫停 — 角色即時狀態</h2>
       <div id="pauseContent" class="status-grid"></div>
-      <div style="display:flex;justify-content:center;gap:14px;margin-top:14px;">
+      <div class="pause-actions" style="display:flex;justify-content:center;gap:14px;margin-top:14px;">
         <button type="button" class="music-toggle" data-music-toggle onclick="AudioManager.toggle()">🔊 音樂開</button>
-        <button class="stat-btn" style="width:180px;height:36px;background:#22c55e;" onclick="togglePause()">▶ 繼續戰鬥 (ESC / P)</button>
+        <button class="stat-btn" style="width:180px;height:36px;background:#22c55e;" onclick="togglePause()">▶ 繼續戰鬥 <span class="battle-keyboard-help">(ESC / P)</span></button>
         <button id="abandonBattleBtn" class="stat-btn" style="width:190px;height:36px;background:#ef4444;color:#fff;" onclick="abandonBattle()">放棄戰鬥（撤退結算）</button>
       </div>
     </div>
   </div>
 
+  <canvas id="mobile-joystick" aria-hidden="true" hidden></canvas>
+  <div id="mobile-orientation" role="dialog" aria-modal="true" aria-labelledby="mobile-orientation-title" hidden>
+    <div><h2 id="mobile-orientation-title">請將手機橫置遊玩</h2><p>橫放後即可繼續操作。</p></div>
+  </div>
+
   <!-- 結算視窗 -->
-  <div id="endModal" class="modal">
+  <div id="endModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="endTitle">
     <div class="panel" style="max-width:520px;text-align:center;">
       <h2 id="endTitle" style="color:#fde047;">天翼斷裂</h2>
       <div id="endSummary" style="margin:14px 0;font-size:14px;line-height:1.7;"></div>
@@ -230,6 +238,7 @@
        <script src="core/loot.js"></script>
        <script src="core/render.js"></script>
        <script src="core/sandbox.js"></script>
+       <script src="core/mobile_controls.js"></script>
        <script src="core/game.js"></script>
    
              <!-- ==================== 5. 局外城鎮、選角、選關與獨立 NPC (town/) ==================== -->

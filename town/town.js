@@ -99,6 +99,8 @@ function enterTownClad(keepPos = false) {
     TOWN_STATE.player.targetY = null; 
     TOWN_STATE.player.walkTime = 0;
     TOWN_STATE.player.spriteAnimation = {};
+    TOWN_STATE.activeTarget = null;
+    MobileControls.setTownTarget(null);
 
     if (!TOWN_STATE.bgImg && TOWN_CLAD_MAP.bgImage) {
         const img = new Image();
@@ -118,6 +120,7 @@ function enterTownClad(keepPos = false) {
 // 離開雷蒂亞村莊
 function leaveTownClad() {
     TOWN_STATE.active = false;
+    MobileControls.clear(true);
     if (TOWN_STATE.rafId) {
         cancelAnimationFrame(TOWN_STATE.rafId);
         TOWN_STATE.rafId = null;
@@ -158,7 +161,7 @@ function syncTownViewportSize() {
 
 function bindTownEvents() {
     window.addEventListener('keydown', (e) => {
-        if (!TOWN_STATE.active) return;
+        if (!TOWN_STATE.active || MobileControls.portrait) return;
         const key = e.key.toLowerCase();
 
         // ESC 預設關閉所有市集對話視窗
@@ -203,7 +206,7 @@ function bindTownEvents() {
     };
 
     TOWN_STATE.canvas.addEventListener('mousedown', (e) => {
-        if (e.button !== 0 || !TOWN_STATE.active || isAnyTownModalOpen()) return;
+        if (e.button !== 0 || e.sourceCapabilities?.firesTouchEvents || !TOWN_STATE.active || MobileControls.portrait || isAnyTownModalOpen()) return;
         e.preventDefault();
         const { mx, my } = recordTownMousePos(e);
         for (const item of TOWN_CLAD_MAP.interactables) {
@@ -239,7 +242,7 @@ function townLoop(now) {
     if (!TOWN_STATE.active) return;
     const dt = Math.min(0.05, (now - TOWN_STATE.lastTime) / 1000);
     TOWN_STATE.lastTime = now;
-    if (TOWN_STATE.bgLoaded) updateTownPlayer(dt);
+    if (TOWN_STATE.bgLoaded && !MobileControls.portrait) updateTownPlayer(dt);
     drawTownScene();
     TOWN_STATE.rafId = requestAnimationFrame(townLoop);
 }
@@ -249,6 +252,12 @@ function updateTownPlayer(dt) {
     const p = TOWN_STATE.player, k = TOWN_STATE.keys;
     let dx = (k['d'] || k['arrowright'] ? 1 : 0) - (k['a'] || k['arrowleft'] ? 1 : 0);
     let dy = (k['s'] || k['arrowdown'] ? 1 : 0) - (k['w'] || k['arrowup'] ? 1 : 0);
+    const touch = MobileControls.movement;
+    if (touch.active) {
+        dx = touch.x; dy = touch.y;
+        TOWN_STATE.isMouseDown = false;
+        p.targetX = p.targetY = null;
+    }
 
     let nextX = p.x, nextY = p.y;
     p.vx = 0; p.vy = 0;
@@ -260,7 +269,7 @@ function updateTownPlayer(dt) {
     }
     if (dx !== 0 || dy !== 0) {
         TOWN_STATE.isMouseDown = false;
-        const len = Math.hypot(dx, dy);
+        const len = touch.active ? 1 : Math.hypot(dx, dy);
         p.vx = dx / len; p.vy = dy / len;
         nextX += p.vx * p.speed * dt;
         nextY += p.vy * p.speed * dt;
@@ -344,6 +353,7 @@ function updateTownPlayer(dt) {
         if (d <= item.radius && d < minDist) { minDist = d; nearest = item; }
     }
     TOWN_STATE.activeTarget = nearest;
+    if (MobileControls.enabled) MobileControls.setTownTarget(nearest);
 }
 
 function drawTownScene() {
@@ -416,7 +426,7 @@ function drawTownScene() {
             if (hi) {
                 ctx.fillStyle = '#0f172a'; ctx.strokeStyle = '#facc15'; ctx.lineWidth = 2;
                 ctx.beginPath(); ctx.roundRect(it.x - 52, it.y - 102, 104, 22, 6); ctx.fill(); ctx.stroke();
-                ctx.fillStyle = '#facc15'; ctx.font = 'bold 12px sans-serif'; ctx.fillText('[F] 互動開啟', it.x, it.y - 87);
+                ctx.fillStyle = '#facc15'; ctx.font = 'bold 12px sans-serif'; ctx.fillText(MobileControls.enabled ? '可互動' : '[F] 互動開啟', it.x, it.y - 87);
             }
         }
     }
@@ -472,7 +482,7 @@ function updateTownHeaderInfo() {
         `<button onclick="toggleTownShortcutModal('party')" style="${btnCss}border-color:#4ade80;color:#4ade80;">👥 組隊 [P]</button>` +
         `<button onclick="openTownMailbox()" style="${btnCss}border-color:#f59e0b;color:#fbbf24;">📬 信箱 (${mailLen})</button>` +
         `<button onclick="openTownCardPoolModal()" style="${btnCss}border-color:#a855f7;background:#581c87;color:#f3e8ff;">🃏 卡池</button>` +
-        `<button onclick="enterSandboxArena()" style="${btnCss}border-color:#0284c7;background:#0369a1;color:#fff;">🧪 木樁修鍊場</button>` +
+        `<button class="town-training" onclick="enterSandboxArena()" style="${btnCss}border-color:#0284c7;background:#0369a1;color:#fff;">🧪 木樁修鍊場</button>` +
         `<button onclick="logoutToCharacterSelect()" style="${btnCss}">🚪 登出</button>` +
         (stats ? `<span style="margin-left:10px;color:#94a3b8;font-size:11px;">本機試玩 ${stats.sessions} 人次・出征 ${stats.runs} 場・通關 ${stats.clears} 場</span>` : '');
     AudioManager.syncToggleButtons(el);

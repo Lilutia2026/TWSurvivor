@@ -43,12 +43,21 @@ function upgradeClassicHud() {
     b.textContent = text; b.style.display = 'block'; bannerTimer = 3.2;
   }
   
-  function renderChoiceModal(subText) {
+  function renderChoiceModal(subText, touchSubText = subText) {
     const box = document.getElementById('cardContainer'); box.innerHTML = '';
-    document.getElementById('modalSub').textContent = subText;
+    document.getElementById('modalSub').textContent = MobileControls.enabled ? touchSubText : subText;
     currentChoices.forEach((c, idx) => {
-      const div = document.createElement('div'); div.className = 'card'; div.onclick = () => selectUpgrade(idx);
+      const div = document.createElement('div');
+      div.className = 'card';
+      div.onclick = () => { if (!MobileControls.enabled) selectUpgrade(idx); };
       div.innerHTML = `<div class="card-key">按鍵 ${idx + 1}</div><div class="card-title">${c.title}</div><div class="card-desc">${c.desc}</div><div class="card-tag">${c.tag}</div>`;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'mobile-card-confirm';
+      button.textContent = '選擇';
+      button.setAttribute('aria-label', `選擇 ${div.querySelector('.card-title').textContent}`);
+      button.onclick = event => { event.stopPropagation(); selectUpgrade(idx); };
+      div.appendChild(button);
       box.appendChild(div);
     });
     document.getElementById('levelModal').style.display = 'flex';
@@ -145,7 +154,8 @@ function upgradeClassicHud() {
       ];
       if (!SANDBOX_STATE.active) currentChoices.push({ kind: 'seed', title: '💰 黃金種子袋（獲得 +50 Seed）', desc: '<strong style="color:#fde047;">▲ 局外錢包 Seed +50</strong>', tag: '資源農裝' });
       updateRerollButtonState(false);
-      renderChoiceModal(`目前等級 LV.${player.lv}（全技能滿級突破獎勵）｜ 按 ${SANDBOX_STATE.active ? '1' : '1 / 2'} 選擇`);
+      const subtitle = `目前等級 LV.${player.lv}（全技能滿級突破獎勵）`;
+      renderChoiceModal(`${subtitle}｜ 按 ${SANDBOX_STATE.active ? '1' : '1 / 2'} 選擇`, subtitle);
       return;
     }
 
@@ -308,7 +318,8 @@ function upgradeClassicHud() {
       });
       if (victoryVacuumActive) { selectUpgrade(0); return; }
       updateRerollButtonState(false);
-      renderChoiceModal('📦 開啟金色昇華寶箱！請選擇要昇華的技能（按 1 / 2 / 3）');
+      const subtitle = '📦 開啟金色昇華寶箱！請選擇要昇華的技能';
+      renderChoiceModal(`${subtitle}（按 1 / 2 / 3）`, subtitle);
       return;
     }
     player.hp = Math.min(player.maxHp, player.hp + 50);
@@ -326,8 +337,8 @@ function getSkillTooltipEl() {
     return tip;
   }
   
-  function showSkillTooltip(e, kind, id) {
-    const tip = getSkillTooltipEl();
+  function showSkillTooltip(e, kind, id, inlineTarget) {
+    const tip = inlineTarget || getSkillTooltipEl();
     if (kind === 'skill') {
       const sk = ACTIVE_SKILLS[id], st = ownedSkills[id];
       if (!sk || !st) return;
@@ -385,7 +396,10 @@ function getSkillTooltipEl() {
       if (!statTips[id]) return;
       tip.innerHTML = `<div style="color:#e2e8f0;">${statTips[id]}</div>`;
     }
-    tip.style.display = 'block'; moveSkillTooltip(e);
+    if (!inlineTarget) {
+      tip.style.display = 'block';
+      moveSkillTooltip(e);
+    }
   }
   
   function moveSkillTooltip(e) {
@@ -395,17 +409,34 @@ function getSkillTooltipEl() {
     tip.style.top = `${Math.max(10, Math.min(window.innerHeight - tip.offsetHeight - 14, e.clientY + 14))}px`;
   }
   function hideSkillTooltip() { const tip = document.getElementById('skillTooltip'); if (tip) tip.style.display = 'none'; }
+
+  function toggleMobileSkillDetail(event) {
+    if (!MobileControls.enabled) return;
+    const row = event.target.closest('[data-skill-detail]');
+    if (!row || (event.type === 'keydown' && !['Enter', ' '].includes(event.key))) return;
+    if (event.type === 'keydown') event.preventDefault();
+    const detail = row.nextElementSibling;
+    detail.hidden = !detail.hidden;
+    row.setAttribute('aria-expanded', String(!detail.hidden));
+    if (!detail.hidden) showSkillTooltip(event, row.dataset.skillDetail, row.dataset.skillId, detail);
+  }
+
+  document.getElementById('pauseContent').addEventListener('click', toggleMobileSkillDetail);
+  document.getElementById('pauseContent').addEventListener('keydown', toggleMobileSkillDetail);
   // [第 3 段：ESC 即時狀態面板 togglePause 與遊戲結算 endGame（接續第 238 行至檔案結尾）]
 function togglePause() {
-    if (!battleSceneActive || gameOver) return;
+    if (!battleSceneActive || gameOver || (isPaused && MobileControls.portrait)) return;
     hideSkillTooltip();
     const modal = document.getElementById('pauseModal');
     if (!isPaused) {
       setBattlePaused(true);
-      document.getElementById('abandonBattleBtn').textContent = SANDBOX_STATE.active ? '返回雷蒂亞' : '放棄戰鬥（撤退結算）';
+      const abandon = document.getElementById('abandonBattleBtn');
+      abandon.textContent = SANDBOX_STATE.active ? '返回雷蒂亞' : (victoryVacuumActive ? '正在回收戰利品' : '放棄戰鬥（撤退結算）');
+      abandon.disabled = victoryVacuumActive;
       const s = typeof getTotalStats === 'function' ? getTotalStats() : {};
       const cs = typeof getDerivedCombatStats === 'function' ? getDerivedCombatStats() : {};
       const activePassives = getActivePassivePool();
+      const touchDetailAttrs = MobileControls.enabled ? 'role="button" tabindex="0" aria-expanded="false"' : '';
       const twMeta = [{ key: 'S', label: 'STAB', color: '#fb923c' }, { key: 'H', label: 'HACK', color: '#f87171' }, { key: 'I', label: 'INT', color: '#38bdf8' }, { key: 'DEF', label: 'DEF', color: '#4ade80' }, { key: 'MR', label: 'MR', color: '#c084fc' }, { key: 'DEX', label: 'DEX', color: '#facc15' }, { key: 'AGI', label: 'AGI', color: '#2dd4bf' }];
       const statGridHtml = twMeta.map(m => {
         const tot = s[m.key] || 0, bas = typeof getNakedStat === 'function' ? getNakedStat(m.key) : tot, bonus = tot - bas;
@@ -441,14 +472,14 @@ function togglePause() {
         const curStatus = getSkillCurrentStatusText(k, sk, v.lv, isEvo);
         const statusOverflow = ['ice3', 'thunder3', 'holylight', 'holypoly', 'divinePrayer'].includes(k) ? '' : 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
         const dim = v.disabled ? 'opacity:0.4;filter:grayscale(1);border-color:#475569;' : (v.evolved ? 'border-color:#facc15;background:rgba(180,83,9,0.35);' : 'border-color:#38bdf8;background:rgba(15,23,42,0.85);');
-        return `<div style="cursor:help;display:flex;align-items:center;gap:10px;border:1.5px solid;${dim}border-radius:8px;padding:6px 10px;" onmouseenter="showSkillTooltip(event,'skill','${k}')" onmousemove="moveSkillTooltip(event)" onmouseleave="hideSkillTooltip()">
+        return `<div ${touchDetailAttrs} data-skill-detail="skill" data-skill-id="${k}" style="cursor:help;display:flex;align-items:center;gap:10px;border:1.5px solid;${dim}border-radius:8px;padding:6px 10px;" onmouseenter="showSkillTooltip(event,'skill','${k}')" onmousemove="moveSkillTooltip(event)" onmouseleave="hideSkillTooltip()">
           <div style="width:36px;height:36px;border-radius:6px;background:rgba(30,41,59,0.95);border:1px solid #475569;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">${iconChar}</div>
           <div style="flex:1;min-width:0;">
             <div style="display:flex;justify-content:space-between;align-items:center;"><strong style="font-size:13px;color:#fef08a;">${dispName}</strong><span style="font-size:11px;font-weight:bold;color:${isMax ? '#4ade80' : '#38bdf8'};">${lvText}</span></div>
             <div style="font-size:11px;color:#4ade80;margin-top:2px;${statusOverflow}">目前狀態：${curStatus}</div>
             <div style="font-size:11px;color:#cbd5e1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;">${sk.desc || ''}</div>
           </div>
-        </div>`;
+        </div><div class="mobile-skill-detail" hidden></div>`;
       }).join('');
   
       const passiveBadges = Object.entries(ownedPassives).map(([k, lv]) => {
@@ -457,19 +488,19 @@ function togglePause() {
         const cleanName = p.name.replace(iconChar, '').trim() || p.name;
         const isMax = lv >= (p.maxLv || 5);
         const curEffect = getPassiveGainText(k, lv) || p.desc;
-        return `<div style="cursor:help;display:flex;align-items:center;gap:10px;border:1px solid #475569;background:rgba(15,23,42,0.85);border-radius:8px;padding:6px 10px;" onmouseenter="showSkillTooltip(event,'passive','${k}')" onmousemove="moveSkillTooltip(event)" onmouseleave="hideSkillTooltip()">
+        return `<div ${touchDetailAttrs} data-skill-detail="passive" data-skill-id="${k}" style="cursor:help;display:flex;align-items:center;gap:10px;border:1px solid #475569;background:rgba(15,23,42,0.85);border-radius:8px;padding:6px 10px;" onmouseenter="showSkillTooltip(event,'passive','${k}')" onmousemove="moveSkillTooltip(event)" onmouseleave="hideSkillTooltip()">
           <div style="width:36px;height:36px;border-radius:6px;background:rgba(30,41,59,0.95);border:1px solid #475569;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">${iconChar}</div>
           <div style="flex:1;min-width:0;">
             <div style="display:flex;justify-content:space-between;align-items:center;"><strong style="font-size:13px;color:#e2e8f0;">${cleanName}</strong><span style="font-size:11px;font-weight:bold;color:${isMax ? '#4ade80' : '#94a3b8'};">${isMax ? 'MAX' : 'LV.' + lv + '/' + (p.maxLv || 5)}</span></div>
             <div style="font-size:11px;color:#4ade80;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;">${curEffect}</div>
           </div>
-        </div>`;
+        </div><div class="mobile-skill-detail" hidden></div>`;
       }).join('') || '<span style="color:#64748b;font-size:12px;">尚未習得輔助</span>';
   
       document.getElementById('pauseContent').innerHTML = `
         <div class="status-sec" style="border-color:#eab308;"><div style="display:flex;justify-content:space-between;margin-bottom:6px;"><strong style="color:#fef08a;font-size:14px;">${getCurrentCharData().name}</strong><strong style="color:#fde047;">LV.${player.lv} ｜ HP ${Math.ceil(player.hp)}/${player.maxHp}</strong></div><div style="display:flex;flex-direction:column;gap:3px;">${statGridHtml}</div></div>
-        <div class="status-sec"><h3>⚔️ 即時戰鬥面板總覽 <span style="font-size:11px;color:#94a3b8;font-weight:normal;">(移上查看說明)</span></h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:6px;">${combatGridHtml}</div></div>
-        <div class="status-sec"><h3>🔥 主動技能欄（${Object.keys(ownedSkills).length}/${MAX_ACTIVE_SKILLS}）</h3><div style="display:flex;flex-direction:column;gap:6px;margin-top:6px;">${skillBadges}</div></div>
+        <div class="status-sec"><h3>⚔️ 即時戰鬥面板總覽 <span class="battle-keyboard-help" style="font-size:11px;color:#94a3b8;font-weight:normal;">(移上查看說明)</span></h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:6px;">${combatGridHtml}</div></div>
+        <div class="status-sec"><h3>🔥 主動技能欄（${Object.keys(ownedSkills).length}/${MAX_ACTIVE_SKILLS}）<span class="mobile-skill-help">點按看說明</span></h3><div style="display:flex;flex-direction:column;gap:6px;margin-top:6px;">${skillBadges}</div></div>
         <div class="status-sec"><h3>🔮 被動輔助欄（${Object.keys(ownedPassives).length}/${MAX_PASSIVE_SKILLS}）</h3><div style="display:flex;flex-direction:column;gap:6px;margin-top:6px;">${passiveBadges}</div></div>`;
         modal.style.display = 'flex';
       } else { modal.style.display = 'none'; setBattlePaused(false); }

@@ -1,0 +1,126 @@
+#mobile-battle-pause, #mobile-town-interact, #mobile-orientation, #mobile-joystick, .mobile-skill-help { display: none; }
+.mobile-card-confirm, .stage-first-clear { display: none; }
+
+.mobile-layout {
+  --screen-top: max(8px, env(safe-area-inset-top));
+  --screen-bottom: max(8px, env(safe-area-inset-bottom));
+  --screen-left: max(8px, env(safe-area-inset-left));
+  --screen-right: max(8px, env(safe-area-inset-right));
+}
+.mobile-layout #gameCanvas { width: 100vw; height: 100vh; height: 100dvh; }
+.mobile-layout #gameCanvas, .mobile-layout #town-canvas { touch-action: none; }
+.mobile-layout #mobile-joystick:not([hidden]) {
+  display: block; position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; pointer-events: none; z-index: 940;
+}
+.mobile-layout #mobile-orientation:not([hidden]) {
+  position: fixed; z-index: 12000; inset: 0; display: grid; place-items: center; padding: 20px;
+  background: rgba(9, 18, 26, .96); text-align: center;
+}
+#mobile-orientation > div { border: 1px solid #52665f; border-radius: 12px; padding: 20px; background: #17242c; }
+#mobile-orientation p { margin-top: 8px; color: #c4d2cb; }
+.mobile-layout .mobile-action {
+  min-height: 44px; padding: 6px 12px; border: 1px solid #668e94; border-radius: 8px;
+  background: #152a35; color: #ecf8fa; font-size: 13px; font-weight: 700; pointer-events: auto;
+}
+.mobile-layout #mobile-battle-pause { display: inline-block; margin-left: 4px; }
+.mobile-layout #mobile-town-interact:not([hidden]) {
+  display: block; position: absolute; bottom: var(--screen-bottom); right: var(--screen-right);
+}
+
+.mobile-layout #login-select-view { padding: var(--screen-top) var(--screen-right) var(--screen-bottom) var(--screen-left); }
+.mobile-layout .login-layout { gap: 8px; }
+.mobile-layout .login-layout h1 { font-size: 22px; }
+.mobile-layout .login-game-title { font-size: 11px; margin-bottom: 2px; }
+.mobile-layout .login-showcase { grid-template-columns: minmax(0, 1.35fr) minmax(170px, 1fr); }
+.mobile-layout .login-stage { min-height: clamp(112px, 45dvh, 250px); }
+.mobile-layout .login-character-info { border-top: 0; border-left: 1px solid #3e4d4b; gap: 5px; padding: 8px 12px; }
+.mobile-layout .login-character-info h2 { font-size: clamp(16px, 3vw, 22px); }
+.mobile-layout .login-character-title { font-size: 11px; }
+.mobile-layout .login-variants { gap: 4px; }
+.mobile-layout .login-variant { min-height: 36px; padding: 4px 8px; }
+.mobile-layout #login-enter-town { min-height: 44px; margin-top: 0; padding: 5px 12px; }
+.mobile-layout .login-roster { grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 4px; }
+.mobile-layout .login-roster-button { min-height: 48px; padding: 4px 2px; gap: 3px; }
+.mobile-layout .login-avatar { width: 23px; font-size: 13px; }
+.mobile-layout .login-roster-name { font-size: 10px; }
+
+.mobile-layout #town-header-status {
+  flex: none; flex-wrap: nowrap !important; gap: 5px; white-space: nowrap; overflow-x: auto;
+  padding: var(--screen-top) var(--screen-right) 4px var(--screen-left) !important;
+}
+.mobile-layout #town-header-status > * { flex: none; }
+.mobile-layout #town-header-status button { min-height: 40px; }
+.mobile-layout #town-header-status .town-training { order: -1; }
+.mobile-layout #town-canvas { flex: 1; min-height: 0; }
+
+.mobile-layout #hud { top: var(--screen-top); left: var(--screen-left); right: var(--screen-right); align-items: flex-start; }
+.mobile-layout #hud .hud-box { padding: 5px 7px; }
+.mobile-layout #hud .hud-box:first-child { width: min(240px, 48vw) !important; pointer-events: none !important; }
+.mobile-layout #hud .hud-box:last-child { display: flex; align-items: center; gap: 5px; max-width: 50vw; }
+.mobile-layout #hudCharName, .mobile-layout #weaponText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mobile-layout #hudCharName { font-size: 11px; }
+.mobile-layout #weaponText { max-width: 43%; }
+.mobile-layout #hud .hud-box:last-child > :nth-child(2), .mobile-layout .battle-keyboard-help { display: none; }
+.mobile-layout #skillList { display: none !important; }
+.mobile-layout #timeText { font-variant-numeric: tabular-nums; font-size: 15px !important; }
+.mobile-layout #banner { top: 65px; max-width: 80vw; padding: 6px 12px; font-size: 12px; pointer-events: none; }
+.mobile-layout #sandboxControlPanel { top: auto !important; bottom: var(--screen-bottom); right: var(--screen-right) !important; }
+.mobile-layout #sandboxControlPanel button, .mobile-layout #sandboxControlPanel select { min-height: 34px; }
+.mobile-layout #sandboxDpsBox { display: none; }
+.mobile-layout .panel, .mobile-layout #npc-modal-box { max-height: calc(100dvh - var(--screen-top) - var(--screen-bottom)); overflow-y: auto; }
+.mobile-layout #npc-modal-box button { min-height: 40px; }
+.mobile-layout #pauseModal .panel { padding: 10px; }
+.mobile-layout #pauseModal h2 { font-size: 17px; }
+.mobile-layout #pauseContent { gap: 7px; }
+.mobile-layout #pauseContent .status-sec { padding: 7px; }
+.mobile-layout #pauseContent .status-sec:nth-child(3), .mobile-layout #pauseContent .status-sec:nth-child(4) { order: -1; }
+.mobile-layout .mobile-skill-help { display: inline; color: #b5c7da; font-size: 11px; font-weight: normal; margin-left: 5px; }
+.mobile-layout .pause-actions { position: sticky; bottom: -10px; flex-wrap: wrap; gap: 5px !important; background: #1e293b; padding: 5px 0; }
+.mobile-layout .pause-actions button { min-height: 44px; width: auto !important; padding-inline: 10px; }
+.mobile-layout [data-skill-detail] { min-height: 44px; }
+.mobile-layout .mobile-skill-detail { padding: 8px; border: 1px solid #526b85; border-radius: 6px; color: #e2e8f0; font-size: 12px; }
+.mobile-layout #skillTooltip { display: none !important; }
+.mobile-layout #levelModal .panel { display: flex; flex-direction: column; overflow: hidden; padding: 10px; }
+.mobile-layout #levelModal .panel h2 { font-size: 17px; }
+.mobile-layout #cardContainer { min-height: 0; overflow-y: auto; gap: 7px; margin-top: 7px; }
+.mobile-layout #levelModal .card { display: flex; flex-direction: column; min-width: 0; gap: 4px; padding: 7px; cursor: default; }
+.mobile-layout #levelModal .card:hover { transform: none; }
+.mobile-layout #levelModal .card-key { display: none; }
+.mobile-layout #levelModal .card-title, .mobile-layout #levelModal .card-tag { margin: 0; }
+.mobile-layout #levelModal .card-tag { padding-bottom: 3px; }
+.mobile-layout .mobile-card-confirm { display: block; min-height: 44px; margin-top: auto; background: #13567a; color: #f1f9ff; border: 1px solid #69b6d8; border-radius: 7px; font-weight: 700; }
+.mobile-layout .level-actions { flex: none; margin-top: 6px !important; }
+.mobile-layout #rerollCardBtn, .mobile-layout #endModal button { min-height: 44px; }
+.mobile-layout #endModal .panel { padding: 12px; }
+.mobile-layout #endTitle { font-size: clamp(18px, 3vw, 23px); }
+.mobile-layout #endSummary { line-height: 1.6 !important; margin: 7px 0 12px !important; }
+
+.mobile-layout #stage-select-view { padding: var(--screen-top) var(--screen-right) var(--screen-bottom) var(--screen-left) !important; }
+.mobile-layout .stage-shell {
+  display: flex; flex-direction: column; padding: 8px !important;
+  max-height: calc(100dvh - var(--screen-top) - var(--screen-bottom));
+}
+.mobile-layout .stage-header { gap: 8px; flex: none; padding-bottom: 5px !important; margin-bottom: 6px !important; }
+.mobile-layout .stage-heading { flex-wrap: wrap; gap: 4px !important; }
+.mobile-layout .stage-heading h2 { font-size: 17px !important; }
+.mobile-layout .stage-header-extra, .mobile-layout .stage-card .stage-card-boss { display: none !important; }
+.mobile-layout .stage-back, .mobile-layout .stage-difficulty, .mobile-layout .stage-launch button { min-height: 44px; }
+.mobile-layout .stage-back { white-space: nowrap; padding: 5px 9px !important; }
+.mobile-layout .stage-body { min-height: 0 !important; max-height: none !important; gap: 8px !important; }
+.mobile-layout #stage-cards-container { width: clamp(122px, 25vw, 190px) !important; }
+.mobile-layout .stage-card { padding: 7px !important; }
+.mobile-layout .stage-card-name { flex-wrap: wrap; gap: 3px; }
+.mobile-layout .stage-card-name > span:nth-child(2) { white-space: nowrap; }
+.mobile-layout #stage-detail-panel { min-width: 0; min-height: 0; padding: 7px !important; overflow: hidden !important; }
+.mobile-layout .stage-details { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; }
+.mobile-layout .stage-details > div { flex: none; margin-bottom: 6px !important; padding: 6px 8px !important; }
+.mobile-layout .stage-intro { order: -2; }
+.mobile-layout .stage-intro h3 { font-size: 17px !important; margin: 2px 0 !important; }
+.mobile-layout .stage-options { order: -1; }
+.mobile-layout .stage-options-label > span:nth-child(2) { display: none; }
+.mobile-layout .stage-difficulty-list { display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px !important; }
+.mobile-layout .stage-difficulty { gap: 2px !important; font-size: 12px !important; padding: 4px 2px !important; }
+.mobile-layout .stage-rates { flex-wrap: wrap; gap: 3px 8px; }
+.mobile-layout .stage-first-clear { display: block; font-size: 11px; color: #fde68a; text-align: right; }
+.mobile-layout .stage-launch { flex: none; padding-top: 5px; }
+.mobile-layout .stage-launch button { padding: 6px 9px !important; font-size: 14px !important; }
