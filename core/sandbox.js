@@ -192,7 +192,7 @@ function maxAllOwnedSandboxSkills() {
     if (typeof showBanner === 'function') showBanner('📈 已將所有已持有主動技提升至滿級！');
   }
   
-  // 一鍵觸發所有可昇華技能的超武昇華
+  // 一鍵觸發所有可昇華技能的測試昇華
   function evolveAllSandboxSkills() {
     if (!SANDBOX_STATE.active || typeof ownedSkills === 'undefined') return;
     let count = 0;
@@ -209,7 +209,7 @@ function maxAllOwnedSandboxSkills() {
       count++;
     }
     if (typeof showBanner === 'function') {
-      showBanner(count > 0 ? `🌟 已強制完成 ${count} 項超武昇華！` : '⚠️ 目前沒有可昇華的基礎技能（請先從下方選單添加）');
+      showBanner(count > 0 ? `🌟 已強制完成 ${count} 項技能昇華！` : '⚠️ 目前沒有可昇華的基礎技能（請先從下方選單添加）');
     }
   }
   
@@ -451,7 +451,7 @@ function maxAllOwnedSandboxSkills() {
   
         <div style="border-top:1px solid #334155;padding-top:5px;display:grid;grid-template-columns:1fr 1fr;gap:4px;">
           <button onclick="maxAllOwnedSandboxSkills()" style="padding:5px;background:#0369a1;color:#fff;border:none;border-radius:5px;font-weight:bold;cursor:pointer;">📈 技能滿級</button>
-          <button onclick="evolveAllSandboxSkills()" style="padding:5px;background:#b45309;color:#fef08a;border:none;border-radius:5px;font-weight:bold;cursor:pointer;">🌟 超武昇華</button>
+          <button onclick="evolveAllSandboxSkills()" style="padding:5px;background:#b45309;color:#fef08a;border:none;border-radius:5px;font-weight:bold;cursor:pointer;">🌟 技能昇華</button>
         </div>
   
                 <div style="border-top:1px solid #334155;padding-top:5px;">

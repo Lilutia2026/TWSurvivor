@@ -298,7 +298,7 @@ function getPassiveGainText(id, lv) {
       parts.push(`自身 360° 火龍（半徑 ${rPx}px）${lv >= 3 ? 4 : 3} 段重擊｜擊殺【點燃】觸發紅蓮爆碎`);
     }
     if (id === 'red_dragon_sky') parts.push(`喚出 ${lv >= 3 ? 3 : 2} 條赤蓮神龍範圍轟炸`);
-    if (isEvo && !sk.isSuperWeapon) parts.push('超武昇華增傷 +45%');
+    if (isEvo && !sk.isSuperWeapon) parts.push('昇華增傷 +45%');
   
     return parts.length > 0 ? parts.join(' ｜ ') : '基礎初始狀態（LV.1）';
   }

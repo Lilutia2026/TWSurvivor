@@ -2,15 +2,15 @@
 const LUCIEN_PASSIVES = {
   fastsword: {
     name: '⚡ 萊格藍治快劍術', reqChar: ['lucien'], skillTags: ['lucien_unique'], maxLv: 5,
-    desc: '每級連擊觸發率 +2.5%、全技能冷卻縮減 +3%（可昇華極光刺刃）'
+    desc: '每級連擊觸發率 +2.5%、全技能冷卻縮減 +3%'
   },
   guard: {
     name: '🛡️ 萊格藍治之護', reqChar: ['lucien'], skillTags: ['lucien_unique'], maxLv: 5,
-    desc: '每級物理（碰撞）減傷 +3%、魔法（射彈）減傷 +1.5%（可昇華連牙斬）'
+    desc: '每級物理（碰撞）減傷 +3%、魔法（射彈）減傷 +1.5%'
   },
   dualMastery: {
     name: '⚔️ 劍刀雙修', reqChar: ['lucien'], skillTags: ['lucien_unique'], maxLv: 5,
-    desc: '每級物理技能無視抗性 +3%；同時持有劍技與刀技時物理傷害 +2%（可昇華閃空烈破）'
+    desc: '每級物理技能無視抗性 +3%；同時持有劍技與刀技時物理傷害 +2%'
   },
   speedUp: {
     name: '🌪️ 疾速術', reqChar: ['lucien'], skillTags: ['lucien_unique'], maxLv: 5,
@@ -23,7 +23,7 @@ const LUCIEN_PASSIVES = {
 };
 
 const LUCIEN_SKILLS = {
-  // === 物理劍刀基礎主動池（全劍可選，超武依武器型態唯一鎖定） ===
+  // === 物理劍刀基礎主動池（全劍可選，昇華依武器型態鎖定） ===
   aurorathrust: {
     name: '極光刺刃', icon: '🗡️', evoName: '極光雷閃刺', evoIcon: '⚡',
     reqChar: ['lucien'], skillTags: ['sword_art'], reqWeaponTypes: ['rapier', 'blade', 'longsword'],
@@ -55,7 +55,7 @@ const LUCIEN_SKILLS = {
     baseDmg: 20, perLv: 7, baseCd: 1.45, canEvolve: false,
     desc: '【刀技・物理・H・近戰・範圍】以自身為中心 360° 迴旋揮斬橫掃周身敵群。'
   },
-    // === 路西安一轉元素超武（一武器類型 ＝ 每局唯一超武；本質為物理劍刀技，需持有對應元素法術卡才啟動元素共鳴） ===
+    // === 路西安一轉元素昇華（每局依武器選定一條路線，持有對應元素法術才啟動共鳴） ===
     aurora_lightning: {
       name: '極光雷閃刺', icon: '⚡', reqChar: ['lucien'], skillTags: ['sword_art'], reqWeaponTypes: ['rapier'],
       isSuperWeapon: true, evoFrom: 'aurorathrust', resonancePartner: 'thunder1',

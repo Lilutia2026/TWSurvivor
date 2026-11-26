@@ -284,7 +284,7 @@ function getSkillRawDmg(id, lv, evolved) {
             damageTexts.push({ x: e.x, y: e.y - e.radius - 14, txt: `💰+${bonusSeed} Seed`, color: '#fde047', fontSize: 12, life: 0.65 });
           }
         }
-               // 已捨棄寶箱機制，超武昇華改由升級三選一金色昇華卡觸發
+               // 技能昇華由升級三選一的金色昇華卡觸發
 
         // 讀取當前關卡、難度與防炸魚等級補正
         const runCfg = window.ACTIVE_STAGE_RUN || null;

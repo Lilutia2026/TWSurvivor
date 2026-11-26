@@ -2,11 +2,11 @@
 const SIVELIN_PASSIVES = {
     powerCrest: {
       name: '🔥 力量紋章', reqChar: ['sivelin'], skillTags: ['sivelin_unique'], maxLv: 5,
-      desc: '每級全物理技能最終傷害 +8%（獨立乘區，滿級 +40%）；代價：物理減傷 -4%、魔法減傷 -3%（最低降至 0%）（槍超武昇華鑰匙）'
+      desc: '每級全物理技能最終傷害 +8%（獨立乘區，滿級 +40%）；代價：物理減傷 -4%、魔法減傷 -3%（最低降至 0%）'
     },
     crimsonHeart: {
       name: '🐉 紅蓮鬥氣', reqChar: ['sivelin'], skillTags: ['sivelin_unique'], maxLv: 5,
-      desc: '每級連擊觸發率 +2.5%；擊殺帶有【點燃】或【破甲】的敵人回復最大生命 0.4%（冷卻 0.5 秒）（棍超武昇華鑰匙）'
+      desc: '每級連擊觸發率 +2.5%；擊殺帶有【點燃】或【破甲】的敵人回復最大生命 0.4%（冷卻 0.5 秒）'
     },
     crimsonReaper: {
       name: '💀 真紅的死神', reqChar: ['sivelin'], skillTags: ['sivelin_unique'], maxLv: 5,
@@ -22,12 +22,12 @@ const SIVELIN_PASSIVES = {
     },
     bronzeBody: {
       name: '🛡️ 銅體', reqChar: ['sivelin'], skillTags: ['sivelin_unique'], reqJobTier: 2, maxLv: 5,
-      desc: '【二轉技能】每級物理（碰撞）減傷 +3%、最大生命值 +5%（二轉超武昇華鑰匙）'
+      desc: '【二轉技能】每級物理（碰撞）減傷 +3%、最大生命值 +5%'
     }
   };
   
   const SIVELIN_SKILLS = {
-    // === 希培林一轉基礎主動池（槍 spear / 棍 polearm 雙武器通用，超武依武器型態唯一鎖定） ===
+    // === 希培林一轉基礎主動池（槍 spear / 棍 polearm 雙武器通用，昇華依武器型態鎖定） ===
     sky_whirl_spear: {
       name: '迴天槍舞', icon: '🐉', evoName: '紅龍破嶽', evoIcon: '🐲',
       reqChar: ['sivelin'], skillTags: ['spear_art'], reqWeaponTypes: ['spear', 'polearm'],
@@ -56,7 +56,7 @@ const SIVELIN_PASSIVES = {
       reqChar: ['sivelin'], skillTags: ['spear_art'], reqWeaponTypes: ['spear', 'polearm'],
       type: 'physical', element: 'fire', statusTags: ['fire'], statTags: ['S', 'H'], behaviorTags: ['melee', 'aoe'], maxLv: 8,
       baseDmg: 24, perLv: 8, baseCd: 1.35, canEvolve: true, reqPassive: 'bronzeBody', reqJobTier: 1, evoSkillId: 'red_dragon_sky', disableWhenEvo: true,
-      evoDesc: '【二轉超武・物理・火・S+H・近戰・範圍】喚出赤蓮神龍騰空衝擊大範圍敵群並引發全屏烈焰震爆。',
+      evoDesc: '【二轉昇華・物理・火・S+H・近戰・範圍】喚出赤蓮神龍騰空衝擊大範圍敵群並引發全屏烈焰震爆。',
       desc: '【槍技・物理・火・S+H・近戰・範圍】近距離鎖定單一目標打出直擊，同時在目標周邊引發小範圍烈焰爆破，機率附加【點燃】。'
     },
     eight_whirl: {
@@ -67,7 +67,7 @@ const SIVELIN_PASSIVES = {
       desc: '【槍技・物理・S・近戰・範圍】以自身為中心 360° 旋轉長槍橫掃周身圓形範圍內所有敵人。'
     },
   
-    // === 希培林專屬超武（一轉槍／棍各一 ＋ 二轉預留一招） ===
+    // === 希培林專屬昇華（一轉槍／棍各一 ＋ 二轉預留一招） ===
     crimson_wave: {
       name: '紅龍破嶽', icon: '🐲', reqChar: ['sivelin'], skillTags: ['spear_art'], reqWeaponTypes: ['spear'],
       isSuperWeapon: true, evoFrom: 'sky_whirl_spear',
@@ -89,11 +89,10 @@ const SIVELIN_PASSIVES = {
       reqJobTier: 2, isSuperWeapon: true, evoFrom: 'flame_spear_dance',
       type: 'physical', element: 'fire', statusTags: ['fire'], statTags: ['S', 'H'], behaviorTags: ['melee', 'aoe'], maxLv: 3,
       baseDmg: 68, perLv: 22, baseCd: 1.80, canEvolve: false,
-      desc: '【二轉超武・物理・火・S+H・近戰・範圍】喚出雙重赤蓮神龍騰空衝擊大範圍敵群並引發全屏烈焰震爆，機率附加【點燃】。'
+      desc: '【二轉昇華・物理・火・S+H・近戰・範圍】喚出雙重赤蓮神龍騰空衝擊大範圍敵群並引發全屏烈焰震爆，機率附加【點燃】。'
     }
   };
   
   CHAR_SKILL_REGISTRY.sivelin = { passives: SIVELIN_PASSIVES, skills: SIVELIN_SKILLS };
   if (typeof registerGlobalPassives === 'function') registerGlobalPassives(SIVELIN_PASSIVES);
   if (typeof registerGlobalSkills === 'function') registerGlobalSkills(SIVELIN_SKILLS);
-  

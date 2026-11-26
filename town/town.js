@@ -488,22 +488,27 @@ function openTownCardPoolModal() {
     const typeLabel = wTypeNames[rawType] || rawType || '未知';
     const wName = w ? `${w.name} (${typeLabel}${w.wandElem ? '・' + w.wandElem : ''})` : '徒手';
 
-    const actEntries = Object.entries(actPool);
+    const evolutionRoutes = getSkillEvolutionRoutes(actPool, pasPool);
+    const actEntries = Object.entries(actPool).filter(([, sk]) => !sk.isSuperWeapon);
     const pasEntries = Object.entries(pasPool);
 
     const actHtml = actEntries.map(([id, sk]) => {
-        const badge = sk.isSuperWeapon ? '<span style="color:#facc15;font-size:11px;">[超武]</span>' : (sk.canEvolve ? '<span style="color:#38bdf8;font-size:11px;">[可昇華]</span>' : '');
-        return `<div style="padding:6px 8px;background:#0f172a;border-radius:6px;margin-bottom:5px;border-left:3px solid ${sk.isSuperWeapon ? '#facc15' : '#38bdf8'};">
+        const evolution = evolutionRoutes[id];
+        const badge = evolution ? '<span style="color:#38bdf8;font-size:11px;">[可昇華]</span>' : '';
+        return `<div style="padding:6px 8px;background:#0f172a;border-radius:6px;margin-bottom:5px;border-left:3px solid #38bdf8;">
             <div style="font-size:13px;font-weight:bold;color:#f8fafc;">${sk.icon || '✨'} ${sk.name} ${badge}</div>
             <div style="font-size:11px;color:#94a3b8;margin-top:2px;">${sk.desc || ''}</div>
+            ${evolution ? `<div style="font-size:11px;color:#facc15;margin-top:3px;">[昇華] ${evolution.name}</div>` : ''}
         </div>`;
     }).join('') || '<div style="color:#64748b;font-size:12px;">無可用主動技能</div>';
 
     const pasHtml = pasEntries.map(([id, p]) => {
         const isUnique = Array.isArray(p.reqChar) && p.reqChar.length > 0;
+        const evolves = actEntries.filter(([skillId, skill]) => evolutionRoutes[skillId] && skill.reqPassive === id).map(([, skill]) => skill.name);
         return `<div style="padding:6px 8px;background:#0f172a;border-radius:6px;margin-bottom:5px;border-left:3px solid ${isUnique ? '#c084fc' : '#4ade80'};">
             <div style="font-size:13px;font-weight:bold;color:${isUnique ? '#e9d5ff' : '#f8fafc'};">${p.name} ${isUnique ? '<span style="color:#c084fc;font-size:11px;">[專屬]</span>' : ''}</div>
             <div style="font-size:11px;color:#94a3b8;margin-top:2px;">${p.desc || ''}</div>
+            ${evolves.length ? `<div style="font-size:11px;color:#facc15;margin-top:3px;">昇華前置｜${evolves.join('、')}</div>` : ''}
         </div>`;
     }).join('') || '<div style="color:#64748b;font-size:12px;">無可用被動卡片</div>';
 

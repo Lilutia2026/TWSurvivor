@@ -26,7 +26,7 @@ const LIGHT_VORTEX_DESCRIPTION = '【白魔術・魔法・MR・範圍・領域�
 const LIGHT_VORTEX_RESONANCE = '對已有 3 層【聖印】的敵人造成傷害時，有機率引爆聖印，追加淨化傷害。';
 
 const TICHIEL_SKILLS = {
-  // === 法杖（MR）＆ 權杖／釘錘（DEF+H）雙向共用主動池（共 7 招，超武仍依武器型態唯一鎖定） ===
+  // === 法杖（MR）＆ 權杖／釘錘（DEF+H）雙向共用主動池（共 7 招，昇華依武器型態鎖定） ===
   holylight: {
     name: '神聖之光', icon: '✨', reqChar: ['tichiel'], skillTags: ['staff_mace'], reqWeaponTypes: ['staff', 'mace'],
     type: 'magic', element: 'holy', statusTags: ['holy'], statTags: ['MR'], behaviorTags: ['ranged', 'projectile'], maxLv: 10,

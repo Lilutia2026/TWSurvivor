@@ -36,7 +36,7 @@ function initEnemyStatus(enemy) {
   enemy.stunTimer = 0;
 }
 
-// 動態掃描角色當前持有的超武／客製共鳴等級（0 = 未覺醒，1 ~ 5 = 超武等級）
+// 動態掃描角色當前持有的昇華技能／客製共鳴等級（0 = 未昇華）
 function getAwakenedTier(elem) {
   const tag = normalizeStatusTag(elem);
   if (typeof ownedSkills === 'undefined' || typeof ACTIVE_SKILLS === 'undefined') return 0;

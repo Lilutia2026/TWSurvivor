@@ -1,5 +1,5 @@
 // ============================================================================
-// core/ui_battle.js — 局內 HUD、升級三選一、寶箱超武昇華、ESC 面板與 Tooltip
+// systems/ui_battle.js — 局內 HUD、升級三選一、技能昇華、ESC 面板與 Tooltip
 // ============================================================================
 
 // [第 1 段：戰鬥 HUD 初始化、升級三選一與寶箱昇華（第 1 ～ 165 行）]
@@ -58,9 +58,9 @@ function upgradeClassicHud() {
     return !isFirstStageBalanceTrial() || gameTime >= 600;
   }
 
-  function getMainRouteCards(pool, signatureId) {
-    for (const [id, skill] of Object.entries(ACTIVE_SKILLS)) {
-      if (!skill.canEvolve) continue;
+  function getMainRouteCards(pool, signatureId, evolutionRoutes) {
+    for (const id of Object.keys(evolutionRoutes)) {
+      const skill = ACTIVE_SKILLS[id];
       const path = [{ id, level: skill.maxLv || 10 }];
       let step = skill;
       while (path[0].id !== signatureId && step.reqSkill && ACTIVE_SKILLS[step.reqSkill]) {
@@ -83,16 +83,16 @@ function upgradeClassicHud() {
     if (!isReroll) routeOffer = null;
     const pool = [], activePassives = getActivePassivePool();
     const hasAngel = !!ownedPassives.angelWish;
+    const evolutionRoutes = getSkillEvolutionRoutes(ACTIVE_SKILLS, activePassives);
+    const evolutionTimeReached = canOfferBattleEvolution();
     const passiveToSkillMap = {};
-    for (const skObj of Object.values(ACTIVE_SKILLS)) {
-      if (skObj.canEvolve && skObj.reqPassive) passiveToSkillMap[skObj.reqPassive] = skObj.name;
+    for (const id of Object.keys(evolutionRoutes)) {
+      const skill = ACTIVE_SKILLS[id];
+      passiveToSkillMap[skill.reqPassive] = skill.name;
     }
   
     const curW = (typeof saveData !== 'undefined' && saveData.equip) ? saveData.equip.weapon : null;
-    const curWType = curW ? curW.type : null;
-    const curCharId = (typeof saveData !== 'undefined' && saveData.charId) ? saveData.charId : 'lucien';
     const sigSkill = typeof getWeaponSignatureSkill === 'function' ? getWeaponSignatureSkill(curW) : (curW ? curW.startSkill : null);
-    const isSwordType = new Array('longsword', 'blade', 'rapier', 'tachi', 'greatsword', 'spear', 'polearm').includes(curWType);
 
     for (const [k, sk] of Object.entries(ACTIVE_SKILLS)) {
       if (sk.isSuperWeapon && !ownedSkills[k]) continue;
@@ -101,30 +101,18 @@ function upgradeClassicHud() {
       const o = ownedSkills[k], maxL = sk.maxLv || 10;
 
       // 滿級、專屬被動與適用武器皆符合時，昇華卡以高權重入池。
-      if (canOfferBattleEvolution() && o && !o.disabled && !o.evolved && o.lv >= maxL && sk.canEvolve && sk.reqPassive && ownedPassives[sk.reqPassive]) {
-        const charEvo = (sk.evoByChar && sk.evoByChar[curCharId]) ? sk.evoByChar[curCharId] : null;
-        const targetEvoId = charEvo ? charEvo.evoSkillId : sk.evoSkillId;
-        const evoSk = targetEvoId ? (ACTIVE_SKILLS[targetEvoId] || (typeof GLOBAL_SKILL_POOL !== 'undefined' ? GLOBAL_SKILL_POOL[targetEvoId] : null)) : null;
-        const allowedWeapons = (evoSk && Array.isArray(evoSk.reqWeaponTypes)) ? evoSk.reqWeaponTypes
-          : (Array.isArray(sk.reqWeaponTypes) ? sk.reqWeaponTypes : (sk.reqWeaponType ? new Array(sk.reqWeaponType) : null));
-          const curTier = (typeof saveData !== 'undefined' && saveData.jobTier) ? saveData.jobTier : 1;
-          const jobTierOk = !evoSk || !evoSk.reqJobTier || curTier >= evoSk.reqJobTier;
-          const weaponOk = !allowedWeapons || !curWType || allowedWeapons.includes(curWType);
-          const swordOk = !isSwordType || !sigSkill || k === sigSkill;
-          if (jobTierOk && weaponOk && swordOk) { 
-          const titleName = charEvo ? charEvo.evoName : (sk.evoName || sk.name);
-          const cleanDesc = (evoSk && evoSk.desc) ? evoSk.desc : (sk.evoDesc || sk.desc);
-          pool.push({
-            kind: 'evolve',
-            id: k,
-            targetEvoId,
-            weight: 8.5,
-            title: `<span style="color:#facc15;">🌟 技能昇華【${titleName}】</span>`,
-            desc: `<strong style="color:#fde047;">★ 超武覺醒：</strong>${cleanDesc}`,
-            tag: '唯一超武昇華'
-          });
-          continue;
-        }
+      const evolution = evolutionRoutes[k];
+      if (evolutionTimeReached && evolution && o && !o.disabled && !o.evolved && o.lv >= maxL && ownedPassives[sk.reqPassive]) {
+        pool.push({
+          kind: 'evolve',
+          id: k,
+          targetEvoId: evolution.targetId,
+          weight: 8.5,
+          title: `<span style="color:#facc15;">🌟 技能昇華【${evolution.name}】</span>`,
+          desc: `<strong style="color:#fde047;">★ 昇華效果：</strong>${evolution.desc}`,
+          tag: '昇華技能'
+        });
+        continue;
       }
 
       if (o && !o.disabled && o.lv < maxL) {
@@ -176,7 +164,7 @@ function upgradeClassicHud() {
       tempPool.splice(pickedIdx, 1);
     }
     if (isFirstStageBalanceTrial()) {
-      const routeCards = getMainRouteCards(pool, sigSkill);
+      const routeCards = getMainRouteCards(pool, sigSkill, evolutionRoutes);
       if (routeCards.length) {
         const hasRouteCard = currentChoices.some(card => routeCards.includes(card));
         if (!hasRouteCard && routeUpgradeMisses >= 2) currentChoices[currentChoices.length - 1] = routeCards[0];
@@ -305,37 +293,18 @@ function upgradeClassicHud() {
       }
       return;
     }
-    const curW = (typeof saveData !== 'undefined' && saveData.equip) ? saveData.equip.weapon : null;
-    const curWType = curW ? curW.type : null;
-    const curCharId = (typeof saveData !== 'undefined' && saveData.charId) ? saveData.charId : 'lucien';
-    const sigSkill = typeof getWeaponSignatureSkill === 'function' ? getWeaponSignatureSkill(curW) : (curW ? curW.startSkill : null);
-    const isSwordType = ['longsword', 'blade', 'rapier', 'tachi', 'greatsword'].includes(curWType);
-
-    const ready = Object.entries(ownedSkills).filter(([k, st]) => {
-      const sk = ACTIVE_SKILLS[k];
-      if (!canOfferBattleEvolution() || !sk || !sk.canEvolve || st.evolved || st.disabled || st.lv < sk.maxLv) return false;
-      if (!sk.reqPassive || !ownedPassives[sk.reqPassive]) return false;
-      const charEvo = (sk.evoByChar && sk.evoByChar[curCharId]) ? sk.evoByChar[curCharId] : null;
-      const targetEvoId = charEvo ? charEvo.evoSkillId : sk.evoSkillId;
-      const evoSk = targetEvoId ? (ACTIVE_SKILLS[targetEvoId] || (typeof GLOBAL_SKILL_POOL !== 'undefined' ? GLOBAL_SKILL_POOL[targetEvoId] : null)) : null;
-      const allowedWeapons = (evoSk && Array.isArray(evoSk.reqWeaponTypes)) ? evoSk.reqWeaponTypes
-        : (Array.isArray(sk.reqWeaponTypes) ? sk.reqWeaponTypes : (sk.reqWeaponType ? [sk.reqWeaponType] : null));
-      if (allowedWeapons && curWType && !allowedWeapons.includes(curWType)) return false;
-      // 戰士劍類鐵則：唯有綁定當前武器本命技能的招式才具備超武昇華資格
-      if (isSwordType && sigSkill && k !== sigSkill) return false;
-      return true;
-    });
+    const evolutionRoutes = getSkillEvolutionRoutes(ACTIVE_SKILLS, getActivePassivePool());
+    const ready = canOfferBattleEvolution() ? Object.entries(ownedSkills).filter(([id, st]) => {
+      if (!evolutionRoutes[id] || st.evolved || st.disabled) return false;
+      const skill = ACTIVE_SKILLS[id];
+      return st.lv >= (skill.maxLv || 10) && ownedPassives[skill.reqPassive];
+    }) : [];
 
     if (ready.length > 0) {
       hideSkillTooltip(); setBattlePaused(true);
       currentChoices = ready.slice(0, 3).map(([id]) => {
-        const sk = ACTIVE_SKILLS[id];
-        const charEvo = (sk.evoByChar && sk.evoByChar[curCharId]) ? sk.evoByChar[curCharId] : null;
-        const targetEvoId = charEvo ? charEvo.evoSkillId : sk.evoSkillId;
-        const evoSk = targetEvoId ? ACTIVE_SKILLS[targetEvoId] : null;
-        const titleName = charEvo ? charEvo.evoName : (sk.evoName || sk.name);
-        const cleanDesc = (evoSk && evoSk.desc) ? evoSk.desc : (sk.evoDesc || sk.desc);
-        return { kind: 'evolve', id, targetEvoId, title: `🌟 技能昇華【${titleName}】`, desc: cleanDesc, tag: '唯一超武昇華' };
+        const evolution = evolutionRoutes[id];
+        return { kind: 'evolve', id, targetEvoId: evolution.targetId, title: `🌟 技能昇華【${evolution.name}】`, desc: evolution.desc, tag: '昇華技能' };
       });
       if (victoryVacuumActive) { selectUpgrade(0); return; }
       updateRerollButtonState(false);
@@ -368,7 +337,7 @@ function getSkillTooltipEl() {
       if (id === 'spiralHammer') skillCdScale = 1 - (st.lv >= 7 ? 0.20 : (st.lv >= 3 ? 0.10 : 0));
       const realCd = (sk.baseCd * skillCdScale * getEffectiveCdMult(1.0)).toFixed(2);
       const isEvo = !st.disabled && !!(st.evolved || sk.isSuperWeapon);
-      const curStatusText = st.disabled ? '已昇華停用（由超武取代）' : getSkillCurrentStatusText(id, sk, st.lv, isEvo);
+      const curStatusText = st.disabled ? '已由昇華技能取代' : getSkillCurrentStatusText(id, sk, st.lv, isEvo);
       const partnerId = sk.resonancePartner || sk.resonanceSkill;
       const isResActive = !partnerId || !!ownedSkills[partnerId];
       const resLine = (isEvo && sk.resonanceDesc)

@@ -93,3 +93,34 @@ function getActivePassivePool() {
   }
   return pool;
 }
+
+const SIGNATURE_EVOLUTION_WEAPONS = new Set(['longsword', 'blade', 'rapier', 'tachi', 'greatsword', 'spear', 'polearm']);
+
+// 角色配置決定可走的昇華路線。局內時刻、技能等級及已持有被動由抽卡時檢查。
+function getSkillEvolutionRoutes(skillPool, passivePool) {
+  const weapon = saveData?.equip?.weapon;
+  const weaponType = weapon?.subType || weapon?.type;
+  const signature = getWeaponSignatureSkill(weapon);
+  const charId = saveData?.charId || 'lucien';
+  const jobTier = saveData?.jobTier || 1;
+  const routes = {};
+
+  for (const [id, skill] of Object.entries(skillPool)) {
+    if (!skill.canEvolve || !skill.reqPassive || !passivePool[skill.reqPassive]) continue;
+    if (SIGNATURE_EVOLUTION_WEAPONS.has(weaponType) && signature && id !== signature) continue;
+    const charEvolution = skill.evoByChar?.[charId];
+    const targetId = charEvolution?.evoSkillId ?? skill.evoSkillId;
+    const target = targetId ? skillPool[targetId] : null;
+    if (targetId && !target) continue;
+    if ((target?.reqJobTier || 1) > jobTier) continue;
+    const allowedWeapons = target?.reqWeaponTypes || skill.reqWeaponTypes || (skill.reqWeaponType ? [skill.reqWeaponType] : null);
+    if (allowedWeapons && weaponType && !allowedWeapons.includes(weaponType)) continue;
+    if (target?.wandElem && target.wandElem !== weapon?.wandElem) continue;
+    routes[id] = {
+      targetId,
+      name: charEvolution?.evoName || skill.evoName || target?.name || skill.name,
+      desc: target?.desc || skill.evoDesc || skill.desc
+    };
+  }
+  return routes;
+}
