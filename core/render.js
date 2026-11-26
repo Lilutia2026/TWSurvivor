@@ -10,6 +10,18 @@ function draw() {
     for (let x = ox % 80; x < canvas.width; x += 80) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke(); }
     for (let y = oy % 80; y < canvas.height; y += 80) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke(); }
     ctx.save(); ctx.translate(ox, oy);
+    const provokeLvRender = (typeof ownedPassives !== 'undefined' && ownedPassives.provoke) || 0;
+    if (provokeLvRender > 0) {
+      const pRad = (130 + provokeLvRender * 15) * (player.areaMult || 1.0);
+      const pulse = 0.25 + 0.12 * Math.sin(gameTime * 8);
+      ctx.save();
+      ctx.strokeStyle = `rgba(249, 115, 22, ${pulse + 0.25})`;
+      ctx.fillStyle = `rgba(234, 88, 12, ${pulse * 0.28})`;
+      ctx.lineWidth = 2;
+      ctx.setLineDash(new Array(8, 6));
+      ctx.beginPath(); ctx.arc(player.x, player.y, pRad, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.restore();
+    }
     zones.forEach(z => {
       ctx.save();
       if (z.kind === 'spiral_hammer') {
@@ -286,6 +298,36 @@ slashes.forEach(s => {
         ctx.fillRect(px - colW * 0.22, py - colH * 0.92, colW * 0.44, colH * 0.92);
       });
     });
+  } else if (s.type === 'crimson_dragon_rect') {
+    const maxLife = s.maxLife || 0.34;
+    const prog = 1 - Math.max(0, Math.min(1, s.life / maxLife));
+    ctx.globalAlpha = Math.max(0, Math.min(1, s.life / maxLife));
+    ctx.translate(sx, sy);
+    ctx.rotate(ang);
+    const len = s.length || 280;
+    const halfW = (s.width || 72) / 2;
+    const grad = ctx.createLinearGradient(0, 0, len, 0);
+    grad.addColorStop(0, 'rgba(220, 38, 38, 0.22)');
+    grad.addColorStop(0.65, 'rgba(249, 115, 22, 0.45)');
+    grad.addColorStop(1, 'rgba(254, 240, 138, 0.85)');
+    ctx.fillStyle = grad;
+    ctx.strokeStyle = '#fb923c';
+    ctx.lineWidth = 3;
+    ctx.fillRect(0, -halfW, len, halfW * 2);
+    ctx.strokeRect(0, -halfW, len, halfW * 2);
+    // 繪製向前衝鋒的赤紅龍頭輪廓
+    const headX = Math.min(len, 40 + prog * (len - 20));
+    ctx.fillStyle = '#ef4444';
+    ctx.strokeStyle = '#fef08a';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(headX + 26, 0);
+    ctx.lineTo(headX - 18, -halfW * 0.92);
+    ctx.lineTo(headX - 6, 0);
+    ctx.lineTo(headX - 18, halfW * 0.92);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
   } else if (s.type === 'renga' || s.type === 'renga_fire') {
     const isFire = s.type === 'renga_fire';
     ctx.globalAlpha = Math.max(0, Math.min(1, s.life / 0.20));
@@ -364,6 +406,7 @@ const drewBattleSprite = (typeof SpriteAnimManager !== 'undefined') &&
   SpriteAnimManager.drawCharacter(ctx, ch.id || 'lucien', player.x, player.y + 14, {
     isMoving: isBattleMoving,
     dirInfo: player.dirInfo,
+    animationState: player.spriteAnimation,
     scale: 0.92
   });
 

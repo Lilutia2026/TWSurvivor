@@ -2,6 +2,8 @@
 // core/skill_exec.js — 主動技能發射器與技能狀態動態計算
 // ============================================================================
 
+const TARGETED_ELEMENTAL_SKILLS = new Set(['fire2', 'fire4', 'fire5', 'ice4', 'ice5', 'thunder4', 'thunder5']);
+
 function getBonusSkillProjectiles(tags = [], stats) {
   return (tags.includes('射彈') || tags.includes('projectile')) ? (stats.extraProj || 0) : 0;
 }
@@ -28,9 +30,9 @@ function getThunderBallStats(level, config = GLOBAL_SKILL_POOL.thunder3.thunderB
 
 // [第 1 段：被動／主動技能升級預覽與目前狀態敘述計算（第 1 ～ 105 行）]
 function getPassiveGainText(id, lv) {
-    const map = {
-      might:      `全技能最終傷害 +${8 * lv}%`,
-      cdr:        `全技能冷卻縮減 +${6 * lv}%`,
+  const map = {
+      might:      `全技能最終傷害 +${5 * lv}%`,
+      cdr:        `全技能冷卻縮減 +${5 * lv}%`,
       area:       `全技能攻擊範圍 +${10 * lv}%`,
       crit:       `全技能暴擊率 +${4 * lv}%`,
       resonance:  `元素異常與共鳴傷害 +${12 * lv}%`,
@@ -50,9 +52,16 @@ function getPassiveGainText(id, lv) {
       lightWall:  `物理減傷率 +${3 * lv}%`,
       magicShield:`魔法減傷率 +${3 * lv}%`,
       angelWish:  `賦予 1 次原地滿血復活與全屏淨化（代價：傷害 -10%、移速 -10%）`,
-      greed:      `結算獲得 Seed 貨幣 +${15 * lv}%`,
-      curse:      `怪物生命、移速與刷怪頻率 +${10 * lv}%`,
-      magnet:     `拾取範圍 +${20 * lv}%`
+      greed:         `結算獲得 Seed 貨幣 +${15 * lv}%`,
+      expBoost:      `局內經驗獲取 +${10 * lv}%`,
+      curse:         `怪物生命、移速與刷怪頻率 +${10 * lv}%`,
+      magnet:        `拾取範圍 +${20 * lv}%`,
+      powerCrest:    `物理技能最終傷害 +${8 * lv}%（獨立乘區）｜代價：物減 -${4 * lv}%、魔減 -${3 * lv}%`,
+      crimsonHeart:  `連擊觸發率 +${(2.5 * lv).toFixed(1)}%｜擊殺【點燃/破甲】敵人回復 ${(0.4 * lv).toFixed(1)}% 最大生命`,
+      crimsonReaper: `攻擊命中獨立檢定 +${5 * lv}% 機率附加【點燃】、【點燃】燃燒傷 +${8 * lv}%`,
+      provoke:       `挑釁光圈半徑 ${130 + 15 * lv}px｜每 0.33s 獨立 +${6 * lv}% 機率附加【破甲】`,
+      lanceCharge:   `移動速度 +${6 * lv}%、近戰範圍 +${5 * lv}%、遠程槍氣速距 +${8 * lv}%`,
+      bronzeBody:    `物理（碰撞）減傷 +${3 * lv}%、最大生命值 +${5 * lv}%`
     };
     return map[id] || '';
   }
@@ -150,17 +159,40 @@ function getPassiveGainText(id, lv) {
       if (nextLv === 5) gains.push('持續時間延長至 1.5s、擊退力道強化');
       if (nextLv === 10) gains.push('擊退力道最大化');
     }
+    if (id === 'sky_whirl_spear' && nextLv === 4) gains.push('升級為前方扇形 3 連揮');
+    if (id === 'shining_spear') {
+      if (nextLv === 4) gains.push('槍陣突刺距離與寬度擴大 +25%');
+      if (nextLv === 6) gains.push('連刺段數升級為 4 連刺');
+      if (nextLv === 8) gains.push('暴擊率額外 +20%');
+    }
+    if (id === 'swallow_spear') {
+      if (nextLv === 4) gains.push('同時鎖定敵人增至 2 名');
+      if (nextLv === 6) gains.push('同時鎖定敵人增至 3 名');
+      if (nextLv === 8) gains.push('擊中分裂小射彈增至 3 顆');
+    }
+    if (id === 'flame_spear_dance' && nextLv === 5) gains.push('烈焰爆破半徑擴大 +25%');
+    if (id === 'eight_whirl' && nextLv === 5) gains.push('360° 旋槍半徑擴大 +20%');
+    if (id === 'crimson_wave') gains.push('龍頭射程與矩形寬度大幅擴大（LV.3 滿級翻倍）');
+    if (id === 'sky_fire_dragon') {
+      gains.push('火龍範圍半徑擴大至 ' + (nextLv === 2 ? '175px' : '205px（與滿級挑釁光圈同大）'));
+      if (nextLv === 3) gains.push('火龍連擊段數提升至 4 段');
+    }
+    if (id === 'red_dragon_sky' && nextLv === 3) gains.push('赤蓮神龍增至 3 條');
     return gains.join('、');
   }
-  
+
   // 動態計算並彙整主動技能「目前等級」已累積的實際狀態敘述（供 Tooltip 與 ESC 面板顯示）
   function getSkillCurrentStatusText(id, sk, lv, isEvo) {
     const parts = [];
-    if (id === 'holylight' || id === 'fire1') parts.push(`單次發射 ${1 + Math.floor(lv / 2)} 發射彈`);
+    if (id === 'fire1') parts.push(`單次發射 ${1 + Math.floor(lv / 2)} 發射彈`);
+    if (id === 'holylight') {
+      const extraShots = getBonusSkillProjectiles(sk.behaviorTags, getDerivedCombatStats());
+      parts.push(`單次發射 ${1 + Math.floor(lv / 2) + extraShots} 發，每發可穿透 ${sk.projectileHitLimit - 1} 次，最多命中 ${sk.projectileHitLimit} 名敵人`);
+    }
     if (id === 'radiance') {
       const radBonus = Math.round((lv - 1) * (50 / 9));
       const dur = (3.0 + Math.floor(lv / 5) * 0.5).toFixed(1);
-      parts.push(`領域範圍 +${radBonus}%｜持續 ${dur}s（每 0.5s 灼燒並檢定聖印）`);
+      parts.push(`領域範圍 +${radBonus}%｜持續 ${dur} 秒，每 0.5 秒灼燒敵人，有機率附加【聖印】`);
     }
     if (id === 'fire3') parts.push(`環繞火球 ${4 + Math.floor(lv / 2)} 顆`);
     if (id === 'ice1') parts.push(`單次投射 ${1 + Math.floor(lv / 4)} 發（每發可彈跳 ${1 + Math.floor(lv / 2)} 次）`);
@@ -186,7 +218,7 @@ function getPassiveGainText(id, lv) {
     if (id === 'thunder5') parts.push(`單次落下 ${4 + Math.floor(lv / 2)} 道紫霄神雷（附帶二次範圍電環）`);
     if (id === 'fire5') parts.push(`單次召喚 ${1 + Math.floor(lv / 2)} 顆天罰隕石（殘留灼燒火海）`);
     if (id === 'ice5') parts.push(`單次召喚 ${1 + Math.floor(lv / 2)} 顆太陰冰隕（殘留極凍冰霧）`);
-    if (id === 'holypoly') parts.push(`漩渦半徑 ${140 + lv * 20}（2 秒無傷牽引聚怪並每秒檢定聖印，結束淨化引爆並擴散外圍補印光波）`); 
+    if (id === 'holypoly') parts.push(`牽引敵人 ${sk.zoneDuration} 秒，期間不造成傷害，每秒有機率附加 1 層【聖印】。`);
     if (id === 'windblade' || id === 'firearrow' || id === 'thunder') parts.push(`單次發動 ${1 + Math.floor(lv / 3)} 道`);
     if (id === 'windblade' && lv >= 4) parts.push('風刃穿透 2 名敵人');
     if (id === 'armorbreak') {
@@ -216,9 +248,9 @@ function getPassiveGainText(id, lv) {
       parts.push(`光陣每秒回復 ${healPct}% 最大生命（殘留光陣無傷害）`);
     }
     if (id === 'divinePrayer') {
-      const bolts = 2 + Math.floor((lv - 1) / 3);
-      const boomR = lv >= 8 ? 46 : 34;
-      parts.push(`單次召喚 ${bolts} 顆浮空曲線追尾光彈（落點引發 ${boomR}px 聖光爆破；若鎖定重複目標，後續光彈傷害降為 30%）`);
+      const bolts = 2 + Math.floor((lv - 1) / 3) + getBonusSkillProjectiles(sk.behaviorTags, getDerivedCombatStats());
+      const blast = lv >= 8 ? '聖光爆破（範圍已擴大）' : '小範圍聖光爆破';
+      parts.push(`召喚 ${bolts} 顆追尾光彈，落點引發${blast}。重複鎖定同一目標時，後續光彈傷害為 30%。`);
     }
 
     if (id === 'spiralHammer') {
@@ -246,6 +278,26 @@ function getPassiveGainText(id, lv) {
       const rBon = (lv - 1) * 10;
       parts.push(`遠距衝擊光柱（射程+${rBon}%）｜每 3 次施放捲起 2.0s 真空風渦（下發光柱寬度+${wBon}%${lv >= 3 ? '、壓制增傷+15%' : ''}）`);
     }
+    if (id === 'sky_whirl_spear') parts.push(`扇形 ${lv >= 4 ? 3 : 2} 連揮`);
+    if (id === 'shining_spear') parts.push(`前方 ${lv >= 6 ? 4 : 3} 連交錯閃耀槍陣（100% 全額傷）${lv >= 4 ? '｜範圍+25%' : ''}${lv >= 8 ? '｜暴率+20%' : ''}`);
+    if (id === 'swallow_spear') {
+      const locks = lv >= 6 ? 3 : (lv >= 4 ? 2 : 1);
+      const splits = lv >= 8 ? 3 : 2;
+      parts.push(`鎖定 ${locks} 敵｜擊中分裂 ${splits} 顆 50% 小槍氣`);
+    }
+    if (id === 'flame_spear_dance') parts.push(`近身單體 100% 直擊 ＋ 周邊 75% 烈焰爆破${lv >= 5 ? '（範圍+25%）' : ''}`);
+    if (id === 'eight_whirl') parts.push(`自身 360° 圓形旋掃（半徑 ${lv >= 5 ? 132 : 110}px）`);
+    if (id === 'crimson_wave') {
+      const idx = Math.min(2, lv - 1);
+      const rPx = new Array(280, 420, 560)[idx];
+      const wPx = new Array(72, 108, 144)[idx];
+      parts.push(`前方 ${rPx}×${wPx}px 矩形龍頭 3 段連擊｜對【破甲】無視 40% 抗性＋暴傷 +35%`);
+    }
+    if (id === 'sky_fire_dragon') {
+      const rPx = new Array(145, 175, 205)[Math.min(2, lv - 1)];
+      parts.push(`自身 360° 火龍（半徑 ${rPx}px）${lv >= 3 ? 4 : 3} 段重擊｜擊殺【點燃】觸發紅蓮爆碎`);
+    }
+    if (id === 'red_dragon_sky') parts.push(`喚出 ${lv >= 3 ? 3 : 2} 條赤蓮神龍範圍轟炸`);
     if (isEvo && !sk.isSuperWeapon) parts.push('超武昇華增傷 +45%');
   
     return parts.length > 0 ? parts.join(' ｜ ') : '基礎初始狀態（LV.1）';
@@ -269,7 +321,154 @@ function triggerSkills(dt) {
       const hasResonance = (st.evolved || sk.isSuperWeapon) && partnerId && ownedSkills[partnerId] && !ownedSkills[partnerId].disabled;
       const tMode = sk.targetMode || 'nearest';
   
-      if (id === 'aurorathrust') {
+      if (id === 'sky_whirl_spear') {
+        const swings = st.lv >= 4 ? 3 : 2;
+        const range = 136 * (1 + (st.lv - 1) * 0.03) * areaFactor;
+        const target = findTargetEnemy(range + 160, tMode);
+        const aimAng = target ? Math.atan2(target.y - player.y, target.x - player.x) : player.facingAngle;
+        for (let s = 0; s < swings; s++) {
+          const execWhirl = () => {
+            slashes.push({ type: 'renga', angle: aimAng + (s - 1) * 0.18, range, arc: 1.85, life: 0.18 });
+            damageArea(player.x, player.y, range, aimAng, 1.85, rawDmg, 0, {
+              element: 'physical', isPhysSkill: true
+            });
+          };
+          if (s === 0) execWhirl();
+          else if (typeof delayedActions !== 'undefined') delayedActions.push({ delay: s * 0.10, fn: execWhirl });
+        }
+        sk.timer = sk.baseCd * cdFactor;
+      } else if (id === 'shining_spear') {
+        const scaleMult = st.lv >= 4 ? 1.25 : 1.0;
+        const range = 185 * scaleMult * areaFactor;
+        const arc = 0.65 * scaleMult;
+        const baseW = 24 * scaleMult * areaFactor;
+        const hits = st.lv >= 6 ? 4 : 3;
+        const target = findTargetEnemy(range + 180, tMode);
+        const aimAng = target ? Math.atan2(target.y - player.y, target.x - player.x) : player.facingAngle;
+        const offsets = new Array(-0.22, 0.22, 0, -0.11);
+        for (let h = 0; h < hits; h++) {
+          const execShining = () => {
+            const bAng = aimAng + offsets[h % offsets.length];
+            slashes.push({ type: 'aurora_needle', angle: bAng, range, baseW, life: 0.20, maxLife: 0.20 });
+            damageArea(player.x, player.y, range, aimAng, arc, rawDmg, 0, {
+              element: 'physical', isPhysSkill: true,
+              bonusCritFn: () => (st.lv >= 8 ? 0.20 : 0)
+            });
+          };
+          if (h === 0) execShining();
+          else if (typeof delayedActions !== 'undefined') delayedActions.push({ delay: h * 0.08, fn: execShining });
+        }
+        sk.timer = sk.baseCd * cdFactor;
+      } else if (id === 'swallow_spear') {
+	      const locks = (st.lv >= 6 ? 3 : (st.lv >= 4 ? 2 : 1)) + bonusProj;
+        const splitCount = st.lv >= 8 ? 3 : 2;
+        const lanceSpdMult = 1 + ((ownedPassives.lanceCharge || 0) * 0.08);
+        const spd = 650 * lanceSpdMult;
+        const lifeDur = 1.25 * lanceSpdMult;
+        const cands = enemies.filter(e => !e.isDead && Math.hypot(e.x - player.x, e.y - player.y) <= 680 * lanceSpdMult);
+        cands.sort((a, b) => Math.hypot(a.x - player.x, a.y - player.y) - Math.hypot(b.x - player.x, b.y - player.y));
+        const targets = cands.slice(0, locks);
+        const spawnSwallowMain = (ang) => {
+          projectiles.push({
+            type: 'wind', elem: 'physical', skillId: 'swallow_spear', isPhysSkill: true,
+            splitCount, speed: spd,
+            x: player.x, y: player.y, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd,
+            radius: 11 * areaFactor, dmg: rawDmg, pierce: 1, life: lifeDur, hitSet: new Set()
+          });
+        };
+        if (targets.length === 0) {
+          spawnSwallowMain(player.facingAngle);
+        } else {
+          for (let i = 0; i < targets.length; i++) {
+            spawnSwallowMain(Math.atan2(targets[i].y - player.y, targets[i].x - player.x));
+          }
+        }
+        sk.timer = sk.baseCd * cdFactor;
+      } else if (id === 'flame_spear_dance') {
+        const lockRange = 220 * areaFactor;
+        const target = findTargetEnemy(lockRange, tMode);
+        if (!target) { sk.timer = 0; continue; }
+        const tx = target.x, ty = target.y;
+        const boomR = (st.lv >= 5 ? 95 : 75) * areaFactor;
+        const tIdx = enemies.indexOf(target);
+        if (tIdx !== -1 && !target.isDead) {
+          applyStatusTagsOnHit(target, ['fire'], spellBase, cs, { isMelee: true });
+          hitEnemy(tIdx, rawDmg, { element: 'fire', isPhysSkill: true });
+        }
+        slashes.push({ type: 'fireboom', x: tx, y: ty, range: boomR, arc: Math.PI * 2, life: 0.22 });
+        damageArea(tx, ty, boomR, 0, Math.PI * 2, rawDmg * 0.75, 0, {
+          element: 'fire', isPhysSkill: true,
+          onTargetHit: (e) => { if (e !== target) applyStatusTagsOnHit(e, ['fire'], spellBase, cs, { isMelee: true }); }
+        });
+        sk.timer = sk.baseCd * cdFactor;
+      } else if (id === 'eight_whirl') {
+        const range = (st.lv >= 5 ? 132 : 110) * areaFactor;
+        slashes.push({ type: 'enbu', angle: player.facingAngle, range, arc: Math.PI * 2, life: 0.22 });
+        damageArea(player.x, player.y, range, 0, Math.PI * 2, rawDmg, 0, {
+          element: 'physical', isPhysSkill: true
+        });
+        sk.timer = sk.baseCd * cdFactor;
+      } else if (id === 'crimson_wave') {
+        const lvIdx = Math.min(2, st.lv - 1);
+        const rectLen = (new Array(280, 420, 560)[lvIdx]) * areaFactor;
+        const rectW = (new Array(72, 108, 144)[lvIdx]) * areaFactor;
+        const target = findTargetEnemy(rectLen + 120, tMode);
+        const aimAng = target ? Math.atan2(target.y - player.y, target.x - player.x) : player.facingAngle;
+        const cosA = Math.cos(aimAng), sinA = Math.sin(aimAng);
+        slashes.push({ type: 'crimson_dragon_rect', x: player.x, y: player.y, angle: aimAng, length: rectLen, width: rectW, life: 0.34, maxLife: 0.34 });
+        for (let h = 0; h < 3; h++) {
+          const execDragonHit = () => {
+            for (let i = enemies.length - 1; i >= 0; i--) {
+              const e = enemies[i];
+              if (!e || e.isDead) continue;
+              const dx = e.x - player.x, dy = e.y - player.y;
+              const along = dx * cosA + dy * sinA;
+              const perp = Math.abs(-dx * sinA + dy * cosA);
+              if (along >= -10 && along <= rectLen + e.radius && perp <= (rectW / 2) + e.radius) {
+                hitEnemy(i, rawDmg, { element: 'physical', isPhysSkill: true, isCrimsonWave: true });
+              }
+            }
+          };
+          if (h === 0) execDragonHit();
+          else if (typeof delayedActions !== 'undefined') delayedActions.push({ delay: h * 0.08, fn: execDragonHit });
+        }
+        sk.timer = sk.baseCd * cdFactor;
+      } else if (id === 'sky_fire_dragon') {
+        const hits = st.lv >= 3 ? 4 : 3;
+        const baseRad = new Array(145, 175, 205)[Math.min(2, st.lv - 1)];
+        const range = baseRad * areaFactor;
+        for (let h = 0; h < hits; h++) {
+          const execSkyDragon = () => {
+            slashes.push({ type: 'fireboom', x: player.x, y: player.y, range, arc: Math.PI * 2, life: 0.24 });
+            slashes.push({ type: 'enbu', angle: player.facingAngle + h * 0.7, range, arc: Math.PI * 2, life: 0.20 });
+            damageArea(player.x, player.y, range, 0, Math.PI * 2, rawDmg, 0, {
+              element: 'fire', isPhysSkill: true, isSkyFireDragon: true,
+              onTargetHit: (e) => applyStatusTagsOnHit(e, ['fire'], spellBase, cs, { isMelee: true })
+            });
+          };
+          if (h === 0) execSkyDragon();
+          else if (typeof delayedActions !== 'undefined') delayedActions.push({ delay: h * 0.11, fn: execSkyDragon });
+        }
+        sk.timer = sk.baseCd * cdFactor;
+      } else if (id === 'red_dragon_sky') {
+        const dragons = st.lv >= 3 ? 3 : 2;
+        const range = 195 * areaFactor;
+        for (let d = 0; d < dragons; d++) {
+          const execRedSky = () => {
+            const ang = player.facingAngle + (d - (dragons - 1) / 2) * 0.8;
+            const cx = player.x + Math.cos(ang) * 75;
+            const cy = player.y + Math.sin(ang) * 75;
+            slashes.push({ type: 'fireboom', x: cx, y: cy, range, arc: Math.PI * 2, life: 0.28 });
+            damageArea(cx, cy, range, 0, Math.PI * 2, rawDmg, 0, {
+              element: 'fire', isPhysSkill: true,
+              onTargetHit: (e) => applyStatusTagsOnHit(e, ['fire'], spellBase, cs, { isMelee: true })
+            });
+          };
+          if (d === 0) execRedSky();
+          else if (typeof delayedActions !== 'undefined') delayedActions.push({ delay: d * 0.15, fn: execRedSky });
+        }
+        sk.timer = sk.baseCd * cdFactor;
+      } else if (id === 'aurorathrust') {
         const lenMult = (1 + (st.lv - 1) * 0.03) * (st.lv >= 4 ? 1.25 : 1.0);
         const range = 150 * lenMult * areaFactor;
         const arc = (st.lv >= 4 ? 0.28 : 0.24) * 1.15;
@@ -445,12 +644,13 @@ function triggerSkills(dt) {
         const baseAng = t ? Math.atan2(t.y - player.y, t.x - player.x) : player.facingAngle;
         for (let i = 0; i < shots; i++) {
           const ang = baseAng + (i - (shots - 1) / 2) * 0.14;
-          projectiles.push({ type: 'holy', elem: 'holy', statusTags: sTags, x: player.x, y: player.y, vx: Math.cos(ang) * 620, vy: Math.sin(ang) * 620, radius: 9 * areaFactor, dmg: rawDmg, pierce: 4, life: 1.3, hitSet: new Set() });
+          projectiles.push({ type: 'holy', elem: 'holy', statusTags: sTags, x: player.x, y: player.y, vx: Math.cos(ang) * 620, vy: Math.sin(ang) * 620, radius: 9 * areaFactor, dmg: rawDmg, pierce: sk.projectileHitLimit, life: 1.3, hitSet: new Set() });
         }
         sk.timer = sk.baseCd * cdFactor;
       } else if (id === 'radiance' || id === 'healLight' || id === 'holypoly') {
-        const t = findTargetEnemy(650, tMode);
-        const tx = t ? t.x : player.x + (Math.random() - 0.5) * 160, ty = t ? t.y : player.y + (Math.random() - 0.5) * 160;
+        const target = findTargetEnemy(650, tMode, getVisibleSkillTargets(650));
+        if (!target) { sk.timer = 0; continue; }
+        const tx = target.x, ty = target.y;
         const lvScale = id === 'radiance' ? (1 + (st.lv - 1) * (0.50 / 9)) : 1.0;
         const rad = (id === 'holypoly' ? (140 + st.lv * 20) : (110 * lvScale)) * areaFactor;
         if (id === 'healLight') {
@@ -460,7 +660,7 @@ function triggerSkills(dt) {
             onTargetHit: (e) => applyStatusTagsOnHit(e, 'holy', spellBase, cs, { isMelee: false })
           });
         }
-        const dur = id === 'holypoly' ? 2.0 : (3.0 + Math.floor(st.lv / 5) * 0.5);
+        const dur = id === 'holypoly' ? sk.zoneDuration : (3.0 + Math.floor(st.lv / 5) * 0.5);
         zones.push({ kind: id, statusTags: sTags, x: tx, y: ty, radius: rad, life: dur, tickTimer: id === 'holypoly' ? 1.0 : 0.5, dmg: rawDmg, lv: st.lv });
         sk.timer = sk.baseCd * cdFactor;  
       } else if (id === 'armorbreak') {
@@ -487,19 +687,18 @@ function triggerSkills(dt) {
         const bolts = 2 + Math.floor((st.lv - 1) / 3) + bonusProj;
         const boomR = (st.lv >= 8 ? 46 : 34) * player.areaMult;
         const cdScale = 1 - Math.floor(st.lv / 3) * 0.10;
-        const mainTarget = findTargetEnemy(760, tMode);
+        const visibleTargets = getVisibleSkillTargets(760);
+        const mainTarget = findTargetEnemy(760, tMode, visibleTargets);
+        if (!mainTarget) { sk.timer = 0; continue; }
         const usedTargets = new Set();
         for (let i = 0; i < bolts; i++) {
-          let targetObj = null;
-          if (i === 0 && mainTarget && !mainTarget.isDead) {
-            targetObj = mainTarget;
-          } else {
-            const avail = enemies.filter(cand => !cand.isDead && !usedTargets.has(cand) && Math.hypot(cand.x - player.x, cand.y - player.y) <= 760);
+          let targetObj = mainTarget;
+          if (i > 0) {
+            const avail = visibleTargets.filter(cand => !usedTargets.has(cand));
             if (avail.length > 0) targetObj = avail[Math.floor(Math.random() * avail.length)];
-            else if (mainTarget && !mainTarget.isDead) targetObj = mainTarget;
           }
-          const isDupLock = !!(targetObj && usedTargets.has(targetObj));
-          if (targetObj) usedTargets.add(targetObj);
+          const isDupLock = usedTargets.has(targetObj);
+          usedTargets.add(targetObj);
           const boltDmg = isDupLock ? (rawDmg * 0.30) : rawDmg;
           const spreadAngle = -Math.PI * 0.8 + (bolts > 1 ? (i / (bolts - 1)) * Math.PI * 0.6 : Math.PI * 0.3);
           const offX = Math.cos(spreadAngle) * 34;
@@ -510,8 +709,7 @@ function triggerSkills(dt) {
             x: player.x + offX, y: player.y + offY, offX, offY,
             hoverTimer: 0.40 + i * 0.06, flightTime: 0,
             startX: player.x + offX, startY: player.y + offY,
-            targetX: targetObj ? targetObj.x : player.x + Math.cos(player.facingAngle) * 260,
-            targetY: targetObj ? targetObj.y : player.y + Math.sin(player.facingAngle) * 260,
+            targetX: targetObj.x, targetY: targetObj.y,
             waveSign: (i % 2 === 0 ? 1 : -1),
             radius: 9, boomRadius: boomR,
             dmg: boltDmg, pierce: 1, life: 2.2, hitSet: new Set()
@@ -582,9 +780,9 @@ function triggerSkills(dt) {
       } else if (id.startsWith('fire') || id.startsWith('ice') || id.startsWith('thunder')) {
         const elem = id.startsWith('fire') ? 'fire' : (id.startsWith('ice') ? 'ice' : 'lightning');
         if (id === 'ice2') {
-          const t = findTargetEnemy(650, tMode);
-          const tx = t ? t.x : player.x + Math.cos(player.facingAngle) * 140;
-          const ty = t ? t.y : player.y + Math.sin(player.facingAngle) * 140;
+          const t = findTargetEnemy(650, tMode, getVisibleSkillTargets(650));
+          if (!t) { sk.timer = 0; continue; }
+          const tx = t.x, ty = t.y;
           const ice2Radius = 110 * (1 + (st.lv - 1) * 0.06) * areaFactor;
           zones.push({ kind: 'ice2', statusTags: sTags, x: tx, y: ty, radius: ice2Radius, life: 3.0 + Math.floor(st.lv / 3) * 0.5, tickTimer: 0.5, dmg: rawDmg, lv: st.lv });
           sk.timer = sk.baseCd * cdFactor;
@@ -611,7 +809,9 @@ function triggerSkills(dt) {
           : (id === 'thunder1' ? (3 + Math.floor(st.lv / 2))
           : ((id === 'thunder4' || id === 'thunder5') ? (4 + Math.floor(st.lv / 2)) : (1 + Math.floor(st.lv / 3))))))));
         const count = baseCount + bonusProj;
-        const mainTarget = findTargetEnemy(750, tMode);
+        const visibleTargets = TARGETED_ELEMENTAL_SKILLS.has(id) ? getVisibleSkillTargets(750) : null;
+        const mainTarget = findTargetEnemy(750, tMode, visibleTargets ?? enemies);
+        if (visibleTargets && !mainTarget) { sk.timer = 0; continue; }
         const mainAng = mainTarget ? Math.atan2(mainTarget.y - player.y, mainTarget.x - player.x) : player.facingAngle;
   
         const struckTargets = new Set();
@@ -622,7 +822,7 @@ function triggerSkills(dt) {
             if (i === 0 && mainTarget && !mainTarget.isDead) {
               t = mainTarget;
             } else {
-              const avail = enemies.filter(cand => !cand.isDead && !struckTargets.has(cand) && Math.hypot(cand.x - player.x, cand.y - player.y) <= 750);
+              const avail = (visibleTargets ?? enemies).filter(cand => !cand.isDead && !struckTargets.has(cand) && Math.hypot(cand.x - player.x, cand.y - player.y) <= 750);
               if (avail.length > 0) t = avail[Math.floor(Math.random() * avail.length)];
             }
             if (t) struckTargets.add(t);
@@ -636,7 +836,8 @@ function triggerSkills(dt) {
             if (!t && i > 0) continue; // 一彈一目標：場上無更多獨立目標時，不把多餘火箭灌在同一目標上
             if (t) struckTargets.add(t);
           } else {
-            t = (i === 0 && mainTarget) ? mainTarget : (enemies[Math.floor(Math.random() * enemies.length)] || mainTarget);
+            const candidates = visibleTargets ?? enemies;
+            t = (i === 0 && mainTarget) ? mainTarget : (candidates[Math.floor(Math.random() * candidates.length)] || mainTarget);
           }
 
           const spreadOffset = (i === 0 || (id === 'fire1' && t)) ? 0 : (i - (count - 1) / 2) * 0.16;
@@ -667,10 +868,9 @@ function triggerSkills(dt) {
               });
             }
           } else if (id === 'fire2') {
-            const targetObj = (i === 0 && mainTarget) ? mainTarget : (enemies[Math.floor(Math.random() * enemies.length)] || null);
-            const spreadAng = mainAng + (i - (count - 1) / 2) * 0.22;
-            const destX = targetObj ? targetObj.x + (i > 0 ? (Math.random() - 0.5) * 70 : 0) : player.x + Math.cos(spreadAng) * 260;
-            const destY = targetObj ? targetObj.y + (i > 0 ? (Math.random() - 0.5) * 70 : 0) : player.y + Math.sin(spreadAng) * 260;
+            const targetObj = t;
+            const destX = targetObj.x + (i > 0 ? (Math.random() - 0.5) * 70 : 0);
+            const destY = targetObj.y + (i > 0 ? (Math.random() - 0.5) * 70 : 0);
             const dist = Math.hypot(destX - player.x, destY - player.y);
             const flightDur = Math.max(0.45, Math.min(0.80, dist / 520));
             projectiles.push({
@@ -680,10 +880,8 @@ function triggerSkills(dt) {
               radius: 18 * areaFactor, dmg: rawDmg, pierce: 1, life: flightDur + 0.1, hitSet: new Set()
             });
           } else if (id === 'fire4' || id === 'fire5' || id === 'ice4' || id === 'ice5') {
-            const targetObj = (i === 0 && mainTarget) ? mainTarget : (enemies[Math.floor(Math.random() * enemies.length)] || null);
-            const spreadAng = mainAng + (i - (count - 1) / 2) * 0.35;
-            const destX = targetObj ? targetObj.x + (i > 0 ? (Math.random() - 0.5) * 95 : 0) : player.x + Math.cos(spreadAng) * (240 + i * 35);
-            const destY = targetObj ? targetObj.y + (i > 0 ? (Math.random() - 0.5) * 95 : 0) : player.y + Math.sin(spreadAng) * (240 + i * 35);
+            const destX = t.x + (i > 0 ? (Math.random() - 0.5) * 95 : 0);
+            const destY = t.y + (i > 0 ? (Math.random() - 0.5) * 95 : 0);
             const fallDur = 0.42 + i * 0.08;
             const isSuper = id.endsWith('5');
             projectiles.push({

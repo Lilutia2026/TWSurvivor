@@ -5,8 +5,9 @@ const ARCHETYPE_RULES = {
   'S+H':   { name: '複合型',   autoStat: 'S',   bonusStat: 'DEX', primaryStats: ['S', 'H'] },
   'H+I':   { name: '魔劍型',   autoStat: 'H',   bonusStat: 'AGI', primaryStats: ['H', 'I'] },
   I:       { name: '攻擊型',   autoStat: 'I',   bonusStat: 'DEX', primaryStats: ['I'] },
-  MR:      { name: '輔助型',   autoStat: 'MR',  bonusStat: 'AGI', primaryStats: ['MR'] },
-  'DEF+H': { name: '戰鬥型',   autoStat: 'DEF', bonusStat: 'H',   primaryStats: ['DEF', 'H'] }
+  MR:       { name: '輔助型',   autoStat: 'MR',  bonusStat: 'AGI', primaryStats: ['MR'] },
+  'DEF+H':  { name: '戰鬥型',   autoStat: 'DEF', bonusStat: 'H',   primaryStats: ['DEF', 'H'] },
+  H_STRIKE: { name: '打擊型',   autoStat: 'H',   bonusStat: 'DEF', primaryStats: ['H'] }
 };
 
 // 全 8 位經典角色台版正統類型與初始數值總表（共 22 筆資料，初始 AGI 皆為 1）
@@ -81,12 +82,17 @@ const CHARACTERS = {
   },
 
   sivelin: {
-    id: 'sivelin', name: '希培林．武', title: '失憶的紅蓮槍豪', color: '#f97316', playable: false,
+    id: 'sivelin', name: '希培林．武', title: '失憶的紅蓮槍豪', color: '#f97316', playable: true,
     defaultVariant: 'spear',
     equipTags: ['all', 'heavy', 'knuckle', 'spear', 'polearm'],
+    skillTags: ['spear_art', 'sivelin_unique'],
+    resonances: {
+      crimsonWave:   { rangeByLv: new Array(280, 420, 560), widthByLv: new Array(72, 108, 144), hits: 3, armorBreakIgnoreRes: 0.40, armorBreakCritDmg: 0.35 },
+      skyFireDragon: { hitsByLv: new Array(3, 3, 4), radiusByLv: new Array(145, 175, 205), burstRadius: 115, burstMult: 0.85 }
+    },
     variants: {
-      spear: { wName: '槍', archetype: 'S',   initHp: 220, defaultTpl: 'w_rap_1',  baseStats: { S: 5, H: 2, I: 1, DEF: 2, MR: 1, DEX: 2, AGI: 1 } },
-      rod:   { wName: '棍', archetype: 'S+H', initHp: 240, defaultTpl: 'w_long_1', baseStats: { S: 4, H: 4, I: 1, DEF: 2, MR: 1, DEX: 1, AGI: 1 } }
+      spear:   { wName: '槍', archetype: 'S',        initHp: 220, defaultTpl: 'w_spr_0',  baseStats: { S: 5, H: 2, I: 1, DEF: 2, MR: 1, DEX: 2, AGI: 1 } },
+      polearm: { wName: '棍', archetype: 'H_STRIKE', initHp: 240, defaultTpl: 'w_pole_0', baseStats: { S: 4, H: 4, I: 1, DEF: 2, MR: 1, DEX: 1, AGI: 1 } }
     }
   },
 

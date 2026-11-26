@@ -12,6 +12,7 @@ const AudioManager = {
     playToken: 0,            // 防串音流水號：確保切換場景後舊音檔載入不會延遲插播
     htmlAudio: null,
     synthCtx: null,
+    synthOutput: null,
     synthTimer: null,
     synthStep: 0,
     isBlurred: false,
@@ -34,8 +35,11 @@ const AudioManager = {
     },
 
     init() {
-        const savedMute = localStorage.getItem('tws_bgm_enabled');
-        if (savedMute !== null) this.enabled = savedMute === 'true';
+        try {
+            const savedMute = localStorage.getItem('tws_bgm_enabled');
+            if (savedMute !== null) this.enabled = savedMute === 'true';
+        } catch (e) { /* 保留目前的音樂設定 */ }
+        this.syncToggleButtons();
 
         // 瀏覽器首次點擊解鎖音效播放權限（包含處於 paused 狀態的 HTML5 Audio）
         const unlock = () => {
@@ -43,7 +47,7 @@ const AudioManager = {
                 if (this.htmlAudio && this.htmlAudio.paused) {
                     this.htmlAudio.play().catch(() => {});
                 } else if (!this.htmlAudio && !this.synthTimer) {
-                    this.play(this.currentTrack, true);
+                    this._resumePlayback();
                 }
             }
             if (this.synthCtx && this.synthCtx.state === 'suspended') {
@@ -75,15 +79,23 @@ const AudioManager = {
 
     toggle() {
         this.enabled = !this.enabled;
-        localStorage.setItem('tws_bgm_enabled', String(this.enabled));
+        try { localStorage.setItem('tws_bgm_enabled', String(this.enabled)); }
+        catch (e) { /* 本次遊戲仍採用切換結果 */ }
+        this.syncToggleButtons();
         if (!this.enabled) {
             this.stop();
-        } else if (this.playlist && this.playlist.length > 0) {
-            this._playPlaylistCurrent();
-        } else if (this.currentTrack) {
-            this.play(this.currentTrack, true);
+        } else if (!this.isBlurred) {
+            this._resumePlayback();
         }
         return this.enabled;
+    },
+
+    syncToggleButtons(root = document) {
+        for (const button of root.querySelectorAll('[data-music-toggle]')) {
+            button.textContent = this.enabled ? '🔊 音樂開' : '🔇 音樂關';
+            button.setAttribute('aria-label', '背景音樂');
+            button.setAttribute('aria-pressed', String(this.enabled));
+        }
     },
 
     // 播放關卡多曲輪播清單（支援自動接下一首、隨機不連播、缺檔自動跳下一首）
@@ -208,6 +220,8 @@ const AudioManager = {
             if (!AudioCtx) return;
             if (!this.synthCtx) this.synthCtx = new AudioCtx();
             if (this.synthCtx.state === 'suspended') this.synthCtx.resume();
+            this.synthOutput = this.synthCtx.createGain();
+            this.synthOutput.connect(this.synthCtx.destination);
             this.synthStep = 0;
 
             const playNote = () => {
@@ -223,7 +237,7 @@ const AudioManager = {
                 gain.gain.exponentialRampToValueAtTime(0.045 * this.volume, now + 0.04);
                 gain.gain.exponentialRampToValueAtTime(0.0008, now + (cfg.tempo / 1000) * 1.4);
                 osc.connect(gain);
-                gain.connect(this.synthCtx.destination);
+                gain.connect(this.synthOutput);
                 osc.start(now);
                 osc.stop(now + (cfg.tempo / 1000) * 1.45);
             };
@@ -234,14 +248,22 @@ const AudioManager = {
 
     _pausePlayback() {
         if (this.htmlAudio) this.htmlAudio.pause();
+        this._stopSynth();
+    },
+
+    _stopSynth() {
         if (this.synthTimer) { clearInterval(this.synthTimer); this.synthTimer = null; }
+        if (this.synthOutput) { this.synthOutput.disconnect(); this.synthOutput = null; }
     },
 
     _resumePlayback() {
+        if (!this.enabled || this.isBlurred || this.synthTimer) return;
         if (this.htmlAudio) {
             this.htmlAudio.play().catch(() => {});
+        } else if (this.playlist?.length) {
+            this._playPlaylistCurrent();
         } else if (this.currentTrack && this.tracks[this.currentTrack]) {
-            this._startSynth(this.tracks[this.currentTrack]);
+            this.play(this.currentTrack, true);
         }
     },
 
@@ -252,10 +274,7 @@ const AudioManager = {
             this.htmlAudio.src = '';
             this.htmlAudio = null;
         }
-        if (this.synthTimer) {
-            clearInterval(this.synthTimer);
-            this.synthTimer = null;
-        }
+        this._stopSynth();
     }
 };
 

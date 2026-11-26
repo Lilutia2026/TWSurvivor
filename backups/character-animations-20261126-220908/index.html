@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>天翼之鍊倖存者</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: "Microsoft JhengHei", sans-serif; user-select: none; }
+    body { background: #0f172a; color: #f8fafc; overflow: hidden; }
+    canvas { display: block; }
+    #hud { position: fixed; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; pointer-events: none; z-index: 10; }
+    .hud-box { background: rgba(15, 23, 42, 0.85); border: 1px solid #475569; border-radius: 10px; padding: 8px 12px; }
+    .music-toggle { padding: 5px 9px; border-radius: 6px; border: 1px solid #34d399; background: #0f172a; color: #a7f3d0; font-size: 12px; cursor: pointer; white-space: nowrap; pointer-events: auto; }
+    .music-toggle[aria-pressed="false"] { color: #cbd5e1; border-color: #64748b; }
+    #banner { position: fixed; top: 82px; left: 50%; transform: translateX(-50%); background: rgba(180, 83, 9, 0.94); border: 2px solid #facc15; padding: 8px 20px; border-radius: 999px; font-weight: bold; display: none; z-index: 15; }
+    .modal { position: fixed; inset: 0; background: rgba(2, 6, 23, 0.86); display: none; align-items: center; justify-content: center; z-index: 30; }
+    .panel { background: #1e293b; border: 2px solid #eab308; border-radius: 14px; padding: 18px; width: min(1040px, 95vw); max-height: 92vh; overflow-y: auto; }
+    .stat-row, .eq-slot, .bag-item { display: flex; justify-content: space-between; align-items: center; padding: 5px 8px; margin-bottom: 5px; background: rgba(30, 41, 59, 0.8); border-radius: 6px; font-size: 13px; }
+    .stat-btn { background: #38bdf8; color: #0f172a; border: none; border-radius: 4px; width: 24px; height: 22px; font-weight: bold; cursor: pointer; }
+    .stat-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .card-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 14px; }
+    .card { background: #0f172a; border: 2px solid #475569; border-radius: 12px; padding: 14px; cursor: pointer; transition: 0.15s; }
+    .card:hover { border-color: #facc15; transform: translateY(-3px); }
+    .card-key { font-size: 11px; color: #facc15; margin-bottom: 4px; }
+    .card-title { font-size: 15px; font-weight: bold; color: #fef08a; margin-bottom: 6px; }
+    .card-desc { font-size: 12px; color: #cbd5e1; line-height: 1.5; }
+    .card-tag { margin-top: 8px; font-size: 11px; color: #38bdf8; }
+    .status-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin-top: 10px; }
+    .status-sec { background: rgba(15, 23, 42, 0.78); border: 1px solid #334155; border-radius: 10px; padding: 10px; font-size: 13px; line-height: 1.6; min-width: 0; overflow: hidden; }
+    #login-select-view { display: none; position: fixed; inset: 0; z-index: 900; overflow: auto; padding: clamp(16px, 4vw, 44px); background: radial-gradient(ellipse at 28% 0%, #283e43, #101a25 52%, #0b111b); }
+    .login-layout { width: min(1040px, 100%); margin: auto; display: grid; gap: 18px; }
+    .login-layout h1 { font-size: clamp(25px, 4vw, 39px); letter-spacing: .06em; }
+    .login-game-title { margin-bottom: 5px; color: #a7bab5; font-size: 13px; letter-spacing: .1em; }
+    .login-showcase { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(246px, 1fr); overflow: hidden; border: 1px solid #53615b; border-radius: 14px; background: #17242c; }
+    .login-stage { position: relative; display: grid; place-items: center; isolation: isolate; overflow: hidden; min-height: 330px; color: var(--character-accent, #60a5fa); background: radial-gradient(ellipse at 50% 44%, color-mix(in srgb, currentColor 23%, #1b2b35), #121d27 72%); }
+    .login-stage::before, .login-stage::after { content: ""; position: absolute; z-index: -1; border: 1px solid currentColor; opacity: .23; pointer-events: none; }
+    .login-stage::before { width: min(65%, 360px); aspect-ratio: 1; border-radius: 50%; }
+    .login-stage::after { width: 58%; height: 24%; bottom: 9%; border-radius: 50%; }
+    .login-stage canvas, .login-stage img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+    .login-stage img { padding: 24px; pointer-events: none; }
+    .login-stage [hidden], .login-pagination[hidden] { display: none; }
+    .login-placeholder { text-align: center; }
+    .login-placeholder-symbol { display: block; font-family: Georgia, "Microsoft JhengHei", serif; font-size: clamp(56px, 12vw, 118px); line-height: 1; text-shadow: 0 0 40px currentColor; }
+    .login-placeholder p { margin-top: 16px; color: #c4cfce; font-size: 13px; }
+    .login-character-info { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 12px; min-width: 0; padding: clamp(18px, 4vw, 34px); border-left: 1px solid #3e4d4b; }
+    .login-character-info h2 { font-size: clamp(21px, 3vw, 30px); color: var(--character-accent, #f8fafc); }
+    .login-character-title { color: #b6c8c2; font-size: 14px; }
+    .login-variant-label { color: #c9d6d0; font-size: 13px; }
+    .login-variants { display: flex; flex-wrap: wrap; gap: 7px; }
+    .login-variant, .login-pagination button { padding: 6px 10px; border: 1px solid #5e726d; border-radius: 5px; background: #21333c; color: #f8fafc; cursor: pointer; }
+    .login-variant[aria-pressed="true"] { border-color: var(--character-accent); background: color-mix(in srgb, var(--character-accent) 21%, #21333c); }
+    #login-enter-town { margin-top: 8px; padding: 11px 16px; border: 1px solid #d9d09e; border-radius: 6px; background: #d9d09e; color: #182724; font-weight: bold; cursor: pointer; }
+    #login-enter-town:disabled, .login-pagination button:disabled { opacity: .55; cursor: default; }
+    .login-roster { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 8px; }
+    .login-roster-button { display: grid; justify-items: center; align-content: start; gap: 6px; min-width: 0; padding: 8px 4px; border: 1px solid #51645f; border-radius: 8px; background: #1a2930; color: #e4ece8; text-align: center; cursor: pointer; }
+    .login-roster-button:hover, .login-roster-button[aria-pressed="true"] { border-color: var(--roster-accent); background: color-mix(in srgb, var(--roster-accent) 16%, #1a2930); }
+    .login-roster-button[data-locked="true"] { color: #a6b5b4; }
+    .login-avatar { position: relative; display: grid; place-items: center; width: 40px; aspect-ratio: 1; overflow: hidden; border: 1px solid currentColor; border-radius: 50%; color: var(--roster-accent); background: #101d25; font-size: 19px; }
+    .login-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .login-roster-name { font-size: 12px; overflow-wrap: anywhere; }
+    .login-pagination { display: flex; justify-content: center; align-items: center; gap: 12px; color: #c4d2cb; font-size: 13px; }
+    .login-layout button:focus-visible { outline: 2px solid #f7eab5; outline-offset: 3px; }
+    @media (max-width: 680px) {
+      .login-showcase { grid-template-columns: 1fr; }
+      .login-stage { min-height: clamp(200px, 42vw, 330px); }
+      .login-character-info { border-left: 0; border-top: 1px solid #3e4d4b; }
+      .login-roster { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+    <!-- ==================== 1. 登入與角色選擇頁面 (town/login.js) ==================== -->
+<div id="login-select-view">
+  <main class="login-layout" aria-labelledby="login-heading">
+    <header style="display:flex;justify-content:space-between;align-items:flex-end;gap:8px;">
+      <div>
+      <p class="login-game-title">天翼之鍊倖存者</p>
+      <h1 id="login-heading">選擇角色</h1>
+      </div>
+      <button type="button" class="music-toggle" data-music-toggle onclick="AudioManager.toggle()">🔊 音樂開</button>
+    </header>
+    <section class="login-showcase" id="login-showcase" aria-labelledby="login-character-name">
+      <div class="login-stage">
+        <div class="login-placeholder" id="login-preview-placeholder">
+          <span class="login-placeholder-symbol" id="login-preview-symbol" aria-hidden="true"></span>
+          <p id="login-preview-message">角色圖像準備中</p>
+        </div>
+        <canvas id="login-preview-canvas" width="640" height="350" aria-hidden="true" hidden></canvas>
+        <img id="login-preview-image" alt="" hidden />
+      </div>
+      <div class="login-character-info">
+        <h2 id="login-character-name"></h2>
+        <p class="login-character-title" id="login-character-title"></p>
+        <p class="login-variant-label" id="login-variant-label"></p>
+        <div class="login-variants" id="login-variants" role="group" aria-label="測試用武器型態"></div>
+        <button id="login-enter-town" type="button" onclick="confirmEnterTownFromLogin()">進入雷蒂亞</button>
+      </div>
+    </section>
+    <nav aria-label="角色名單">
+      <div class="login-roster" id="login-char-grid"></div>
+    </nav>
+    <div class="login-pagination" id="login-pagination" hidden>
+      <button id="login-prev-page" type="button" onclick="changeLoginRosterPage(-1)">上一頁</button>
+      <span id="login-page-number" aria-live="polite"></span>
+      <button id="login-next-page" type="button" onclick="changeLoginRosterPage(1)">下一頁</button>
+    </div>
+  </main>
+</div>
+
+<!-- ==================== 2. 樹上精靈村・雷蒂亞互動舞台 (town/town.js) ==================== -->
+<div id="town-clad-view" style="display:none;position:fixed;inset:0;background:#0b1120;z-index:850;flex-direction:column;align-items:center;justify-content:center;">
+  <div id="town-header-status" style="width:100%;max-width:1280px;padding:10px 16px;background:#1e293b;border-bottom:1px solid #334155;color:#f8fafc;font-size:14px;display:flex;align-items:center;flex-wrap:wrap;"></div>
+  <canvas id="town-canvas" width="1280" height="820" style="width:100%;max-width:1280px;max-height:calc(100vh - 52px);background:#14281d;border:1px solid #334155;cursor:pointer;"></canvas>
+</div>
+
+<!-- ==================== 3. 傳送門：雙欄關卡出征與難度選擇頁面 (town/stage_select.js) ==================== -->
+<div id="stage-select-view" style="display:none;position:fixed;inset:0;background:rgba(9,13,26,0.92);z-index:880;flex-direction:column;align-items:center;justify-content:center;color:#f8fafc;padding:16px;">
+  <div style="width:100%;max-width:980px;background:#1e293b;border:2px solid #38bdf8;border-radius:14px;padding:18px;box-shadow:0 12px 36px rgba(0,0,0,0.65);">
+      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #334155;padding-bottom:10px;margin-bottom:12px;">
+          <div style="display:flex;align-items:center;gap:12px;">
+              <h2 style="margin:0;font-size:20px;color:#38bdf8;">🌌 雷蒂亞精靈傳送門 — 遠征地圖</h2>
+              <span id="stage-player-summary" style="font-size:13px;color:#cbd5e1;background:#0f172a;padding:4px 12px;border-radius:99px;border:1px solid #334155;"></span>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;">
+              <button type="button" class="music-toggle" data-music-toggle onclick="AudioManager.toggle()">🔊 音樂開</button>
+              <button onclick="closeStageSelectPage()" style="padding:6px 14px;background:#334155;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:bold;">⬅ 返回雷蒂亞村莊</button>
+          </div>
+      </div>
+      <div style="display:flex;gap:16px;min-height:440px;max-height:74vh;">
+          <!-- 左側：關卡清單 -->
+          <div id="stage-cards-container" style="width:300px;flex-shrink:0;display:flex;flex-direction:column;gap:8px;overflow-y:auto;padding-right:4px;"></div>
+          <!-- 右側：關卡詳細情報與 4 階難度按鈕 -->
+          <div id="stage-detail-panel" style="flex:1;background:#0f172a;border:1px solid #334155;border-radius:12px;padding:16px;display:flex;flex-direction:column;justify-content:space-between;overflow-y:auto;"></div>
+      </div>
+  </div>
+</div>
+
+<!-- ==================== 4. 通用 NPC 互動視窗容器 (npc/npc_*.js 共用) ==================== -->
+<div id="npc-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:950;align-items:center;justify-content:center;padding:16px;">
+  <div id="npc-modal-box" style="width:100%;max-width:720px;background:#0f172a;border:2px solid #facc15;border-radius:12px;padding:18px;color:#f8fafc;box-shadow:0 10px 30px rgba(0,0,0,0.6);"></div>
+</div>
+
+  <canvas id="gameCanvas"></canvas>
+  <div id="hud">
+    <div class="hud-box"></div>
+    <div class="hud-box" style="text-align:right;font-size:13px;line-height:1.5;">
+      <div id="timeText" style="font-size:18px;font-weight:bold;color:#fde047;">00:00</div>
+      <div>擊殺：<strong id="killText">0</strong> ｜ 連擊：<strong id="comboText">0</strong></div>
+      <div style="font-size:11px;color:#94a3b8;">[ESC/P]角色狀態 [L]升級 [B]精英王 [G]狂暴王 [T]+1分</div>
+      <button type="button" class="music-toggle" data-music-toggle onclick="AudioManager.toggle()">🔊 音樂開</button>
+    </div>
+  </div>
+  <div id="banner"></div>
+   <!-- 升級選卡視窗 -->
+   <div id="levelModal" class="modal">
+    <div class="panel" style="max-width:780px;">
+      <h2 style="color:#fde047;text-align:center;">✨ 選擇強化</h2>
+      <div id="modalSub" style="text-align:center;font-size:13px;color:#94a3b8;margin-top:4px;">點擊一張卡片，或按鍵盤 1 / 2 / 3</div>
+      <div id="cardContainer" class="card-grid"></div>
+      <div style="text-align:center;margin-top:14px;">
+        <button id="rerollCardBtn" onclick="rerollUpgradeChoices()" style="padding:7px 18px;font-size:13px;font-weight:bold;background:#1e293b;color:#fde047;border:1.5px solid #eab308;border-radius:8px;cursor:pointer;">
+          🎲 刷新卡片（30 Seed｜剩餘 3 次）
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ESC 暫停狀態面板 -->
+  <div id="pauseModal" class="modal">
+    <div class="panel" style="max-width:860px;">
+      <h2 style="color:#fde047;text-align:center;">⏸ 遊戲暫停 — 角色即時狀態</h2>
+      <div id="pauseContent" class="status-grid"></div>
+      <div style="display:flex;justify-content:center;gap:14px;margin-top:14px;">
+        <button type="button" class="music-toggle" data-music-toggle onclick="AudioManager.toggle()">🔊 音樂開</button>
+        <button class="stat-btn" style="width:180px;height:36px;background:#22c55e;" onclick="togglePause()">▶ 繼續戰鬥 (ESC / P)</button>
+        <button id="abandonBattleBtn" class="stat-btn" style="width:190px;height:36px;background:#ef4444;color:#fff;" onclick="abandonBattle()">放棄戰鬥（撤退結算）</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 結算視窗 -->
+  <div id="endModal" class="modal">
+    <div class="panel" style="max-width:520px;text-align:center;">
+      <h2 id="endTitle" style="color:#fde047;">天翼斷裂</h2>
+      <div id="endSummary" style="margin:14px 0;font-size:14px;line-height:1.7;"></div>
+      <button class="stat-btn" style="width:160px;height:36px;background:#38bdf8;" onclick="returnFromBattleToTown()">返回雷蒂亞</button>
+    </div>
+  </div>
+
+      <!-- ==================== 1. 靜態資料庫 (data/) ==================== -->
+      <script src="data/characters.js"></script>
+      <script src="data/raw_tw_skills.js"></script>
+      <script src="data/anims/anim_tichiel.js"></script>
+      <script src="data/town_raidia.js"></script>
+      <script src="data/weapons/item_weapon_swords.js"></script>
+      <script src="data/weapons/item_weapon_heavy.js"></script>
+      <script src="data/weapons/item_weapon_light.js"></script>
+      <script src="data/weapons/item_weapon_magic.js"></script>
+      <script src="data/weapons/item_weapons.js"></script>
+      <script src="data/armors/armor_body.js"></script>
+      <script src="data/armors/armor_parts.js"></script>
+      <script src="data/armors/armor_sub.js"></script>
+      <script src="data/armors/armor_special.js"></script>
+      <script src="data/armors/armor_wings.js"></script>
+      <script src="data/armors/item_armors.js"></script>
+      <script src="data/item_sets.js"></script>
+      <script src="data/item_event.js"></script>
+      <script src="data/item_consumable.js"></script>
+  
+            <!-- ==================== 2. 技能卡池資料庫 (skills/) ==================== -->
+            <script src="skills/skill_common.js"></script>
+            <script src="skills/skill_tichiel.js"></script>
+            <script src="skills/skill_lucien.js"></script>
+            <script src="skills/skill_sivelin.js"></script>     
+  
+      <!-- ==================== 3. 系統引擎層 (systems/) ==================== -->
+      <script src="systems/equip.js"></script>
+      <script src="systems/ui_battle.js"></script>
+  
+       <!-- ==================== 4. 局內核心戰鬥與存檔引擎 (core/) ==================== -->
+       <script src="core/audio.js"></script>
+       <script src="core/sprite_anim.js"></script>
+       <script src="core/save.js"></script>
+       <script src="core/resonance.js"></script>
+       <script src="core/combat.js"></script>
+       <script src="core/skill_exec.js"></script>
+       <script src="core/zones.js"></script>
+       <script src="core/projectiles.js"></script>
+       <script src="core/enemies.js"></script>
+       <script src="core/loot.js"></script>
+       <script src="core/render.js"></script>
+       <script src="core/sandbox.js"></script>
+       <script src="core/game.js"></script>
+   
+             <!-- ==================== 5. 局外城鎮、選角、選關與獨立 NPC (town/) ==================== -->
+      <script src="town/town.js"></script>
+      <script src="town/login.js"></script>
+      <script src="town/stage_select.js"></script>
+      <script src="town/NPC/npc_aizuwen.js"></script>
+      <script src="town/NPC/npc_kalipa.js"></script>
+      <script src="town/NPC/npc_qiedeluo.js"></script>
+      <script src="town/NPC/npc_feiya.js"></script> 
+       <script>
+         window.addEventListener('load', openLoginSelectScreen);
+     </script>
+</body>
+</html>

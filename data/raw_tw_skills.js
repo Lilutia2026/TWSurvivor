@@ -188,23 +188,24 @@ const RAW_TW_SKILLS_DB = {
         shuriken_throw:{ name: '手裡劍',   xien: '打擊系', stat: 'HACK+STAB', req: '無',                   sharedBy: [],                    tags: [] }
       },
     
-      sivelin: {
-        zeni_throw:    { name: '金錢鏢',       xien: '共通系', stat: 'SEED',      req: '無',                   sharedBy: ['lucien', 'ispin', 'maximin', 'naya', 'boris', 'mila', 'tichiel'], tags: ['shared'] },
-        power_crest:   { name: '力量紋章',     xien: '共通系', stat: 'MR',        req: '無',                   sharedBy: [],                    tags: [] },
-        platinum_body: { name: '白金之軀',     xien: '共通系', stat: 'DEF',       req: '無',                   sharedBy: [],                    tags: ['二轉'] },
-        provoke:       { name: '挑釁',         xien: '共通系', stat: '-',         req: '無',                   sharedBy: [],                    tags: [] },
-        spear_basic:   { name: '@刺槍術',      xien: '槍系',   stat: 'STAB',      req: '無',                   sharedBy: [],                    tags: ['basic_atk'] },
-        swallow_spear: { name: '飛燕連槍術',   xien: '槍系',   stat: 'STAB',      req: '無',                   sharedBy: [],                    tags: [] },
-        eight_whirl:   { name: '八旋舞槍訣',   xien: '槍系',   stat: 'STAB',      req: '無',                   sharedBy: [],                    tags: [] },
-        twin_dragon_sp:{ name: '雙龍飛槍舞',   xien: '槍系',   stat: 'STAB+HACK', req: '無',                   sharedBy: [],                    tags: [] },
-        crimson_wave:  { name: '赤龍波',       xien: '槍系',   stat: 'STAB',      req: '雙龍飛槍舞(20)+火舞飛連(10)', sharedBy: [],            tags: [] },
-        down_spin_sp:  { name: '@下旋槍術',    xien: '打擊系', stat: 'STAB+HACK', req: '無',                   sharedBy: [],                    tags: ['basic_atk'] },
-        round_thrust:  { name: '@回旋刺槍術',  xien: '打擊系', stat: 'STAB+HACK', req: '無',                   sharedBy: [],                    tags: ['basic_atk'] },
-        back_spear:    { name: '@回馬槍',      xien: '打擊系', stat: 'STAB+HACK', req: '無',                   sharedBy: [],                    tags: ['basic_atk'] },
-        shining_spear: { name: '閃耀刺擊槍',   xien: '打擊系', stat: 'HACK',      req: '無',                   sharedBy: [],                    tags: [] },
-        fire_dance_sp: { name: '火舞飛連',     xien: '打擊系', stat: 'STAB+HACK', req: '無',                   sharedBy: [],                    tags: [] },
-        red_dragon_sky:{ name: '紅龍登天',     xien: '打擊系', stat: 'STAB+HACK', req: '閃耀刺擊槍(10)+雙龍飛槍舞(20)', sharedBy: [],          tags: ['二轉'] }
-      },
+        sivelin: {
+          zeni_throw:       { name: '金錢鏢',       xien: '共通系', stat: 'SEED',      req: '無',                   sharedBy: ['lucien', 'ispin', 'maximin', 'naya', 'boris', 'mila', 'tichiel'], tags: ['shared'] },
+          power_crest:      { name: '力量紋章',     xien: '共通系', stat: 'MR',        req: '無',                   sharedBy: [],                    tags: ['selected'] },
+          provoke:          { name: '挑釁',         xien: '共通系', stat: '-',         req: '無',                   sharedBy: [],                    tags: ['selected'] },
+          bronze_body:      { name: '銅體',         xien: '任務系', stat: 'DEF',       req: '力量紋章(5)',          sharedBy: [],                    tags: ['二轉'] },
+          sky_fire_dragon:  { name: '舞天火龍閃',   xien: '任務系', stat: 'HACK',      req: '力量紋章(5)',          sharedBy: [],                    tags: ['selected'] },
+          spear_basic:      { name: '@刺槍術',      xien: '槍技系', stat: 'STAB',      req: '無',                   sharedBy: [],                    tags: ['basic_atk'] },
+          sky_whirl_spear:  { name: '迴天槍舞',     xien: '槍技系', stat: 'STAB',      req: '無',                   sharedBy: [],                    tags: ['selected'] },
+          eight_whirl:      { name: '八旋舞槍訣',   xien: '槍技系', stat: 'STAB',      req: '無',                   sharedBy: [],                    tags: ['selected'] },
+          flame_spear_dance:{ name: '烈燄舞槍訣',   xien: '槍技系', stat: 'STAB+HACK', req: '無',                   sharedBy: [],                    tags: ['selected'] },
+          crimson_wave:     { name: '紅龍破嶽',     xien: '槍技系', stat: 'STAB',      req: '迴天槍舞(20)+烈燄舞槍訣(10)', sharedBy: [],          tags: ['selected'] },
+          round_thrust:     { name: '@迴旋槍',      xien: '打擊系', stat: 'STAB+HACK', req: '無',                   sharedBy: [],                    tags: ['basic_atk'] },
+          back_spear:       { name: '@回馬槍',      xien: '打擊系', stat: 'STAB+HACK', req: '無',                   sharedBy: [],                    tags: ['basic_atk'] },
+          sweep_army:       { name: '橫掃千軍',     xien: '打擊系', stat: 'HACK',      req: '無',                   sharedBy: [],                    tags: [] },
+          shining_spear:    { name: '閃耀刺槍訣',   xien: '打擊系', stat: 'HACK',      req: '無',                   sharedBy: [],                    tags: ['selected'] },
+          swallow_spear:    { name: '飛燕連槍訣',   xien: '打擊系', stat: 'HACK',      req: '無',                   sharedBy: [],                    tags: ['selected'] },
+          red_dragon_sky:   { name: '紅龍登天',     xien: '槍技系', stat: 'STAB+HACK', req: '閃耀刺槍訣(10)+烈燄舞槍訣(20)', sharedBy: [],        tags: ['二轉'] }
+        }, 
     
       mila: {
         zeni_throw:    { name: '金錢鏢',       xien: '共通系', stat: 'SEED',      req: '無',                   sharedBy: ['lucien', 'ispin', 'maximin', 'naya', 'sivelin', 'boris', 'tichiel'], tags: ['shared'] },

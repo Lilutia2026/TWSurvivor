@@ -124,38 +124,45 @@ function rollStageDropRarity(enemyTier = 'mob', diffKey = 'normal', maxRarIdx = 
   return RARITY_ORDER[cappedIdx] || 'white';
 }
 
-// 生成未鑑定裝備（支援 minLv ~ maxLv 關卡區間鎖，嚴格排除翅膀、活動裝與合成專屬裝）
-function createUnidentifiedDrop(rarity = 'white', maxLv = CURRENT_DROP_MAX_LV, targetSlots = null, forceSelfChar = false, minLv = 0) {
-  const curCharData = typeof getCurrentCharData === 'function' ? getCurrentCharData() : { id: 'lucien', equipTags: ['all'] };
-  const charTags = curCharData.equipTags || ['all'];
+const SELF_EQUIPMENT_APPRAISAL_CHANCE = 0.75;
+
+function getDroppableEquipTemplates(minLv, maxLv, targetSlots = null) {
   const effectiveMaxLv = Math.min(maxLv || CURRENT_DROP_MAX_LV, CURRENT_DROP_MAX_LV);
   const effectiveMinLv = Math.max(0, Math.min(minLv || 0, effectiveMaxLv));
-  let candidates = EQUIP_TEMPLATES.filter(t =>
-    t.reqLv >= effectiveMinLv &&
-    t.reqLv <= effectiveMaxLv &&
-    !t.isWing &&
-    !t.isEvent &&
-    (!t.obtain || t.obtain === 'drop')
-  );
-  if (candidates.length === 0) {
-    candidates = EQUIP_TEMPLATES.filter(t =>
-      t.reqLv <= effectiveMaxLv && !t.isWing && !t.isEvent && (!t.obtain || t.obtain === 'drop')
-    );
-  }
-  if (targetSlots && targetSlots.length > 0) {
-    const f = candidates.filter(t => targetSlots.includes(t.slot));
-    if (f.length > 0) candidates = f;
-  }
-  const isFitChar = (t) => {
-    const tag = getItemCategoryTag(t);
-    return tag === 'all' || charTags.includes('all') || charTags.includes(tag);
+  const eligible = EQUIP_TEMPLATES.filter(t =>
+    t.reqLv <= effectiveMaxLv && !t.isWing && !t.isEvent && (!t.obtain || t.obtain === 'drop')
+    && (!targetSlots?.length || targetSlots.includes(t.slot)));
+  const inRange = eligible.filter(t => t.reqLv >= effectiveMinLv);
+  return inRange.length ? inRange : eligible;
+}
+
+function pickEquipTemplateForCharacter(candidates, preferSelf) {
+  const charTags = getCurrentCharData().equipTags || [];
+  const isFit = template => {
+    const tag = getItemCategoryTag(template);
+    return tag === 'all' || charTags.includes(tag);
   };
-  const wantSelf = forceSelfChar || (Math.random() < 0.65);
-  const selfPool = candidates.filter(isFitChar);
-  const otherPool = candidates.filter(t => !isFitChar(t));
-  const finalPool = (wantSelf && selfPool.length > 0) ? selfPool : (otherPool.length > 0 ? otherPool : candidates);
-  const tpl = finalPool[Math.floor(Math.random() * finalPool.length)];
+  const preferred = candidates.filter(template => isFit(template) === preferSelf);
+  const pool = preferred.length ? preferred : candidates;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+// 部位抽獎與保證本職掉落在生成時確定模板。
+function createUnidentifiedDrop(rarity = 'white', maxLv = CURRENT_DROP_MAX_LV, targetSlots = null, forceSelfChar = false, minLv = 0) {
+  const candidates = getDroppableEquipTemplates(minLv, maxLv, targetSlots);
+  const tpl = pickEquipTemplateForCharacter(candidates, forceSelfChar || Math.random() < 0.65);
+  if (!tpl) return null;
   return { uid: generateEquipUid(), tplId: tpl.tplId, slot: tpl.slot, rarity, identified: false };
+}
+
+function createBattleEquipmentDrop(rarity, { minLv, maxLv }, forceSelf = false) {
+  if (forceSelf) return createUnidentifiedDrop(rarity, maxLv, null, true, minLv);
+  const candidates = getDroppableEquipTemplates(minLv, maxLv);
+  const tpl = candidates[Math.floor(Math.random() * candidates.length)];
+  if (!tpl) return null;
+  // 掉落先確定部位和稀有度，鑑定時再依當前角色選模板。
+  return { uid: generateEquipUid(), tplId: tpl.tplId, slot: tpl.slot, rarity,
+    identified: false, appraisalRange: { minLv, maxLv } };
 }
 
 function createFirstClearWeapon(charId, variantId, { minLv, maxLv }) {
@@ -176,7 +183,12 @@ function createFirstClearWeapon(charId, variantId, { minLv, maxLv }) {
 
 // 鑑定裝備並生成浮動基礎數值、魔杖元素詞條、純戰鬥四色副詞條與傳說特效
 function identifyEquipItem(unidItem) {
-  const tpl = EQUIP_TEMPLATES.find(t => t.tplId === unidItem.tplId);
+  const range = unidItem.identified === false ? unidItem.appraisalRange : null;
+  const appraisedTemplate = range && pickEquipTemplateForCharacter(
+    getDroppableEquipTemplates(range.minLv, range.maxLv, [unidItem.slot]),
+    Math.random() < SELF_EQUIPMENT_APPRAISAL_CHANCE
+  );
+  const tpl = appraisedTemplate || EQUIP_TEMPLATES.find(t => t.tplId === unidItem.tplId);
   const rar = RARITIES[unidItem.rarity] || RARITIES.white;
   const realSub = tpl.subType || tpl.type || tpl.equipTag || tpl.slot;
   let assignedElem = tpl.wandElem || null;

@@ -46,22 +46,27 @@ function getEffectiveCdMult(extraFactor = 1.0) {
   return Math.max(0.35, player.cdMult * extraFactor);
 }
 
-// 計算物理（碰撞）減傷百分比（上限 70%，含小愛光之壁障術與路西安萊格藍治之護）
+// 計算物理（碰撞）減傷百分比（上限 70%，含小愛光之壁障術、路西安萊格藍治之護、希培林銅體與力量紋章代價）
 function getEffectivePhysReducePct(cs) {
   const basePct = (cs && cs.physReducePct) ? cs.physReducePct : 0;
   const wallLv = (typeof ownedPassives !== 'undefined' && ownedPassives.lightWall) ? ownedPassives.lightWall : 0;
   const guardLv = (typeof ownedPassives !== 'undefined' && ownedPassives.guard) ? ownedPassives.guard : 0;
-  const rawMult = (1 - basePct / 100) * Math.pow(0.97, wallLv + guardLv);
-  return Math.min(70, Math.round((1 - rawMult) * 100));
+  const bronzeLv = (typeof ownedPassives !== 'undefined' && ownedPassives.bronzeBody) ? ownedPassives.bronzeBody : 0;
+  const crestLv = (typeof ownedPassives !== 'undefined' && ownedPassives.powerCrest) ? ownedPassives.powerCrest : 0;
+  const rawMult = (1 - basePct / 100) * Math.pow(0.97, wallLv + guardLv + bronzeLv);
+  const netPct = Math.round((1 - rawMult) * 100) - crestLv * 4;
+  return Math.max(0, Math.min(70, netPct));
 }
 
-// 計算魔法（射彈）減傷百分比（上限 70%，含小愛魔法盾牌與路西安萊格藍治之護）
+// 計算魔法（射彈）減傷百分比（上限 70%，含小愛魔法盾牌、路西安萊格藍治之護與力量紋章代價）
 function getEffectiveMagReducePct(cs) {
   const basePct = (cs && cs.magReducePct) ? cs.magReducePct : 0;
   const msLv = (typeof ownedPassives !== 'undefined' && ownedPassives.magicShield) ? ownedPassives.magicShield : 0;
   const guardLv = (typeof ownedPassives !== 'undefined' && ownedPassives.guard) ? ownedPassives.guard : 0;
+  const crestLv = (typeof ownedPassives !== 'undefined' && ownedPassives.powerCrest) ? ownedPassives.powerCrest : 0;
   const rawMult = (1 - basePct / 100) * Math.pow(0.97, msLv) * Math.pow(0.985, guardLv);
-  return Math.min(70, Math.round((1 - rawMult) * 100));
+  const netPct = Math.round((1 - rawMult) * 100) - crestLv * 3;
+  return Math.max(0, Math.min(70, netPct));
 }
 
 // 【前端標籤中文化對照字典】底層使用英文代碼，前端自動渲染為繁體中文
@@ -98,7 +103,7 @@ const keys = {};
 window.addEventListener('keydown', e => {
   if (!battleSceneActive) return;
   keys[e.code] = true;
-  if (gameOver && e.code === 'KeyR') location.reload();
+  if (gameOver && e.code === 'KeyR') { returnFromBattleToTown(); return; }
   if (!gameOver && (e.code === 'Escape' || e.code === 'KeyP') && document.getElementById('levelModal').style.display !== 'flex') {
     togglePause(); return;
   }
@@ -154,7 +159,26 @@ function update(dt) {
   if (!victoryVacuumActive) gameTime += dt;
   if (bannerTimer > 0 && (bannerTimer -= dt) <= 0) document.getElementById('banner').style.display = 'none';
   if (player.thornsCd > 0) player.thornsCd -= dt;
+  if (player.crimsonHeartIcd > 0) player.crimsonHeartIcd -= dt;
   if (player.regen > 0) player.hp = Math.min(player.maxHp, player.hp + player.regen * dt);
+
+  const provokeLv = (typeof ownedPassives !== 'undefined' && ownedPassives.provoke) || 0;
+  if (provokeLv > 0 && !victoryVacuumActive && enemies.length > 0) {
+    player.provokeTimer = (player.provokeTimer || 0) - dt;
+    if (player.provokeTimer <= 0) {
+      player.provokeTimer = 0.33;
+      const pRad = (130 + provokeLv * 15) * (player.areaMult || 1.0);
+      const pChance = provokeLv * 0.06;
+      const durMult = (typeof getDerivedCombatStats === 'function' ? getDerivedCombatStats().statusDurMult : 1.0) || 1.0;
+      for (let i = 0; i < enemies.length; i++) {
+        const e = enemies[i];
+        if (!e || e.isDead || (e.statusImmuneTimer || 0) > 0) continue;
+        if (Math.hypot(e.x - player.x, e.y - player.y) <= pRad + e.radius && Math.random() < pChance) {
+          e.armorBreakTimer = Math.max(e.armorBreakTimer || 0, 3.0 * durMult);
+        }
+      }
+    }
+  }
 
   const isSandbox = typeof SANDBOX_STATE !== 'undefined' && SANDBOX_STATE.active;
   if (isSandbox) {
@@ -259,6 +283,7 @@ function resetBattleRun() {
   gems = []; chests = []; lootBags = []; runLoot = []; seedBags = []; fieldItems = [];
   Object.assign(player, INITIAL_BATTLE_PLAYER);
   delete player.dirInfo;
+  player.spriteAnimation = {};
   for (const key of Object.keys(keys)) delete keys[key];
   battleClickTarget = null;
   isMouseMoving = false;

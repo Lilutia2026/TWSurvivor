@@ -10,6 +10,8 @@
     canvas { display: block; }
     #hud { position: fixed; top: 12px; left: 12px; right: 12px; display: flex; justify-content: space-between; pointer-events: none; z-index: 10; }
     .hud-box { background: rgba(15, 23, 42, 0.85); border: 1px solid #475569; border-radius: 10px; padding: 8px 12px; }
+    .music-toggle { padding: 5px 9px; border-radius: 6px; border: 1px solid #34d399; background: #0f172a; color: #a7f3d0; font-size: 12px; cursor: pointer; white-space: nowrap; pointer-events: auto; }
+    .music-toggle[aria-pressed="false"] { color: #cbd5e1; border-color: #64748b; }
     #banner { position: fixed; top: 82px; left: 50%; transform: translateX(-50%); background: rgba(180, 83, 9, 0.94); border: 2px solid #facc15; padding: 8px 20px; border-radius: 999px; font-weight: bold; display: none; z-index: 15; }
     .modal { position: fixed; inset: 0; background: rgba(2, 6, 23, 0.86); display: none; align-items: center; justify-content: center; z-index: 30; }
     .panel { background: #1e293b; border: 2px solid #eab308; border-radius: 14px; padding: 18px; width: min(1040px, 95vw); max-height: 92vh; overflow-y: auto; }
@@ -70,9 +72,12 @@
     <!-- ==================== 1. 登入與角色選擇頁面 (town/login.js) ==================== -->
 <div id="login-select-view">
   <main class="login-layout" aria-labelledby="login-heading">
-    <header>
+    <header style="display:flex;justify-content:space-between;align-items:flex-end;gap:8px;">
+      <div>
       <p class="login-game-title">天翼之鍊倖存者</p>
       <h1 id="login-heading">選擇角色</h1>
+      </div>
+      <button type="button" class="music-toggle" data-music-toggle onclick="AudioManager.toggle()">🔊 音樂開</button>
     </header>
     <section class="login-showcase" id="login-showcase" aria-labelledby="login-character-name">
       <div class="login-stage">
@@ -116,7 +121,10 @@
               <h2 style="margin:0;font-size:20px;color:#38bdf8;">🌌 雷蒂亞精靈傳送門 — 遠征地圖</h2>
               <span id="stage-player-summary" style="font-size:13px;color:#cbd5e1;background:#0f172a;padding:4px 12px;border-radius:99px;border:1px solid #334155;"></span>
           </div>
-          <button onclick="closeStageSelectPage()" style="padding:6px 14px;background:#334155;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:bold;">⬅ 返回雷蒂亞村莊</button>
+          <div style="display:flex;gap:6px;align-items:center;">
+              <button type="button" class="music-toggle" data-music-toggle onclick="AudioManager.toggle()">🔊 音樂開</button>
+              <button onclick="closeStageSelectPage()" style="padding:6px 14px;background:#334155;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:bold;">⬅ 返回雷蒂亞村莊</button>
+          </div>
       </div>
       <div style="display:flex;gap:16px;min-height:440px;max-height:74vh;">
           <!-- 左側：關卡清單 -->
@@ -139,6 +147,7 @@
       <div id="timeText" style="font-size:18px;font-weight:bold;color:#fde047;">00:00</div>
       <div>擊殺：<strong id="killText">0</strong> ｜ 連擊：<strong id="comboText">0</strong></div>
       <div style="font-size:11px;color:#94a3b8;">[ESC/P]角色狀態 [L]升級 [B]精英王 [G]狂暴王 [T]+1分</div>
+      <button type="button" class="music-toggle" data-music-toggle onclick="AudioManager.toggle()">🔊 音樂開</button>
     </div>
   </div>
   <div id="banner"></div>
@@ -162,6 +171,7 @@
       <h2 style="color:#fde047;text-align:center;">⏸ 遊戲暫停 — 角色即時狀態</h2>
       <div id="pauseContent" class="status-grid"></div>
       <div style="display:flex;justify-content:center;gap:14px;margin-top:14px;">
+        <button type="button" class="music-toggle" data-music-toggle onclick="AudioManager.toggle()">🔊 音樂開</button>
         <button class="stat-btn" style="width:180px;height:36px;background:#22c55e;" onclick="togglePause()">▶ 繼續戰鬥 (ESC / P)</button>
         <button id="abandonBattleBtn" class="stat-btn" style="width:190px;height:36px;background:#ef4444;color:#fff;" onclick="abandonBattle()">放棄戰鬥（撤退結算）</button>
       </div>
@@ -173,14 +183,14 @@
     <div class="panel" style="max-width:520px;text-align:center;">
       <h2 id="endTitle" style="color:#fde047;">天翼斷裂</h2>
       <div id="endSummary" style="margin:14px 0;font-size:14px;line-height:1.7;"></div>
-      <button class="stat-btn" style="width:160px;height:36px;background:#38bdf8;" onclick="location.reload()">返回選角</button>
+      <button class="stat-btn" style="width:160px;height:36px;background:#38bdf8;" onclick="returnFromBattleToTown()">返回雷蒂亞</button>
     </div>
   </div>
 
       <!-- ==================== 1. 靜態資料庫 (data/) ==================== -->
       <script src="data/characters.js"></script>
       <script src="data/raw_tw_skills.js"></script>
-      <script src="data/anims/anim_tichiel.js"></script>
+      <script src="data/anims/anim_eight_idle_run.js"></script>
       <script src="data/town_raidia.js"></script>
       <script src="data/weapons/item_weapon_swords.js"></script>
       <script src="data/weapons/item_weapon_heavy.js"></script>
@@ -197,10 +207,11 @@
       <script src="data/item_event.js"></script>
       <script src="data/item_consumable.js"></script>
   
-      <!-- ==================== 2. 技能卡池資料庫 (skills/) ==================== -->
-      <script src="skills/skill_common.js"></script>
-      <script src="skills/skill_tichiel.js"></script>
-      <script src="skills/skill_lucien.js"></script>
+            <!-- ==================== 2. 技能卡池資料庫 (skills/) ==================== -->
+            <script src="skills/skill_common.js"></script>
+            <script src="skills/skill_tichiel.js"></script>
+            <script src="skills/skill_lucien.js"></script>
+            <script src="skills/skill_sivelin.js"></script>     
   
       <!-- ==================== 3. 系統引擎層 (systems/) ==================== -->
       <script src="systems/equip.js"></script>

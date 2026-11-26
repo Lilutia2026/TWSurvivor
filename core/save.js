@@ -1,6 +1,33 @@
 const LEGACY_SAVE_KEY = 'tw_survivor_save_v2_4';
 const SAVE_KEY = 'tw_survivor_trial_profiles';
 const MAX_OUT_LV = 255;
+const DEV_ONLY = true;
+const DEV_PLAY_COUNTS_KEY = 'tw_survivor_dev_play_counts';
+let countedDevSession = false;
+let devPlayCounts = { sessions: 0, runs: 0, clears: 0 };
+
+function getDevPlayCounts() {
+  if (!DEV_ONLY) return null;
+  try {
+    const stored = JSON.parse(localStorage.getItem(DEV_PLAY_COUNTS_KEY));
+    for (const key of Object.keys(devPlayCounts)) {
+      if (Number.isSafeInteger(stored?.[key]) && stored[key] > devPlayCounts[key]) devPlayCounts[key] = stored[key];
+    }
+  } catch (e) { /* 統計仍可在本次遊戲中使用 */ }
+  return devPlayCounts;
+}
+
+function recordDevPlayCount(key) {
+  if (!DEV_ONLY) return;
+  if (key === 'sessions') {
+    if (countedDevSession) return;
+    countedDevSession = true;
+  }
+  const counts = getDevPlayCounts();
+  counts[key]++;
+  try { localStorage.setItem(DEV_PLAY_COUNTS_KEY, JSON.stringify(counts)); }
+  catch (e) { /* 統計不影響遊戲存檔 */ }
+}
 
 const DEFAULT_SAVE = {
   charId: 'lucien',
@@ -291,6 +318,10 @@ function getDerivedCombatStats() {
   const physReducePct = Math.min(70, Math.round((1 - (1 - 0.50 * (defCap / 255)) * (1 - eqPhysRed)) * 100));
   const magReducePct = Math.min(70, Math.round((1 - (1 - 0.50 * (mrCap / 255)) * (1 - eqMagRed)) * 100));
   const passiveDoubleHit = (typeof player !== 'undefined' && player.bonusDoubleHit) ? player.bonusDoubleHit : 0;
+  const pCrestLv = (typeof ownedPassives !== 'undefined' && ownedPassives.powerCrest) || 0;
+  const bBodyLv = (typeof ownedPassives !== 'undefined' && ownedPassives.bronzeBody) || 0;
+  const finalPhysRed = Math.max(0, Math.min(70, physReducePct - pCrestLv * 4 + bBodyLv * 3));
+  const finalMagRed = Math.max(0, Math.min(70, magReducePct - pCrestLv * 3));
 
   return {
     st,
@@ -299,7 +330,7 @@ function getDerivedCombatStats() {
     statusDurMult: 1 + iCap * 0.003,
     statusChanceBonus: Math.min(0.45, mrCap * 0.0012 + (st.statusChance || 0) / 100),
     maxHp: (variant.initHp || 200) + st.DEF * 3 + st.hp,
-    physReducePct, magReducePct,
+    physReducePct: finalPhysRed, magReducePct: finalMagRed,
     defThornsDmg: Math.round(st.DEF * 0.8),
     critRate: 0.05 + dexCap * 0.001 + (st.critRate || 0) / 100,
     expBonusMult: 1 + dexCap * 0.001,
@@ -495,6 +526,9 @@ function startBattle(stageId, diffKey, { sandbox = false } = {}) {
     ownedSkills[sigSkill] = { lv: startLv, evolved: false, disabled: false };
   }
   if (typeof ownedPassives !== 'undefined') { for (const k of Object.keys(ownedPassives)) delete ownedPassives[k]; }
-  if (!sandbox) enterBattleScene();
+  if (!sandbox) {
+    enterBattleScene();
+    recordDevPlayCount('runs');
+  }
   return true;
 }

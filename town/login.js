@@ -117,12 +117,16 @@ function renderLoginPreview(character) {
     }
 
     const meta = window.CHAR_ANIM_REGISTRY[character.id];
-    const idle = meta?.animations?.idle;
-    const base = ['down', 'downLeft', 'left', 'upLeft', 'up'].find(direction => idle?.[direction]?.length);
+    const timedIdle = meta?.timedAnimations?.preview || meta?.timedAnimations?.idle;
+    const idle = timedIdle || meta?.animations?.idle;
+    const base = ['down', 'downLeft', 'left', 'upLeft', 'up'].find(direction =>
+        (timedIdle ? idle[direction]?.frames : idle?.[direction])?.length
+    );
     if (!base) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    const frames = idle[base].map(label => meta.frames?.[label]).filter(Boolean);
+    const labels = timedIdle ? idle[base].frames.map(frame => frame.id) : idle[base];
+    const frames = labels.map(label => meta.frames?.[label]).filter(Boolean);
     if (frames.length === 0) return;
     const scale = Math.min(
         canvas.width * .58 / Math.max(...frames.map(frame => frame.w)),
@@ -131,6 +135,7 @@ function renderLoginPreview(character) {
     const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     const atlas = SpriteAnimManager.ensureLoaded(character.id);
     if (!atlas) return;
+    const animationState = {};
     const draw = now => {
         loginPreviewFrame = null;
         if (version !== loginPreviewVersion || view.style.display !== 'flex') return;
@@ -140,8 +145,10 @@ function renderLoginPreview(character) {
         }
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         const drawn = SpriteAnimManager.drawCharacter(ctx, character.id, canvas.width / 2, canvas.height * .78, {
-            dirInfo: { base, mirror: false },
-            timeSec: reducedMotion ? Number.EPSILON : now / 1000,
+            dirInfo: SpriteAnimManager.mapDirToBase(base),
+            previewPose: true,
+            timeSec: reducedMotion ? 0 : now / 1000,
+            animationState,
             scale,
             footSink: 0
         });
@@ -159,5 +166,6 @@ function confirmEnterTownFromLogin() {
     if (!switchCharacterVariant(loginCharacterId, loginVariantId)) return;
     stopLoginPreview();
     if (typeof saveGame === 'function') saveGame();
+    recordDevPlayCount('sessions');
     if (typeof enterTownClad === 'function') enterTownClad();
 }

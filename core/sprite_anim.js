@@ -43,7 +43,7 @@ const SpriteAnimManager = {
       const entry = { meta, img: rawImg, loaded: false, loading: true };
       rawImg.onload = () => {
         try {
-          entry.img = this.stripColorKey(rawImg);
+          if (!meta.timedAnimations) entry.img = this.stripColorKey(rawImg);
         } catch (error) {
           // 本機檔案環境可能禁止讀回像素，透明 PNG 仍可直接繪製。
           if (error.name !== 'SecurityError') throw error;
@@ -90,23 +90,43 @@ const SpriteAnimManager = {
     return table[dir8] || table.down;
   },
 
+  getTimedFrame(clip, nowMs, state) {
+    if (state && state.clip !== clip) {
+      state.clip = clip;
+      state.startedAtMs = nowMs;
+    }
+    if (clip.durationMs === 0) return clip.frames[0];
+    const elapsedMs = (nowMs - (state?.startedAtMs ?? 0)) % clip.durationMs;
+    return clip.frames.find(frame => elapsedMs < frame.endMs);
+  },
+
   // 繪製角色當前動畫幀（回傳 true 代表成功繪製精靈，false 代表未就緒需走方塊備案）
   drawCharacter(ctx, charId, x, y, opts = {}) {
     const entry = this.ensureLoaded(charId);
     if (!entry || !entry.loaded || !entry.meta) return false;
 
     const { meta, img } = entry;
-    const isMoving = !!opts.isMoving;
-    const action = (isMoving && meta.animations?.run) ? 'run' : 'idle';
-    const dirInfo = opts.dirInfo || { base: 'down', mirror: false };
-    const seq = (meta.animations?.[action]?.[dirInfo.base]) || (meta.animations?.idle?.down) || [];
-    if (seq.length === 0) return false;
-
-    const fps = isMoving
-    ? (meta.runFps || (meta.defaultFps || 9) * 1.15)
-    : (meta.idleFps || (meta.defaultFps || 9) * 0.70);
-    const timeSec = opts.timeSec || (performance.now() / 1000);
-    const frameLabel = seq[Math.floor(timeSec * fps) % seq.length];
+    const dirInfo = opts.dirInfo || this.mapDirToBase('down');
+    const timeMs = opts.timeSec != null ? opts.timeSec * 1000 : performance.now();
+    let frameLabel, mirror;
+    if (meta.timedAnimations) {
+      const action = opts.isMoving && meta.timedAnimations.run ? 'run' : 'idle';
+      const direction = dirInfo.dir8 || dirInfo.base;
+      const preview = opts.previewPose ? meta.timedAnimations.preview?.[direction] : undefined;
+      const clip = preview || meta.timedAnimations[action]?.[direction] || meta.timedAnimations.idle?.down;
+      if (!clip) return false;
+      const frame = this.getTimedFrame(clip, timeMs, opts.animationState);
+      frameLabel = frame?.id;
+      mirror = frame?.mirror;
+    } else {
+      const action = opts.isMoving && meta.animations?.run ? 'run' : 'idle';
+      const seq = meta.animations?.[action]?.[dirInfo.base] || meta.animations?.idle?.down;
+      if (!seq?.length) return false;
+      const defaultFps = meta.defaultFps || 9;
+      const fps = opts.isMoving ? (meta.runFps || defaultFps * 1.15) : (meta.idleFps || defaultFps * 0.70);
+      frameLabel = seq[Math.floor(timeMs * fps / 1000) % seq.length];
+      mirror = dirInfo.mirror;
+    }
     const f = meta.frames?.[frameLabel];
     if (!f) return false;
 
@@ -119,17 +139,20 @@ const SpriteAnimManager = {
     ctx.ellipse(x, y + 2, 16 * scale, 7 * scale, 0, 0, Math.PI * 2);
     ctx.fill();
 
-        // 繪製精靈貼圖（+ 9 * scale 讓鞋底嚴絲合縫踩進腳底陰影中）
-        const footSink = (opts.footSink !== undefined ? opts.footSink : 9) * scale;
-        ctx.translate(x, y);
-        if (dirInfo.mirror) ctx.scale(-1, 1);
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(
-          img,
-          f.x, f.y, f.w, f.h,
-          f.ax * scale, f.ay * scale + footSink, f.w * scale, f.h * scale
-        );
-        ctx.restore();
-        return true;   
+    const footSink = (opts.footSink ?? (meta.timedAnimations ? 0 : 9)) * scale;
+    ctx.translate(x, y);
+    if (mirror) {
+      // 新資料以圖片本身的中心翻轉，和 HTML 預覽的定位相同。
+      if (meta.timedAnimations) ctx.translate((2 * f.ax + f.w) * scale, 0);
+      ctx.scale(-1, 1);
+    }
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(
+      img,
+      f.x, f.y, f.w, f.h,
+      f.ax * scale, f.ay * scale + footSink, f.w * scale, f.h * scale
+    );
+    ctx.restore();
+    return true;
   }
 };

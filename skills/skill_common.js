@@ -17,10 +17,10 @@ function registerGlobalPassives(passivesObj) {
   }
 }
 
-// 全角色共通輔助技能池（共 12 張，上限 LV.5）
+// 全角色共通輔助技能池（共 14 張，上限 LV.5）
 const COMMON_PASSIVES = {
-  might:      { name: '⚔️ 鬥志增幅',     skillTags: ['common'], maxLv: 5, desc: '每級全技能最終傷害 +8%（滿級 +40%）' },
-  cdr:        { name: '⏳ 迅捷詠唱',     skillTags: ['common'], maxLv: 5, desc: '每級全技能冷卻縮減 +6%（總冷卻縮減上限 65%）' },
+  might:      { name: '⚔️ 鬥志增幅',     skillTags: ['common'], maxLv: 5, desc: '每級全技能最終傷害 +5%（滿級 +25%）' },
+  cdr:        { name: '⏳ 迅捷詠唱',     skillTags: ['common'], maxLv: 5, desc: '每級全技能冷卻縮減 +5%（總冷卻縮減上限 65%）' },
   area:       { name: '🌐 領域擴張',     skillTags: ['common'], maxLv: 5, desc: '每級全技能攻擊範圍 +6%（滿級 +30%）' },
   crit:       { name: '🎯 弱點洞察',     skillTags: ['common'], maxLv: 5, desc: '每級全技能暴擊率 +4%（滿級 +20%）' },
   resonance:  { name: '🔮 元素共鳴增幅', skillTags: ['common'], maxLv: 5, desc: '每級元素異常與共鳴觸發傷害 +12%（滿級 +60%）' },
@@ -30,9 +30,11 @@ const COMMON_PASSIVES = {
   manaShield: { name: '💠 魔力護盾',     skillTags: ['common'], maxLv: 5, desc: '每 12 秒生成 15% 最大生命護盾（每級護盾 +5%、冷卻 -1 秒）' },
   thorns:     { name: '🌵 荊棘反甲',     skillTags: ['common'], maxLv: 5, desc: '受碰撞時對該敵人反彈 DEF×150% 傷害並擊退（每級 +50%）' },
   greed:      { name: '💰 貪婪祝福',     skillTags: ['common'], maxLv: 5, desc: '每級結算獲得 Seed 貨幣 +15%（滿級 +75%）' },
+  expBoost:   { name: '📖 博學啟迪',     skillTags: ['common'], maxLv: 5, desc: '每級局內經驗獲取 +10%（滿級 +50%）' },
   curse:      { name: '💀 暗黑詛咒',     skillTags: ['common'], maxLv: 5, desc: '每級怪物生命、移速與刷怪頻率 +10%（滿級 +50%）' },
   magnet:     { name: '🧲 強力磁鐵',     skillTags: ['common'], maxLv: 5, desc: '每級拾取範圍 +20%（滿級 +100%）' }
 };
+
 registerGlobalPassives(COMMON_PASSIVES);
 
 // 雙向標籤篩選：依角色 skillTags、reqChar、reqWeaponTypes 與元素詞條過濾出本局可選主動池

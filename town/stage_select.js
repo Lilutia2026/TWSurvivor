@@ -81,7 +81,7 @@ function renderStageSelectCards() {
         const chestStyle = cleared
             ? 'opacity:0.28;filter:grayscale(1);'
             : 'filter:drop-shadow(0 0 4px rgba(250,204,21,0.85));';
-        const chestTitle = cleared ? '已領取首通金色傳說寶箱' : '首次通關必得金色傳說寶箱！';
+        const chestTitle = cleared ? '已領取首通金色武器' : '首次通關必得本職金色武器';
         return `<button onclick="selectStageDifficulty('${d.key}')" title="${chestTitle}" style="flex:1;padding:8px 6px;border-radius:8px;border:2px solid ${active ? d.color : '#334155'};background:${active ? '#1e293b' : '#0b1120'};color:${active ? d.color : '#94a3b8'};font-weight:bold;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;">
             <span>${d.name}</span>
             <span style="font-size:14px;${chestStyle}">🎁</span>

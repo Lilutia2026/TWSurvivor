@@ -1,5 +1,5 @@
 // ============================================================================
-// 《TW倖存者》卡雷德自由市場：空間行走與 F 鍵互動分發引擎 (core/town.js) [1/2]
+// 《TW倖存者》雷蒂亞村莊的移動與互動
 // ============================================================================
 
 const TOWN_STATE = {
@@ -17,6 +17,7 @@ const TOWN_STATE = {
     activeTarget: null,
     bgImg: null,
     bgLoaded: false,
+    bgLoadFailed: false,
     roomCode: 'RAID-' + Math.random().toString(36).substring(2, 6).toUpperCase(),
     roomMembers: [], // 預留私人房主世界（1~4 人）同步接口
     isNight: null,   // null = 自動同步真實時間（18:00~05:59 為星夜）；true/false = 手動切換
@@ -96,11 +97,13 @@ function enterTownClad(keepPos = false) {
    
     TOWN_STATE.player.targetX = null;
     TOWN_STATE.player.targetY = null; 
+    TOWN_STATE.player.walkTime = 0;
+    TOWN_STATE.player.spriteAnimation = {};
 
     if (!TOWN_STATE.bgImg && TOWN_CLAD_MAP.bgImage) {
         const img = new Image();
         img.onload = () => { TOWN_STATE.bgLoaded = true; };
-        img.onerror = () => { TOWN_STATE.bgLoaded = false; };
+        img.onerror = () => { TOWN_STATE.bgLoadFailed = true; };
         img.src = TOWN_CLAD_MAP.bgImage;
         TOWN_STATE.bgImg = img;
     }
@@ -112,7 +115,7 @@ function enterTownClad(keepPos = false) {
     TOWN_STATE.rafId = requestAnimationFrame(townLoop);
 }
 
-// 離開卡雷德市集
+// 離開雷蒂亞村莊
 function leaveTownClad() {
     TOWN_STATE.active = false;
     if (TOWN_STATE.rafId) {
@@ -138,7 +141,7 @@ function triggerTownInteractable(target) {
     }
 }
 // ============================================================================
-// 《TW倖存者》卡雷德自由市場 (core/town.js) [2/2] - 銜接於 triggerTownInteractable 之後
+// 雷蒂亞畫布與操作
 // ============================================================================
 function syncTownViewportSize() {
     if (!TOWN_STATE.canvas) return;
@@ -236,7 +239,7 @@ function townLoop(now) {
     if (!TOWN_STATE.active) return;
     const dt = Math.min(0.05, (now - TOWN_STATE.lastTime) / 1000);
     TOWN_STATE.lastTime = now;
-    updateTownPlayer(dt);
+    if (TOWN_STATE.bgLoaded) updateTownPlayer(dt);
     drawTownScene();
     TOWN_STATE.rafId = requestAnimationFrame(townLoop);
 }
@@ -351,96 +354,23 @@ function drawTownScene() {
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
     ctx.clearRect(0, 0, viewW, viewH);
+    if (!TOWN_STATE.bgLoaded) {
+        ctx.save();
+        ctx.fillStyle = '#0b1120';
+        ctx.fillRect(0, 0, viewW, viewH);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = '16px sans-serif';
+        ctx.fillStyle = '#cbd5e1';
+        ctx.fillText(TOWN_STATE.bgLoadFailed ? '雷蒂亞地圖載入失敗' : '雷蒂亞地圖載入中…', viewW / 2, viewH / 2);
+        ctx.restore();
+        return;
+    }
     ctx.save();
     ctx.scale(z, z);
     ctx.translate(-TOWN_STATE.camX, -TOWN_STATE.camY);
 
-    if (TOWN_STATE.bgLoaded && TOWN_STATE.bgImg) {
-        ctx.drawImage(TOWN_STATE.bgImg, 0, 0, W, H);
-    } else {
-        // 1. 樹海背景底色
-        ctx.fillStyle = isNight ? '#071318' : '#143322';
-        ctx.fillRect(0, 0, W, H);
-
-        // 2. 左區巨樹生活廣場平台
-        ctx.fillStyle = isNight ? '#5c3a21' : '#9a6338';
-        ctx.strokeStyle = '#451a03';
-        ctx.lineWidth = 6;
-        ctx.beginPath();
-        ctx.roundRect(80, 130, 500, 580, 48);
-        ctx.fill();
-        ctx.stroke();
-
-        // 3. 中央連接木棧道橋樑
-        ctx.fillStyle = isNight ? '#6b4426' : '#b47846';
-        ctx.beginPath();
-        ctx.roundRect(560, 320, 260, 190, 12);
-        ctx.fill();
-        ctx.stroke();
-        // 木板紋路
-        ctx.strokeStyle = 'rgba(69,26,3,0.45)';
-        ctx.lineWidth = 2;
-        for (let bx = 585; bx <= 800; bx += 28) {
-            ctx.beginPath(); ctx.moveTo(bx, 324); ctx.lineTo(bx, 506); ctx.stroke();
-        }
-
-                       // 4. 右區冒險傳送高台（下移讓出上方空間給慶典高台）
-        ctx.fillStyle = isNight ? '#5c3a21' : '#9a6338';
-        ctx.strokeStyle = '#451a03';
-        ctx.lineWidth = 6;
-        ctx.beginPath();
-        ctx.roundRect(800, 310, 400, 390, 44);
-        ctx.fill();
-        ctx.stroke();
-
-        // 4.1 北側連接垂直木棧道（連接右區傳送高台與上方慶典高台）
-        ctx.fillStyle = isNight ? '#6b4426' : '#b47846';
-        ctx.beginPath();
-        ctx.roundRect(930, 225, 140, 100, 10);
-        ctx.fill();
-        ctx.stroke();
-        ctx.strokeStyle = 'rgba(69,26,3,0.45)';
-        ctx.lineWidth = 2;
-        for (let by = 242; by <= 310; by += 22) {
-            ctx.beginPath(); ctx.moveTo(934, by); ctx.lineTo(1066, by); ctx.stroke();
-        }
-
-        // 4.2 北側「樹冠慶典高台」（未來活動 NPC、任務告示牌與公會使者專區）
-        ctx.fillStyle = isNight ? '#5c3a21' : '#9a6338';
-        ctx.strokeStyle = '#451a03';
-        ctx.lineWidth = 6;
-        ctx.beginPath();
-        ctx.roundRect(760, 48, 460, 190, 36);
-        ctx.fill();
-        ctx.stroke();
-        ctx.fillStyle = isNight ? 'rgba(254,240,138,0.28)' : 'rgba(255,255,255,0.32)';
-        ctx.font = 'bold 14px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('🎪 樹冠慶典高台（活動 NPC・任務・公會預留區）', 990, 145);
-
-        // 4.5 橋頭兩端「雷蒂亞精靈燈籠」（橫橋兩端＋北橋兩端共 4 盞）
-        const lanterns = [
-            { x: 822, y: 345 },
-            { x: 822, y: 515 },
-            { x: 915, y: 230 },
-            { x: 1085, y: 230 }
-        ];
-        for (const ln of lanterns) {
-            ctx.fillStyle = '#451a03';
-            ctx.fillRect(ln.x - 3, ln.y - 34, 6, 34);
-            ctx.beginPath(); ctx.arc(ln.x, ln.y, 7, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = isNight ? '#fef08a' : '#f59e0b';
-            ctx.strokeStyle = '#78350f';
-            ctx.lineWidth = 2;
-            ctx.beginPath(); ctx.roundRect(ln.x - 8, ln.y - 46, 16, 18, 5); ctx.fill(); ctx.stroke();
-        }
-
-              // 頂部操作提示文字（靠左上方樹海空白處避免遮擋慶典高台）
-              ctx.fillStyle = isNight ? 'rgba(254,240,138,0.28)' : 'rgba(255,255,255,0.32)';
-              ctx.font = 'bold 14px sans-serif';
-              ctx.textAlign = 'left';
-              ctx.fillText('🌿 樹上精靈村・雷蒂亞（WASD／左鍵移動 ｜ 靠近 NPC、水晶或傳送門按 [F] 互動）', 88, 95);     
-    }
+    ctx.drawImage(TOWN_STATE.bgImg, 0, 0, W, H);
 
     const list = TOWN_CLAD_MAP.interactables.map(d => ({ kind: 'item', y: d.y, data: d }));
     list.push({ kind: 'player', y: TOWN_STATE.player.y, data: TOWN_STATE.player });
@@ -455,10 +385,12 @@ function drawTownScene() {
             const isMoving = p.walkTime > 0;
 
             if (typeof SpriteAnimManager !== 'undefined') {
-                p.dirInfo = SpriteAnimManager.resolveDir8(p.vx || 0, p.vy || 0, p.dirInfo?.dir8 || 'down');
+                p.dirInfo = SpriteAnimManager.resolveDir8(isMoving ? p.vx : 0, isMoving ? p.vy : 0, p.dirInfo?.dir8 || 'down');
             }
             const drewSprite = (typeof SpriteAnimManager !== 'undefined') &&
-                SpriteAnimManager.drawCharacter(ctx, charId, p.x, p.y, { isMoving, dirInfo: p.dirInfo, scale: 0.92 });
+                SpriteAnimManager.drawCharacter(ctx, charId, p.x, p.y, {
+                    isMoving, dirInfo: p.dirInfo, animationState: p.spriteAnimation, scale: 0.92
+                });
 
             if (!drewSprite) {
                 ctx.fillStyle = charColor; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
@@ -529,19 +461,21 @@ function updateTownHeaderInfo() {
     const seedVal = saveData.seed ?? 0;
     const mailLen = Array.isArray(saveData.mailbox) ? saveData.mailbox.length : 0;
     const isNight = getRaidiaNightMode();
-    const bgmOn = typeof AudioManager !== 'undefined' ? AudioManager.enabled : true;
+    const stats = DEV_ONLY ? getDevPlayCounts() : null;
     const btnCss = 'margin-left:6px;padding:4px 9px;border-radius:6px;background:#0f172a;color:#e2e8f0;border:1px solid #475569;cursor:pointer;font-size:12px;';
     el.innerHTML = `<span>👤 <b>${cName}</b> (LV.${lv})</span>` +
         `<span style="margin-left:10px;">💰 <b>${seedVal.toLocaleString()}</b></span>` +
         `<button onclick="toggleTownDayNight()" title="點擊切換雷蒂亞白晝／星夜光影與BGM" style="${btnCss}border-color:${isNight ? '#818cf8' : '#facc15'};color:${isNight ? '#c7d2fe' : '#fde047'};">${isNight ? '🌙 雷蒂亞・星夜' : '☀️ 雷蒂亞・白晝'}</button>` +
-        `<button onclick="if(typeof AudioManager!=='undefined'){AudioManager.toggle();updateTownHeaderInfo();}" style="${btnCss}border-color:#34d399;color:${bgmOn ? '#6ee7b7' : '#94a3b8'};">${bgmOn ? '🔊 BGM:開' : '🔇 BGM:關'}</button>` +
+        '<button type="button" class="music-toggle" data-music-toggle onclick="AudioManager.toggle()" style="margin-left:6px;">🔊 音樂開</button>' +
         `<button onclick="toggleTownShortcutModal('bag')" style="${btnCss}border-color:#38bdf8;color:#38bdf8;">🎒 背包 [I]</button>` +
         `<button onclick="toggleTownShortcutModal('stats')" style="${btnCss}border-color:#facc15;color:#facc15;">📊 素質 [C]</button>` +
         `<button onclick="toggleTownShortcutModal('party')" style="${btnCss}border-color:#4ade80;color:#4ade80;">👥 組隊 [P]</button>` +
         `<button onclick="openTownMailbox()" style="${btnCss}border-color:#f59e0b;color:#fbbf24;">📬 信箱 (${mailLen})</button>` +
         `<button onclick="openTownCardPoolModal()" style="${btnCss}border-color:#a855f7;background:#581c87;color:#f3e8ff;">🃏 卡池</button>` +
         `<button onclick="enterSandboxArena()" style="${btnCss}border-color:#0284c7;background:#0369a1;color:#fff;">🧪 木樁修鍊場</button>` +
-        `<button onclick="logoutToCharacterSelect()" style="${btnCss}">🚪 登出</button>`;
+        `<button onclick="logoutToCharacterSelect()" style="${btnCss}">🚪 登出</button>` +
+        (stats ? `<span style="margin-left:10px;color:#94a3b8;font-size:11px;">本機試玩 ${stats.sessions} 人次・出征 ${stats.runs} 場・通關 ${stats.clears} 場</span>` : '');
+    AudioManager.syncToggleButtons(el);
 }
 
 // 臨時功能：預覽當前角色與武器配置在局內可抽到的完整主動／被動卡池
@@ -794,7 +728,7 @@ function openTownStatsModal() {
             openNpcModalShell('👥 組隊與世界成員列表 [P]', `當前人數：${1 + members.length} / 4 ｜ 房間碼：${TOWN_STATE.roomCode}`, '#4ade80', `
                 <div style="background:#1e293b;padding:12px;border-radius:8px;">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:12px;color:#cbd5e1;">
-                        <span>分享房間邀請碼即可讓好友加入你的卡雷德市集：</span>
+                        <span>分享房間邀請碼即可讓好友加入你的雷蒂亞村莊：</span>
                         <button onclick="navigator.clipboard?.writeText('${TOWN_STATE.roomCode}');alert('已複製房間邀請碼：${TOWN_STATE.roomCode}');" style="padding:4px 10px;background:#2563eb;color:#fff;border:none;border-radius:5px;cursor:pointer;">📋 複製邀請碼</button>
                     </div>
                     ${listHtml}

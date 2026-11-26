@@ -159,7 +159,7 @@ function getStageDropLvRange(targetStage) {
     return { minLv, maxLv };
 }
 
-// 【關卡等級階梯・經驗與掉寶補正鎖】越級 +1 / 適性 0 / 低1階 -1 / 低2階以上 -2
+// 低一階與適性關卡均給正常經驗與掉落。低兩階起套用防炸魚。
 function getStageLevelGapInfo(playerLv, targetStage) {
     const lv = Math.max(1, Number(playerLv) || 1);
     let currentTier = 1;
@@ -169,8 +169,7 @@ function getStageLevelGapInfo(playerLv, targetStage) {
     }
     const diff = targetStage.tier - currentTier;
     if (diff >= 1)  return { tierDiff: diff, mult: 1.2, dropRateMult: 1.2, maxRarIdx: 4, label: '🔥 越級挑戰 EXP 120%', color: '#fbbf24' };
-    if (diff === 0) return { tierDiff: 0,    mult: 1.0, dropRateMult: 1.0, maxRarIdx: 4, label: '✅ 適性關卡 EXP 100%', color: '#4ade80' };
-    if (diff === -1) return { tierDiff: -1,  mult: 0.8, dropRateMult: 0.5, maxRarIdx: 3, label: '⚠️ EXP 80%，掉寶率下降', color: '#fb923c' };
+    if (diff >= -1) return { tierDiff: diff, mult: 1.0, dropRateMult: 1.0, maxRarIdx: 4, label: '✅ 正常關卡 EXP 100%', color: '#4ade80' };
     return { tierDiff: diff, mult: 0.2, dropRateMult: 0.1, maxRarIdx: 2, label: '🔻 EXP 20%，掉寶率下降', color: '#f87171' };
 }
 

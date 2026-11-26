@@ -65,13 +65,14 @@ function getSkillRawDmg(id, lv, evolved) {
           if (hasSwordArt && hasBladeArt) dualMasteryMult += dualLv * 0.02;
         }
     
+        const powerCrestMult = isPhysSkill ? (1 + (ownedPassives.powerCrest || 0) * 0.08) : 1.0;
         const blessMult = 1 + (ownedPassives.blessing || 0) * 0.03;
         const angelMult = ownedPassives.angelWish ? 0.90 : 1.0;
         const evoMult = (evolved && !sk.isSuperWeapon) ? 1.45 : 1.0;
         const rawBase = Array.isArray(sk.dmgCurve)
           ? sk.dmgCurve[Math.min(sk.dmgCurve.length - 1, Math.max(0, lv - 1))]
           : (sk.baseDmg + Math.max(0, lv - 1) * sk.perLv);
-        return (rawBase + statPower + defBonus) * player.dmgMult * dmgTypeMult * dualMasteryMult * blessMult * angelMult * evoMult;
+        return (rawBase + statPower + defBonus) * player.dmgMult * dmgTypeMult * dualMasteryMult * powerCrestMult * blessMult * angelMult * evoMult;   
       }   
   
   function getSpellBase() {
@@ -140,8 +141,9 @@ function getSkillRawDmg(id, lv, evolved) {
     if (iceRes) { e.freezeTimer = 0; }
   
     const mod = typeof calcStatusDamageMods === 'function' ? calcStatusDamageMods(e, elem, isStrikeOrLight) : { addMult: 1, endMult: 1 };
-    const physIgnore = opts.isPhysSkill ? ((ownedPassives.dualMastery || 0) * 0.03) : 0;
-    const talentIgnore = Math.min(0.60, (ownedPassives.mageTalent || 0) * 0.03 + physIgnore);
+    const crimsonWaveIgnore = (opts.isCrimsonWave && (e.armorBreakTimer || 0) > 0) ? 0.40 : 0;
+    const physIgnore = opts.isPhysSkill ? ((ownedPassives.dualMastery || 0) * 0.03 + crimsonWaveIgnore) : 0;
+    const talentIgnore = Math.min(0.80, (ownedPassives.mageTalent || 0) * 0.03 + physIgnore);
     const bossResist = (e.isFinalBoss ? 0.20 : (e.isMegaBoss ? 0.12 : 0)) * (1 - talentIgnore);
 
     // 劍傷灼印（烈焰連牙斬）與氣流撕裂（閃空翔烈破＋龍捲刃術）
@@ -166,7 +168,8 @@ function getSkillRawDmg(id, lv, evolved) {
     const isCrit = !opts.noCrit && (Math.random() < Math.min(1.0, totalCrit));
     let isSuperCrit = false;
     if (isCrit) {
-      finalDmg *= ((cs.critDmg || 1.5) + (opts.bonusCritDmg || 0));
+      const crimsonWaveCritDmg = (opts.isCrimsonWave && (e.armorBreakTimer || 0) > 0) ? 0.35 : 0;
+      finalDmg *= ((cs.critDmg || 1.5) + (opts.bonusCritDmg || 0) + crimsonWaveCritDmg);
       const overflow = Math.max(0, totalCrit - 1.0);
       if (overflow > 0 && Math.random() < overflow) {
         isSuperCrit = true;
@@ -220,11 +223,23 @@ function getSkillRawDmg(id, lv, evolved) {
          }
        }  
   
-    // 【引爆後疊層不浪費】確保在清空舊聖印後才執行當下這一擊的聖印疊層
-    if (opts.onAfterHit && e.hp > 0) {
+     // 【引爆後疊層不浪費】確保在清空舊聖印後才執行當下這一擊的聖印疊層
+     if (opts.onAfterHit && e.hp > 0) {
       opts.onAfterHit(e);
     }
-  
+
+    // 【真紅的死神】攻擊命中時獨立檢定 +5%/級 機率附加【點燃】（滿級 25%），燃燒傷害 +8%/級
+    const reaperLv = (typeof ownedPassives !== 'undefined' && ownedPassives.crimsonReaper) || 0;
+    if (reaperLv > 0 && !opts.isDot && e.hp > 0 && Math.random() < (reaperLv * 0.05)) {
+      const reaperBurnMult = 1 + reaperLv * 0.08;
+      const burnBase = Math.max(getSpellBase(), rawDmg * 0.28) * reaperBurnMult;
+      if (typeof applyBurn === 'function') applyBurn(e, burnBase, cs.statusDurMult || 1.0);
+      else {
+        e.burnTimer = Math.max(e.burnTimer || 0, 3.0 * (cs.statusDurMult || 1.0));
+        e.burnDps = Math.max(e.burnDps || 0, burnBase * 0.45);
+      }
+    }
+
     if (e.shockTimer > 0 && !opts.isShockProc && e.hp > 0) {
       const shockExtra = Math.max(1, Math.round(dmgInt * 0.15 * resBonusMult));
       e.hp -= shockExtra;
@@ -245,6 +260,13 @@ function getSkillRawDmg(id, lv, evolved) {
       if (isDummyLocked) e.hp = e.maxHp;
       if (e.hp <= 0 && !e.isDead) {
         e.isDead = true; // 標記已死亡，防止烈焰殉爆 AOE 再次命中同一具屍體造成無窮遞迴
+        const cHeartLv = (typeof ownedPassives !== 'undefined' && ownedPassives.crimsonHeart) || 0;
+        if (cHeartLv > 0 && ((e.burnTimer || 0) > 0 || (e.armorBreakTimer || 0) > 0) && (player.crimsonHeartIcd || 0) <= 0 && typeof player !== 'undefined') {
+          player.crimsonHeartIcd = 0.5;
+          const healAmt = Math.max(1, Math.round((player.maxHp || 200) * (cHeartLv * 0.004)));
+          player.hp = Math.min(player.maxHp, (player.hp || 0) + healAmt);
+          damageTexts.push({ x: player.x, y: player.y - 26, txt: `🐉+${healAmt}`, color: '#4ade80', fontSize: 13, life: 0.55 });
+        }
         const fireRes = (e.burnTimer > 0 && !opts.isMartyrBoom && typeof getResonanceParams === 'function') ? getResonanceParams('fire') : null;
         if (fireRes) {
           const boomR = fireRes.radius * player.areaMult;
@@ -282,9 +304,7 @@ function getSkillRawDmg(id, lv, evolved) {
               ? rollStageDropRarity(enemyTier, diff.key, gapInfo.maxRarIdx ?? 4)
               : 'green';
             const forceSelf = (e.isFinalBoss || e.isMegaBoss) && d === 0;
-            const dropItem = typeof createUnidentifiedDrop === 'function'
-              ? createUnidentifiedDrop(rar, lvRange.maxLv, null, forceSelf, lvRange.minLv)
-              : null;
+            const dropItem = createBattleEquipmentDrop(rar, lvRange, forceSelf);
             if (dropItem) {
               const ang = (Math.PI * 2 * d) / dropCount + Math.random() * 0.4;
               const spread = dropCount > 1 ? 26 : 0;
@@ -344,7 +364,7 @@ function getSkillRawDmg(id, lv, evolved) {
                 }
         
                 gems.push({ x: e.x, y: e.y, val: e.expValue });
-                if (!e.isDummy && typeof fieldItems !== 'undefined' && Math.random() < 0.016) {
+                if (!e.isDummy && typeof fieldItems !== 'undefined' && Math.random() < 0.012) {
                   const itemKinds = ['potion', 'magnet', 'bomb', 'goldbag'];
                   const pickedKind = itemKinds[Math.floor(Math.random() * itemKinds.length)];
                   const item = { x: e.x, y: e.y, kind: pickedKind, life: 45 };
@@ -420,9 +440,9 @@ function getSkillRawDmg(id, lv, evolved) {
     }
     
     // 統一尋怪引擎（預設採最近敵人優先 nearest，支援技能卡 targetMode 客製覆寫）
-    function findTargetEnemy(maxDist = 900, targetMode = 'nearest') {
-      if (!enemies || enemies.length === 0) return null;
-      const inRange = enemies.filter(e => Math.hypot(e.x - player.x, e.y - player.y) <= maxDist);
+    function findTargetEnemy(maxDist = 900, targetMode = 'nearest', candidates = enemies) {
+      if (!candidates || candidates.length === 0) return null;
+      const inRange = candidates.filter(e => Math.hypot(e.x - player.x, e.y - player.y) <= maxDist);
       if (inRange.length === 0) return null;
       if (targetMode === 'random') {
         return inRange[Math.floor(Math.random() * inRange.length)];
@@ -436,6 +456,14 @@ function getSkillRawDmg(id, lv, evolved) {
         return pool.reduce((best, cur) => (Math.hypot(cur.x - player.x, cur.y - player.y) < Math.hypot(best.x - player.x, best.y - player.y) ? cur : best), pool[0]);
       }
       return inRange.reduce((best, cur) => (Math.hypot(cur.x - player.x, cur.y - player.y) < Math.hypot(best.x - player.x, best.y - player.y) ? cur : best), inRange[0]);
+    }
+
+    function getVisibleSkillTargets(maxDist) {
+      const halfWidth = canvas.width / 2, halfHeight = canvas.height / 2;
+      return enemies.filter(e => {
+        const dx = e.x - player.x, dy = e.y - player.y;
+        return !e.isDead && Math.abs(dx) <= halfWidth && Math.abs(dy) <= halfHeight && Math.hypot(dx, dy) <= maxDist;
+      });
     }
     
     function findNearestEnemy(maxDist) {

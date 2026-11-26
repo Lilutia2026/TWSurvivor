@@ -18,9 +18,12 @@ const TICHIEL_PASSIVES = {
   },
   angelWish: {
     name: '👼 天使之願', reqChar: ['tichiel'], skillTags: ['tichiel_unique'], maxLv: 1,
-    desc: '賦予 1 次原地滿血復活與全屏淨化（代價：傷害 -10%、移速 -10%，且鎖死火／冰高階大招）'
+    desc: '賦予 1 次原地滿血復活與全屏淨化（代價：傷害 -10%、移速 -10%，）'
   }
 };
+
+const LIGHT_VORTEX_DESCRIPTION = '【白魔術・魔法・MR・範圍・領域】漩渦結束時爆發，對範圍內敵人造成傷害。';
+const LIGHT_VORTEX_RESONANCE = '對已有 3 層【聖印】的敵人造成傷害時，有機率引爆聖印，追加淨化傷害。';
 
 const TICHIEL_SKILLS = {
   // === 法杖（MR）＆ 權杖／釘錘（DEF+H）雙向共用主動池（共 7 招，超武仍依武器型態唯一鎖定） ===
@@ -28,14 +31,15 @@ const TICHIEL_SKILLS = {
     name: '神聖之光', icon: '✨', reqChar: ['tichiel'], skillTags: ['staff_mace'], reqWeaponTypes: ['staff', 'mace'],
     type: 'magic', element: 'holy', statusTags: ['holy'], statTags: ['MR'], behaviorTags: ['ranged', 'projectile'], maxLv: 10,
     baseDmg: 24, perLv: 7, baseCd: 1.40, canEvolve: false,
+    projectileHitLimit: 4,
     desc: '【白魔術・魔法・MR・遠程・射彈】召喚純淨聖光化作高速穿透光矢射向敵群，機率附加【聖印】。'
   },
   radiance: {
     name: '光輝紋章', icon: '🔯', evoName: '光之聚咒', evoIcon: '🌟', reqChar: ['tichiel'], skillTags: ['staff_mace'], reqWeaponTypes: ['staff', 'mace'],
     type: 'magic', element: 'holy', statusTags: ['holy'], statTags: ['MR'], behaviorTags: ['aoe', 'zone'], maxLv: 10,
     baseDmg: 16, perLv: 5, baseCd: 4.50, canEvolve: true, reqPassive: 'mageTalent', evoSkillId: 'holypoly', disableWhenEvo: true,
-    evoDesc: '【白魔術・魔法・MR・範圍・領域】遠處生成持續 2 秒的聖光漩渦牽引聚怪並每秒附加【聖印】，2 秒後引爆漩渦並向外發射無傷害聖光波紋補印。',
-    resonanceDesc: '目標疊滿 3 層【聖印】時雙條件引爆聖光淨化並擴散補印波紋。',
+    evoDesc: LIGHT_VORTEX_DESCRIPTION,
+    resonanceDesc: LIGHT_VORTEX_RESONANCE,
     desc: '【白魔術・魔法・MR・範圍・領域】在地面展開神聖六芒星光陣持續灼燒敵人，機率附加【聖印】。'
   },
   healLight: {
@@ -48,14 +52,15 @@ const TICHIEL_SKILLS = {
     name: '光之祈禱', icon: '🕊️', reqChar: ['tichiel'], skillTags: ['staff_mace'], reqWeaponTypes: ['staff', 'mace'],
     statTags: ['MR'], type: 'magic', behaviorTags: ['ranged', 'projectile'], element: 'holy', statusTags: ['holy'],
     baseCd: 2.2, baseDmg: 18, perLv: 4, dmgCurve: new Array(18, 22, 26, 30, 36, 42, 48, 56, 64, 74), maxLv: 10,
-    desc: '【白魔術・魔法・MR・遠程・射彈】召喚 2 顆聖光彈於周身浮空蓄勢，鎖定後以曲線軌跡俯衝貫穿目標並引發小範圍聖光爆破（機率附加聖印）。'
+    desc: '【白魔術・魔法・MR・遠程・射彈】召喚 2 顆聖光彈於周身浮空蓄勢，鎖定後以曲線軌跡俯衝貫穿目標並引發小範圍聖光爆破，機率附加【聖印】。'
   },
   holypoly: {
     name: '光之聚咒', icon: '🌟', reqChar: ['tichiel'], skillTags: ['staff_mace'], reqWeaponTypes: ['staff'], isSuperWeapon: true, evoFrom: 'radiance',
     type: 'magic', element: 'holy', statusTags: ['holy'], statTags: ['MR'], behaviorTags: ['aoe', 'zone'], maxLv: 3,
     baseDmg: 55, perLv: 22, baseCd: 6.00, canEvolve: false,
-    resonanceDesc: '引爆目標身上的 3 層【聖印】造成巨額淨化傷害，並向周圍擴散補印波紋。',
-    desc: '【白魔術・魔法・MR・範圍・領域】遠處生成持續 2 秒的聖光漩渦牽引聚怪並每秒附加【聖印】，2 秒後引爆漩渦並向外發射無傷害聖光波紋補印。'
+    zoneDuration: 2,
+    resonanceDesc: LIGHT_VORTEX_RESONANCE,
+    desc: LIGHT_VORTEX_DESCRIPTION
   },
   armorbreak: {
     name: '破壞盔甲', icon: '🔨', evoName: '失意狂擊', evoIcon: '💥', reqChar: ['tichiel'], skillTags: ['staff_mace'], reqWeaponTypes: ['staff', 'mace'],
@@ -75,7 +80,7 @@ const TICHIEL_SKILLS = {
     name: '螺旋重錘', icon: '🌀', reqChar: ['tichiel'], skillTags: ['staff_mace'], reqWeaponTypes: ['mace', 'staff'],
     statTags: ['S', 'H'], type: 'physical', behaviorTags: ['melee', 'aoe', 'knockback'], element: 'none', statusTags: ['armor_break'],
     baseCd: 5.0, baseDmg: 18, perLv: 4, dmgCurve: new Array(18, 22, 26, 30, 36, 42, 48, 55, 62, 72), maxLv: 10,
-    desc: '【戰錘技・物理・S+H・近戰・範圍・擊退】掄起巨大光錘環繞自身旋轉 1.2s，每 0.3s 判定周遭傷害並強力擊退（撞擊後方敵人觸發額外物理撞擊傷害；持釘錘可附加破甲）。'
+    desc: '【戰錘技・物理・S+H・近戰・範圍・擊退】掄起巨大光錘環繞自身旋轉 1.2s，每 0.3s 判定周遭傷害並強力擊退。'
   },
   frenzyhammer: {
     name: '失意狂擊', icon: '💥', reqChar: ['tichiel'], skillTags: ['staff_mace'], reqWeaponTypes: ['mace'], isSuperWeapon: true, evoFrom: 'armorbreak',
@@ -196,7 +201,7 @@ const TICHIEL_SKILLS = {
     name: '雷道降臨・紫霄', icon: '⚡', reqChar: ['tichiel'], skillTags: ['tichiel_magic'], reqWeaponTypes: ['wand'], wandElem: 'thunder', tier: 5, isSuperWeapon: true, evoFrom: 'thunder4',
     type: 'magic', element: 'lightning', statusTags: ['lightning'], statTags: ['INT'], behaviorTags: ['projectile', 'aoe'], maxLv: 3,
     baseDmg: 45, perLv: 14, baseCd: 3.80, canEvolve: false,
-    resonanceDesc: '雷系技能命中【感電】敵人時觸發【雷殛過載】，引爆青藍色高壓電弧在敵群間連續彈射（周圍無其他敵人時直接劈擊本體）。',
+    resonanceDesc: '雷系技能命中【感電】敵人時觸發【雷殛過載】，引爆青藍色高壓電弧在敵群間連續彈射。',
     desc: '【雷系魔法・魔法・INT・射彈・範圍】紫霄神雷重擊並擴散高壓雷環造成二次電擊，機率附加【感電】。'
   }
 };

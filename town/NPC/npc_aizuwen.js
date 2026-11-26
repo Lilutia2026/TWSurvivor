@@ -105,7 +105,9 @@ function openNpcAizuwen() {
             </div>
         </div>
     `;
-    openNpcModalShell('🔮 愛祖文', '青木魔法店・神秘鑑定與部位抽獎', '#c084fc', html);
+    const selfChance = Math.round(SELF_EQUIPMENT_APPRAISAL_CHANCE * 100);
+    openNpcModalShell('🔮 愛祖文', '青木魔法店・神秘鑑定與部位抽獎', '#c084fc',
+        `<p style="margin-bottom:8px;font-size:12px;color:#cbd5e1;">一般戰鬥裝備袋鑑定時有 ${selfChance}% 機率抽到目前角色適用的裝備類型。</p>${html}`);
 }
 
 function aizuwenIdentifyItem(uid) {

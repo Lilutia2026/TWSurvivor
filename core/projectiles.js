@@ -120,9 +120,11 @@ function updatePlayerProjectiles(dt, cs, spellBase) {
         else p.hitSet.add(e);
 
         const pTags = (p.statusTags && p.statusTags.length > 0) ? p.statusTags : (p.elem || 'none');
-        applyStatusTagsOnHit(e, pTags, spellBase, cs, { isMelee: false });
+        if (pTags !== 'none' && pTags !== 'physical') {
+          applyStatusTagsOnHit(e, pTags, spellBase, cs, { isMelee: false });
+        }
         const hitDmg = iceCrystal ? (p.dmg * iceCrystal.crushDamageMult) : p.dmg;
-        hitEnemy(j, hitDmg, { element: p.elem || 'none' });
+        hitEnemy(j, hitDmg, { element: p.elem || 'none', isPhysSkill: !!p.isPhysSkill });
         if (p.skillId === 'fire3') {
           const orbBoomR = 72 * player.areaMult;
           slashes.push({ type: 'fireboom', x: p.x, y: p.y, range: orbBoomR, arc: Math.PI * 2, life: 0.20 });
@@ -168,6 +170,26 @@ function updatePlayerProjectiles(dt, cs, spellBase) {
           }
         }
 
+        if (p.skillId === 'swallow_spear' && !p.isSwallowSplit && (p.splitCount || 0) > 0) {
+          const sCount = p.splitCount;
+          const baseAng = Math.atan2(p.vy, p.vx);
+          const nearCands = enemies.filter(cand => cand !== e && !cand.isDead && Math.hypot(cand.x - p.x, cand.y - p.y) <= 320);
+          nearCands.sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y));
+          const subSpd = (p.speed || 650) * 1.05;
+          for (let s = 0; s < sCount; s++) {
+            const subTarget = nearCands[s] || null;
+            const subAng = subTarget
+              ? Math.atan2(subTarget.y - p.y, subTarget.x - p.x)
+              : (baseAng + (s - (sCount - 1) / 2) * 0.42);
+            const subHitSet = new Set(new Array(e));
+            spawnedProjectiles.push({
+              type: 'wind', elem: 'physical', skillId: 'swallow_spear', isPhysSkill: true,
+              isSwallowSplit: true, speed: subSpd,
+              x: p.x, y: p.y, vx: Math.cos(subAng) * subSpd, vy: Math.sin(subAng) * subSpd,
+              radius: Math.max(6, p.radius * 0.68), dmg: p.dmg * 0.50, pierce: 1, life: 0.55, hitSet: subHitSet
+            });
+          }
+        }
         if (--p.pierce <= 0) return false;
         if (p.isBounce) {
           let nextE = null, minD = 300;

@@ -92,7 +92,7 @@ function upgradeClassicHud() {
     const curWType = curW ? curW.type : null;
     const curCharId = (typeof saveData !== 'undefined' && saveData.charId) ? saveData.charId : 'lucien';
     const sigSkill = typeof getWeaponSignatureSkill === 'function' ? getWeaponSignatureSkill(curW) : (curW ? curW.startSkill : null);
-    const isSwordType = new Array('longsword', 'blade', 'rapier', 'tachi', 'greatsword').includes(curWType);
+    const isSwordType = new Array('longsword', 'blade', 'rapier', 'tachi', 'greatsword', 'spear', 'polearm').includes(curWType);
 
     for (const [k, sk] of Object.entries(ACTIVE_SKILLS)) {
       if (sk.isSuperWeapon && !ownedSkills[k]) continue;
@@ -107,9 +107,11 @@ function upgradeClassicHud() {
         const evoSk = targetEvoId ? (ACTIVE_SKILLS[targetEvoId] || (typeof GLOBAL_SKILL_POOL !== 'undefined' ? GLOBAL_SKILL_POOL[targetEvoId] : null)) : null;
         const allowedWeapons = (evoSk && Array.isArray(evoSk.reqWeaponTypes)) ? evoSk.reqWeaponTypes
           : (Array.isArray(sk.reqWeaponTypes) ? sk.reqWeaponTypes : (sk.reqWeaponType ? new Array(sk.reqWeaponType) : null));
-        const weaponOk = !allowedWeapons || !curWType || allowedWeapons.includes(curWType);
-        const swordOk = !isSwordType || !sigSkill || k === sigSkill;
-        if (weaponOk && swordOk) {
+          const curTier = (typeof saveData !== 'undefined' && saveData.jobTier) ? saveData.jobTier : 1;
+          const jobTierOk = !evoSk || !evoSk.reqJobTier || curTier >= evoSk.reqJobTier;
+          const weaponOk = !allowedWeapons || !curWType || allowedWeapons.includes(curWType);
+          const swordOk = !isSwordType || !sigSkill || k === sigSkill;
+          if (jobTierOk && weaponOk && swordOk) { 
           const titleName = charEvo ? charEvo.evoName : (sk.evoName || sk.name);
           const cleanDesc = (evoSk && evoSk.desc) ? evoSk.desc : (sk.evoDesc || sk.desc);
           pool.push({
@@ -264,11 +266,15 @@ function upgradeClassicHud() {
     } else if (c.kind === 'passive') {
       ownedPassives[c.id] = (ownedPassives[c.id] || 0) + 1;
       if (c.id === 'fastsword') { player.cdMult *= 0.97; player.bonusDoubleHit = (player.bonusDoubleHit || 0) + 0.025; }
+      if (c.id === 'crimsonHeart') { player.bonusDoubleHit = (player.bonusDoubleHit || 0) + 0.025; }
+      if (c.id === 'lanceCharge') { player.speedMult += 0.06; player.areaMult += 0.05; }
+      if (c.id === 'bronzeBody') { const hpGain = Math.round(player.maxHp * 0.05); player.maxHp += hpGain; player.hp += hpGain; }
       if (c.id === 'haste') player.cdMult *= 0.92;
-      if (c.id === 'cdr') player.cdMult *= 0.94;
+      if (c.id === 'cdr') player.cdMult *= 0.95;
       if (c.id === 'guard') { /* 減傷由 getEffectivePhysReducePct / getEffectiveMagReducePct 動態讀取 */ }
       if (c.id === 'area') player.areaMult += 0.06;
-      if (c.id === 'might') player.dmgMult += 0.08;
+      if (c.id === 'might') player.dmgMult += 0.05;
+      if (c.id === 'expBoost') player.expMult = (player.expMult || 1.0) + 0.10;
       if (c.id === 'crit') player.bonusCritRate += 0.04;
       if (c.id === 'speedUp') { player.speedMult += 0.07; player.bonusCritRate += 0.02; }
       if (c.id === 'nobleFortune') { player.expMult = (player.expMult || 1.0) + 0.06; player.pickupRange = (player.pickupRange || 115) * 1.12; player.seedMult = (player.seedMult || 1.0) + 0.20; }
@@ -361,8 +367,8 @@ function getSkillTooltipEl() {
       if (id === 'divinePrayer') skillCdScale = 1 - Math.floor(st.lv / 3) * 0.10;
       if (id === 'spiralHammer') skillCdScale = 1 - (st.lv >= 7 ? 0.20 : (st.lv >= 3 ? 0.10 : 0));
       const realCd = (sk.baseCd * skillCdScale * getEffectiveCdMult(1.0)).toFixed(2);
-      const isEvo = !!(st.evolved || sk.isSuperWeapon);
-      const curStatusText = getSkillCurrentStatusText(id, sk, st.lv, isEvo);
+      const isEvo = !st.disabled && !!(st.evolved || sk.isSuperWeapon);
+      const curStatusText = st.disabled ? '已昇華停用（由超武取代）' : getSkillCurrentStatusText(id, sk, st.lv, isEvo);
       const partnerId = sk.resonancePartner || sk.resonanceSkill;
       const isResActive = !partnerId || !!ownedSkills[partnerId];
       const resLine = (isEvo && sk.resonanceDesc)
@@ -464,12 +470,13 @@ function togglePause() {
         const isEvo = !!(v.evolved || sk.isSuperWeapon);
         const lvText = v.disabled ? '已進化停用' : (isMax ? 'MAX' : `LV.${v.lv}/${sk.maxLv || 10}`);
         const curStatus = getSkillCurrentStatusText(k, sk, v.lv, isEvo);
+        const statusOverflow = ['ice3', 'thunder3', 'holylight', 'holypoly', 'divinePrayer'].includes(k) ? '' : 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
         const dim = v.disabled ? 'opacity:0.4;filter:grayscale(1);border-color:#475569;' : (v.evolved ? 'border-color:#facc15;background:rgba(180,83,9,0.35);' : 'border-color:#38bdf8;background:rgba(15,23,42,0.85);');
         return `<div style="cursor:help;display:flex;align-items:center;gap:10px;border:1.5px solid;${dim}border-radius:8px;padding:6px 10px;" onmouseenter="showSkillTooltip(event,'skill','${k}')" onmousemove="moveSkillTooltip(event)" onmouseleave="hideSkillTooltip()">
           <div style="width:36px;height:36px;border-radius:6px;background:rgba(30,41,59,0.95);border:1px solid #475569;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">${iconChar}</div>
           <div style="flex:1;min-width:0;">
             <div style="display:flex;justify-content:space-between;align-items:center;"><strong style="font-size:13px;color:#fef08a;">${dispName}</strong><span style="font-size:11px;font-weight:bold;color:${isMax ? '#4ade80' : '#38bdf8'};">${lvText}</span></div>
-            <div style="font-size:11px;color:#4ade80;margin-top:2px;${k === 'ice3' || k === 'thunder3' ? '' : 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'}">目前狀態：${curStatus}</div>
+            <div style="font-size:11px;color:#4ade80;margin-top:2px;${statusOverflow}">目前狀態：${curStatus}</div>
             <div style="font-size:11px;color:#cbd5e1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;">${sk.desc || ''}</div>
           </div>
         </div>`;
@@ -547,6 +554,7 @@ function togglePause() {
       return false;
     }
     gameOver = true;
+    if (win) recordDevPlayCount('clears');
     setBattlePaused(true);
 
     const bossTitle = st.boss?.name || '關卡首領';
@@ -561,4 +569,10 @@ function togglePause() {
       (firstClearReward ? '<br><strong style="color:#facc15;">首通獎勵：未鑑定金色武器已放入背包</strong>' : '');
     document.getElementById('endModal').style.display = 'flex';
     return true;
+  }
+
+  function returnFromBattleToTown() {
+    if (!gameOver) return;
+    leaveBattleScene();
+    enterTownClad(true);
   }
