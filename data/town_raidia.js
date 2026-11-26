@@ -86,11 +86,15 @@ const TOWN_CLAD_MAP = {
 
 // 【通用難度乘算模板】以關卡基礎設定為 1.0x 基底，終點地獄難度：HP ×5、傷害 ×2.5、經驗 ×2.0
 const DIFFICULTY_MODIFIERS = {
-    normal:    { key: 'normal',    name: '🟢 普通', color: '#4ade80', hpMult: 1.0, dmgMult: 1.0, spawnMult: 1.0,  expMult: 1.0,  dropMult: 1.0  },
-    hard:      { key: 'hard',      name: '🟡 困難', color: '#facc15', hpMult: 1.8, dmgMult: 1.4, spawnMult: 1.2,  expMult: 1.25, dropMult: 1.25 },
-    nightmare: { key: 'nightmare', name: '🟠 噩夢', color: '#fb923c', hpMult: 3.0, dmgMult: 1.9, spawnMult: 1.45, expMult: 1.6,  dropMult: 1.6  },
-    hell:      { key: 'hell',      name: '🔴 地獄', color: '#f87171', hpMult: 5.0, dmgMult: 2.5, spawnMult: 1.75, expMult: 2.0,  dropMult: 2.0  }
+    normal:    { key: 'normal',    name: '🟢 普通', color: '#4ade80', hpMult: 1.0, dmgMult: 1.0, spawnMult: 1.0,  expMult: 1.0,  dropMult: 1.0,  mobEquipDropMult: 1 },
+    hard:      { key: 'hard',      name: '🟡 困難', color: '#facc15', hpMult: 1.8, dmgMult: 1.4, spawnMult: 1.2,  expMult: 1.25, dropMult: 1.25, mobEquipDropMult: 5 / 3 },
+    nightmare: { key: 'nightmare', name: '🟠 噩夢', color: '#fb923c', hpMult: 3.0, dmgMult: 1.9, spawnMult: 1.45, expMult: 1.6,  dropMult: 1.6,  mobEquipDropMult: 7 / 3 },
+    hell:      { key: 'hell',      name: '🔴 地獄', color: '#f87171', hpMult: 5.0, dmgMult: 2.5, spawnMult: 1.75, expMult: 2.0,  dropMult: 2.0,  mobEquipDropMult: 3 }
 };
+
+function getMobEquipmentDropChance(stage, difficulty, gap, playerMultiplier = 1) {
+    return (stage.baseDropRate ?? 0.025) * (difficulty.mobEquipDropMult ?? 1) * (gap.dropRateMult ?? 1) * playerMultiplier;
+}
 
 // 【關卡出征清單】目前開放前 2 階原版經典地圖（貝那茵森林、耳語海岸）
 const STAGE_SELECT_LIST = [

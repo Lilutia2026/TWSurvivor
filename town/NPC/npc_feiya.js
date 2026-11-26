@@ -4,9 +4,17 @@
 
 let FEIYA_TAB = 'buy'; // buy | sell
 const AUCTION_MOCK_MARKET = [
-    { auctionId: 'auc_1', name: '精良細劍 (LV.20)', lv: 20, price: 300, seller: '雷蒂亞商人', item: { uid: Date.now() + 101, name: '精良細劍', reqLv: 20, slot: 'weapon', subType: 'rapier', rarity: 'blue', identified: true, tradable: true } },
-    { auctionId: 'auc_2', name: '高階魔力法杖 (LV.35)', lv: 35, price: 500, seller: '魔法公會委託', item: { uid: Date.now() + 102, name: '高階魔力法杖', reqLv: 35, slot: 'weapon', subType: 'wand', rarity: 'purple', identified: true, tradable: true } }
+    { auctionId: 'auc_1', tplId: 'w_rap_20', rarity: 'blue', price: 300, seller: '雷蒂亞商人' },
+    { auctionId: 'auc_2', tplId: 'w_wand_35', rarity: 'purple', price: 500, seller: '魔法公會委託' }
 ];
+
+function getFeiyaAuctionItem(entry) {
+    if (!entry.item) {
+        const item = identifyEquipItem({ tplId: entry.tplId, rarity: entry.rarity });
+        entry.item = { ...item, tradable: true };
+    }
+    return entry.item;
+}
 
 function openNpcFeiya(tab) {
     if (typeof tab === 'string') FEIYA_TAB = tab;
@@ -15,11 +23,23 @@ function openNpcFeiya(tab) {
     let bodyHtml = '';
     if (FEIYA_TAB === 'buy') {
         bodyHtml = `<div style="font-size:12px;color:#facc15;margin-bottom:8px;">※ 得標商品將統一寄送至您的【📬 信箱】領取</div>
-            ${AUCTION_MOCK_MARKET.map(a => `
+            ${AUCTION_MOCK_MARKET.map(a => {
+                const item = getFeiyaAuctionItem(a);
+                const rarity = RARITIES[item.rarity];
+                const stats = Object.keys(item.baseRolled).map(key => `${key} +${item[key]}`).join('、');
+                const requirements = Object.entries(item.reqStats).map(([key, value]) => `${key} ≥ ${value}`).join('、');
+                const affixes = item.affixes.map(affix => `${affix.label} +${affix.val}${affix.unit || ''}`).join('、');
+                const skill = item.startSkill ? getSkillDisplayName(item.startSkill) : '';
+                return `
                 <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:#0f172a;border-radius:6px;margin-bottom:6px;">
-                    <div><b style="color:#f8fafc;">${a.name}</b> <span style="font-size:12px;color:#94a3b8;">(賣家：${a.seller})</span></div>
+                    <div>
+                        <b style="color:${rarity.color};">${item.name}（${rarity.name}｜LV.${item.reqLv}）</b> <span style="font-size:12px;color:#94a3b8;">(賣家：${a.seller})</span>
+                        <div style="font-size:12px;color:#cbd5e1;">${stats} ｜ 穿戴需求 LV.${item.reqLv}${requirements ? '、' + requirements : ''}</div>
+                        <div style="font-size:12px;color:#94a3b8;">${affixes}${skill ? ' ｜ 本命技能 ' + skill : ''}</div>
+                    </div>
                     <button onclick="feiyaBuyAuction('${a.auctionId}')" style="padding:4px 12px;background:#ca8a04;color:#000;font-weight:bold;border:none;border-radius:5px;cursor:pointer;">直購 ${a.price} Seed</button>
-                </div>`).join('')}`;
+                </div>`;
+            }).join('')}`;
     } else {
         bodyHtml = `<div style="font-size:12px;color:#94a3b8;margin-bottom:8px;">※ 僅顯示「已鑑定」且「可交易」裝備（愛祖文賭博裝 🔒 自動排除）；售出 Seed 將寄至【📬 信箱】</div>
             ${tradableBag.length === 0 ? '<div style="color:#64748b;font-size:13px;">無可上架拍賣之裝備</div>' : tradableBag.map(it => {
@@ -60,10 +80,10 @@ function feiyaBuyAuction(auctionId) {
     const entry = AUCTION_MOCK_MARKET.find(a => a.auctionId === auctionId);
     if (!entry) return;
     if ((saveData.seed || 0) < entry.price) return alert('Seed 不足！');
+    const copyItem = JSON.parse(JSON.stringify(getFeiyaAuctionItem(entry)));
+    copyItem.uid = generateEquipUid();
     saveData.seed -= entry.price;
-    const copyItem = JSON.parse(JSON.stringify(entry.item));
-    copyItem.uid = Date.now() + Math.floor(Math.random() * 1000);
-    sendToMailbox(`【拍賣得標】${entry.name}`, 0, copyItem);
+    sendToMailbox(`【拍賣得標】${copyItem.name}`, 0, copyItem);
     alert('得標成功！物品已寄送至【📬 信箱】。');
     openNpcFeiya();
 }

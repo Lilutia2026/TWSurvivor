@@ -71,7 +71,7 @@ function renderStageSelectCards() {
     const diff = DIFFICULTY_MODIFIERS[selectedDifficultyKey] || DIFFICULTY_MODIFIERS.normal;
     const gap = getStageLevelGapInfo(playerLv, st);
     const totalExpMult = (st.baseExpMult * diff.expMult * gap.mult).toFixed(2);
-    const totalDropPct = (st.baseDropRate * diff.dropMult * (gap.dropRateMult ?? 1.0) * 100).toFixed(1);
+    const totalDropPct = (getMobEquipmentDropChance(st, diff, gap) * 100).toFixed(1);
     const isUnder = playerLv < st.minLv;
     const firstClears = saveData.stageFirstClears || {};
 
@@ -144,27 +144,21 @@ function renderStageSelectCards() {
 }
 
 function launchSelectedStage() {
-    const stageView = document.getElementById('stage-select-view');
-    if (stageView) stageView.style.display = 'none';
     const st = STAGE_SELECT_LIST.find(s => s.id === selectedStageId) || STAGE_SELECT_LIST[0];
     const diff = DIFFICULTY_MODIFIERS[selectedDifficultyKey] || DIFFICULTY_MODIFIERS.normal;
+    if (!startBattle(st.id, diff.key)) return;
+
+    const stageView = document.getElementById('stage-select-view');
+    if (stageView) stageView.style.display = 'none';
     if (typeof saveData !== 'undefined') {
         saveData.currentStageId = st.id;
         saveData.currentDifficultyKey = diff.key;
     }
-    if (typeof startBattle === 'function') {
-        if (typeof AudioManager !== 'undefined') {
-            if (Array.isArray(st.bgmList) && st.bgmList.length > 0 && typeof AudioManager.playPlaylist === 'function') {
-                AudioManager.playPlaylist(st.bgmList, true);
-            } else {
-                AudioManager.play('battle');
-            }
+    if (typeof AudioManager !== 'undefined') {
+        if (Array.isArray(st.bgmList) && st.bgmList.length > 0 && typeof AudioManager.playPlaylist === 'function') {
+            AudioManager.playPlaylist(st.bgmList, true);
+        } else {
+            AudioManager.play('battle');
         }
-        startBattle(st.id, diff.key);
-    }
-
-    else {
-        const lobby = document.getElementById('lobby');
-        if (lobby) lobby.style.display = 'flex';
     }
 }

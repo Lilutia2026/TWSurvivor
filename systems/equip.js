@@ -64,9 +64,8 @@ function rollSingleAffix(af, mult = 1.0) {
   const val = realMin + Math.floor(Math.random() * (realMax - realMin + 1));
   return { key: af.key, label: af.label, val, unit: af.unit, min: realMin, max: realMax, color: getAffixTierColor(val, realMin, realMax) };
 }
-let _uidSeq = 1;
-function generateEquipUid() {
-  return Number(`${Date.now().toString().slice(-8)}${(_uidSeq++ % 9000) + 1000}`);
+function generateEquipUid(save = saveData) {
+  return save.nextEquipUid++;
 }
 
 // 全域一般關卡掉落等級上限（當前版本開放至 LV.62；LV.75+ 暫不掉落，LV.90+ 走合成系統）
@@ -157,6 +156,22 @@ function createUnidentifiedDrop(rarity = 'white', maxLv = CURRENT_DROP_MAX_LV, t
   const finalPool = (wantSelf && selfPool.length > 0) ? selfPool : (otherPool.length > 0 ? otherPool : candidates);
   const tpl = finalPool[Math.floor(Math.random() * finalPool.length)];
   return { uid: generateEquipUid(), tplId: tpl.tplId, slot: tpl.slot, rarity, identified: false };
+}
+
+function createFirstClearWeapon(charId, variantId, { minLv, maxLv }) {
+  const character = CHARACTERS[charId];
+  const allowed = ITEM_WEAPONS.filter(tpl => character.equipTags.includes(getItemCategoryTag(tpl)));
+  const dropWeapons = allowed.filter(tpl => tpl.reqLv <= maxLv && !tpl.isEvent && (!tpl.obtain || tpl.obtain === 'drop'));
+  const inRange = dropWeapons.filter(tpl => tpl.reqLv >= minLv);
+  const pool = inRange.length ? inRange : dropWeapons;
+  const starterId = character.variants[variantId]?.defaultTpl || character.variants[character.defaultVariant].defaultTpl;
+  const starter = allowed.find(item => item.tplId === starterId);
+  const lowest = [...allowed].sort((a, b) => a.reqLv - b.reqLv);
+  const tpl = pool[Math.floor(Math.random() * pool.length)]
+    || starter
+    || lowest.find(item => getItemCategoryTag(item) === variantId)
+    || lowest[0];
+  return { uid: generateEquipUid(), tplId: tpl.tplId, slot: 'weapon', rarity: 'gold', identified: false };
 }
 
 // 鑑定裝備並生成浮動基礎數值、魔杖元素詞條、純戰鬥四色副詞條與傳說特效

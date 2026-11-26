@@ -1,7 +1,7 @@
-const SAVE_KEY = 'tw_survivor_save_v2_4';
+const LEGACY_SAVE_KEY = 'tw_survivor_save_v2_4';
+const SAVE_KEY = 'tw_survivor_trial_profiles';
 const MAX_OUT_LV = 255;
 
-// 片段 A：DEFAULT_SAVE 初始長劍本命技能對齊 senku
 const DEFAULT_SAVE = {
   charId: 'lucien',
   variantId: 'longsword',
@@ -12,35 +12,103 @@ const DEFAULT_SAVE = {
   autoStats: { S: 0, H: 0, I: 0, DEF: 0, MR: 0, DEX: 0, AGI: 0 },
   allocated: { S: 0, H: 0, I: 0, DEF: 0, MR: 0, DEX: 0, AGI: 0 },
   equip: {
-    weapon: { tplId: 'w_long_1', slot: 'weapon', subType: 'longsword', type: 'longsword', equipTag: 'longsword', name: '學徒長劍', rarity: 'white', reqLv: 1, reqStats: {}, startSkill: 'senku', H: 4, S: 4, identified: true, affixes: [] },
+    weapon: null,
     sub: null, head: null, armor: null, gloves: null, shoes: null, back: null, relic: null
   },
   bag: []
 };
 
+// 目前角色維持原有欄位供各模組讀取，其餘試玩角色獨立保存在 trialCharacters。
+const TRIAL_CHARACTER_FIELDS = ['charId', 'variantId', 'charName', 'jobTier', 'outLv', 'outExp', 'freePts',
+  'baseStats', 'autoStats', 'allocated', 'equip', 'bag', 'wingQuestDone', 'trialStarterKitGranted'];
+let saveLoadError = false;
 let saveData = loadSave();
 let pendingAlloc = null;
 let pendingFreePts = null;
-let bagSortMode = 'char';
 
 function loadSave() {
+  const defaults = JSON.parse(JSON.stringify(DEFAULT_SAVE));
+  let save = defaults;
+  let migrated = false;
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      return {
-        ...DEFAULT_SAVE, ...parsed,
-        autoStats: { ...DEFAULT_SAVE.autoStats, ...(parsed.autoStats || {}) },
-        allocated: { ...DEFAULT_SAVE.allocated, ...(parsed.allocated || {}) },
-        equip: { ...DEFAULT_SAVE.equip, ...(parsed.equip || {}) },
-        bag: parsed.bag || []
+    const current = localStorage.getItem(SAVE_KEY);
+    const legacy = current === null ? localStorage.getItem(LEGACY_SAVE_KEY) : null;
+    if (current !== null || legacy !== null) {
+      const parsed = JSON.parse(current ?? legacy);
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('存檔格式錯誤');
+      const character = CHARACTERS[parsed.charId || parsed.selectedChar] || CHARACTERS.lucien;
+      const variantId = character.variants[parsed.variantId] ? parsed.variantId : character.defaultVariant;
+      save = {
+        ...defaults, ...parsed,
+        charId: character.id, charName: parsed.charName || character.name, variantId,
+        baseStats: { ...character.variants[variantId].baseStats, ...(parsed.baseStats || {}) },
+        autoStats: { ...defaults.autoStats, ...(parsed.autoStats || {}) },
+        allocated: { ...defaults.allocated, ...(parsed.allocated || {}) },
+        equip: { ...defaults.equip, ...(parsed.equip || {}) },
+        bag: Array.isArray(parsed.bag) ? parsed.bag : []
       };
+      if (legacy !== null) {
+        save.legacyBag = save.bag;
+        save.bag = [];
+        migrated = true;
+      }
     }
-  } catch (e) {}
-  return JSON.parse(JSON.stringify(DEFAULT_SAVE));
+  } catch (e) {
+    saveLoadError = true;
+    console.warn('無法讀取存檔，已保留原資料', e);
+  }
+  const pendingRewards = Object.values(save.pendingFirstClearRewards || {});
+  const mailItems = Array.isArray(save.mailbox) ? save.mailbox.map(mail => mail?.item) : [];
+  const inactiveItems = Object.values(save.trialCharacters || {}).filter(Boolean).flatMap(character => [
+    Object.values(character.equip || {}), character.bag
+  ]);
+  const itemLists = [Object.values(save.equip), save.bag, save.legacyBag, save.accountStash,
+    ...Object.values(save.charStash || {}), ...inactiveItems, pendingRewards, mailItems];
+  const items = itemLists.filter(Array.isArray).flat().filter(item => item && typeof item === 'object');
+  save.nextEquipUid = Number.isSafeInteger(save.nextEquipUid) && save.nextEquipUid > 0 ? save.nextEquipUid : 1;
+  for (const item of items) {
+    if (Number.isSafeInteger(item.uid)) save.nextEquipUid = Math.max(save.nextEquipUid, item.uid + 1);
+  }
+  for (const item of items) {
+    if (item.uid == null) item.uid = generateEquipUid(save);
+  }
+  for (const clearKey of Object.keys(save.pendingFirstClearRewards || {})) deliverFirstClearReward(save, clearKey);
+  if (migrated || pendingRewards.length) {
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); }
+    catch (e) { console.warn('無法寫入遷移或首通補發資料，原存檔已保留', e); }
+  }
+  return save;
 }
 
-function writeSave() { localStorage.setItem(SAVE_KEY, JSON.stringify(saveData)); }
+function deliverFirstClearReward(save, clearKey) {
+  const item = save.pendingFirstClearRewards?.[clearKey];
+  if (!item) return null;
+  if (!save.bag.some(entry => entry?.uid === item.uid)) save.bag.push(item);
+  (save.stageFirstClears ||= {})[clearKey] = true;
+  delete save.pendingFirstClearRewards[clearKey];
+  return item;
+}
+
+function writeSave() {
+  if (saveLoadError) throw new Error('原存檔無法讀取');
+  localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
+}
+
+function claimLegacyBagItem(index, uid) {
+  const source = saveData.legacyBag;
+  if (!Number.isInteger(index) || index < 0 || !source?.[index] || String(source[index].uid) !== String(uid)) return false;
+  const [item] = source.splice(index, 1);
+  saveData.bag.push(item);
+  try {
+    writeSave();
+  } catch (e) {
+    saveData.bag.pop();
+    source.splice(index, 0, item);
+    alert('無法保存領取結果，道具仍在舊背包領取區。');
+    return false;
+  }
+  return true;
+}
 function getNextOutExp(lv) { return Math.round(100 * Math.pow(1.065, Math.min(180, lv - 1))); }
 // V2.4 收斂配點：配合自動升級+凹點(約350點)，每級給 1 pt（逢10級額外+1 pt），255滿級總自由點數約 279 pt，專精約可練滿 2 項 255
 function getLevelPts(lv) { return (lv % 10 === 0) ? 2 : 1; }
@@ -63,7 +131,7 @@ function checkLv15WingQuest() {
   if (typeof identifyEquipItem === 'function' && typeof EQUIP_TEMPLATES !== 'undefined' && Array.isArray(EQUIP_TEMPLATES)) {
     const wingTpl = EQUIP_TEMPLATES.find(t => t.tplId === 'bk_15') || EQUIP_TEMPLATES.find(t => t.slot === 'back');
     if (wingTpl) {
-      const wingItem = identifyEquipItem({ uid: Date.now(), tplId: wingTpl.tplId, slot: 'back', rarity: 'green' });
+      const wingItem = identifyEquipItem({ uid: generateEquipUid(), tplId: wingTpl.tplId, slot: 'back', rarity: 'green' });
       if (wingItem) saveData.bag.push(wingItem);
     }
   }
@@ -82,55 +150,81 @@ function addOutExpAndSeed(expGain, seedGain) {
   writeSave();
 }
 
-// 切換角色與初始武器型態（路西安 3 型 / 蒂琪愛兒 5 型，不重複塞入同名基礎武器）
+function getSavedTrialVariant(charId) {
+  return saveData.charId === charId ? saveData.variantId : saveData.trialCharacters?.[charId]?.variantId;
+}
+
 function switchCharacterVariant(charId, variantId) {
-  if (pendingAlloc) { alert('請先按下「✅ 確認配點」或「↩️ 取消微調」後再切換角色！'); return; }
-  const ch = CHARACTERS[charId];
-  if (!ch || !ch.playable || !ch.variants) return;
-  const fallbackVid = Object.keys(ch.variants)[0];
-  const vid = (variantId && ch.variants[variantId]) ? variantId : (ch.variants[ch.defaultVariant] ? ch.defaultVariant : fallbackVid);
-  const vData = ch.variants[vid];
-  if (!vData) return;
-  const oldW = saveData.equip.weapon;
-  if (oldW) {
-    const dupBase = oldW.reqLv === 1 && oldW.rarity === 'white' && !(oldW.affixes && oldW.affixes.length) && saveData.bag.some(b => b.tplId === oldW.tplId && b.rarity === 'white');
-    if (!dupBase) saveData.bag.push(oldW);
-    saveData.equip.weapon = null;
-  }
-  const nextTags = ch.equipTags || ['all'];
-  for (const sk of ['sub', 'head', 'armor', 'gloves', 'shoes', 'back', 'relic']) {
-    const eq = saveData.equip[sk];
-    if (eq && eq.equipTag && eq.equipTag !== 'all' && !nextTags.includes(eq.equipTag)) {
-      saveData.bag.push(eq); saveData.equip[sk] = null;
+  const character = CHARACTERS[charId];
+  if (!character?.playable) return false;
+  const savedVariant = getSavedTrialVariant(charId);
+  const preferredVariant = variantId ?? savedVariant;
+  const vid = character.variants[preferredVariant] ? preferredVariant : character.defaultVariant;
+  if (saveLoadError) { alert('目前無法讀取存檔，原資料已保留。'); return false; }
+  if (saveData.charId === charId && saveData.variantId === vid && saveData.trialStarterKitGranted) return true;
+  if (pendingAlloc) { alert('請先確認或取消配點，再切換角色或測試型態。'); return false; }
+
+  const previousSave = saveData;
+  saveData = JSON.parse(JSON.stringify(saveData));
+  try {
+    if (saveData.charId !== charId) {
+      const profiles = (saveData.trialCharacters ||= {});
+      profiles[saveData.charId] = Object.fromEntries(TRIAL_CHARACTER_FIELDS.map(key => [key, saveData[key]]));
+      const profile = profiles[charId];
+      const defaults = JSON.parse(JSON.stringify(DEFAULT_SAVE));
+      for (const key of TRIAL_CHARACTER_FIELDS) saveData[key] = profile?.[key] ?? defaults[key];
+      if (profile) delete profiles[charId];
+      else {
+        saveData.charId = charId;
+        saveData.charName = character.name;
+        saveData.variantId = vid;
+        saveData.baseStats = { ...character.variants[vid].baseStats };
+      }
     }
+    const changedVariant = saveData.variantId !== vid;
+    if (changedVariant) {
+      saveData.variantId = vid;
+      saveData.baseStats = { ...character.variants[vid].baseStats };
+      saveData.autoStats = { ...DEFAULT_SAVE.autoStats };
+      saveData.allocated = { ...DEFAULT_SAVE.allocated };
+      saveData.freePts = 0;
+      for (let lv = 2; lv <= saveData.outLv; lv++) {
+        applyAutoLevelGrowth();
+        saveData.freePts += getLevelPts(lv);
+      }
+    }
+    const needsStarterKit = !saveData.trialStarterKitGranted;
+    if (needsStarterKit) grantTrialStarterKit(character);
+    const weapon = saveData.equip.weapon;
+    if ((needsStarterKit && !weapon) || (changedVariant && (!weapon || weapon.trialStarter))) {
+      const starterId = character.variants[vid].defaultTpl;
+      const index = saveData.bag.findIndex(item => item?.trialStarter && item.tplId === starterId);
+      if (index >= 0) {
+        const [starter] = saveData.bag.splice(index, 1);
+        if (weapon) saveData.bag.push(weapon);
+        saveData.equip.weapon = starter;
+      }
+    }
+    writeSave();
+  } catch (error) {
+    saveData = previousSave;
+    console.warn('無法保存角色切換', error);
+    alert('無法保存角色資料，已保留切換前的角色與道具。');
+    return false;
   }
-  saveData.charId = charId; saveData.variantId = vid; saveData.charName = ch.name;
-  saveData.baseStats = { ...vData.baseStats };
-  saveData.autoStats = { S: 0, H: 0, I: 0, DEF: 0, MR: 0, DEX: 0, AGI: 0 };
-  saveData.allocated = { S: 0, H: 0, I: 0, DEF: 0, MR: 0, DEX: 0, AGI: 0 };
-  let totalRefund = 0;
-  for (let lv = 2; lv <= saveData.outLv; lv++) { applyAutoLevelGrowth(); totalRefund += getLevelPts(lv); }
-  saveData.freePts = totalRefund;
-  const wPool = typeof EQUIP_TEMPLATES !== 'undefined' ? EQUIP_TEMPLATES : (typeof ITEM_WEAPONS !== 'undefined' ? ITEM_WEAPONS : []);
-  const tpl = wPool.find(w => w.tplId === vData.defaultTpl) || null;
-  if (tpl) {
-    const realSub = tpl.subType || tpl.type || tpl.equipTag || vid;
-    const defaultElem = (realSub === 'wand') ? (tpl.wandElem || 'fire') : (tpl.wandElem || null);
-    const defaultSk = tpl.startSkill || (realSub === 'wand' ? `${defaultElem}1` : (realSub === 'staff' ? 'holylight' : (realSub === 'mace' ? 'armorbreak' : 'senku')));
-    const baseS = tpl.base?.S?.min || tpl.S || 0;
-    const baseH = tpl.base?.H?.min || tpl.H || 0;
-    const baseI = tpl.base?.I?.min || tpl.I || 0;
-    const baseDEF = tpl.base?.DEF?.min || tpl.DEF || 0;
-    const baseMR = tpl.base?.MR?.min || tpl.MR || 0;
-    saveData.equip.weapon = {
-      uid: Date.now(), tplId: tpl.tplId, slot: 'weapon', subType: realSub, type: realSub, equipTag: tpl.equipTag || realSub,
-      wandElem: defaultElem, name: tpl.name, rarity: 'white', reqLv: 1, reqStats: {},
-      startSkill: defaultSk, baseRolled: { ...(baseS ? { S: baseS } : {}), ...(baseH ? { H: baseH } : {}), ...(baseI ? { I: baseI } : {}), ...(baseDEF ? { DEF: baseDEF } : {}), ...(baseMR ? { MR: baseMR } : {}) },
-      S: baseS, H: baseH, I: baseI, DEF: baseDEF, MR: baseMR,
-      identified: true, affixes: []
-    };
+  return true;
+}
+
+function grantTrialStarterKit(character) {
+  const templateIds = new Set(Object.values(character.variants).map(variant => variant.defaultTpl));
+  for (const tplId of templateIds) {
+    if (!ITEM_WEAPONS.some(template => template.tplId === tplId)) throw new Error('找不到試玩武器模板 ' + tplId);
+    const item = identifyEquipItem({ uid: generateEquipUid(), tplId, rarity: 'white' });
+    item.startSkill = getWeaponSignatureSkill(item);
+    item.trialStarter = true;
+    saveData.bag.push(item);
   }
-  writeSave(); renderLobby();
+  saveData.trialStarterKitGranted = true;
 }
 const ID_COST = { white: 10, green: 25, blue: 60, purple: 150, gold: 400 };
 
@@ -141,32 +235,7 @@ function identifySingle(uid) {
   if (saveData.seed < cost) { alert(`Seed 不足！需要 ${cost} Seed 購買放大鏡`); return; }
   saveData.seed -= cost;
   saveData.bag[idx] = identifyEquipItem(saveData.bag[idx]);
-  writeSave(); renderLobby();
-}
-
-function identifyAllItems() {
-  const unids = saveData.bag.filter(i => !i.identified);
-  if (unids.length === 0) return;
-  let count = 0;
-  for (let i = 0; i < saveData.bag.length; i++) {
-    if (!saveData.bag[i].identified) {
-      const cost = ID_COST[saveData.bag[i].rarity] || 10;
-      if (saveData.seed >= cost) {
-        saveData.seed -= cost;
-        saveData.bag[i] = identifyEquipItem(saveData.bag[i]);
-        count++;
-      }
-    }
-  }
-  writeSave(); renderLobby();
-  if (count === 0) alert('Seed 不足，無法鑑定任何裝備！');
-}
-
-function clearBag() {
-  if (!saveData.bag || saveData.bag.length === 0) return;
-  if (!confirm(`確定要清空背包內全部 ${saveData.bag.length} 件物品嗎？（已穿戴在身上的裝備不會受影響）`)) return;
-  saveData.bag = [];
-  writeSave(); renderLobby();
+  writeSave();
 }
 
 function equipFromBag(uid) {
@@ -181,7 +250,7 @@ function equipFromBag(uid) {
   saveData.equip[item.slot] = item;
   saveData.bag.splice(idx, 1);
   if (oldEquip) saveData.bag.push(oldEquip);
-  writeSave(); renderLobby();
+  writeSave();
 }
 function unequipSlot(slotKey) {
   if (pendingAlloc) { alert('請先按下「✅ 確認配點」或「↩️ 取消微調」後再卸下裝備！'); return; }
@@ -189,21 +258,9 @@ function unequipSlot(slotKey) {
   if (!item) return;
   saveData.bag.push(item);
   saveData.equip[slotKey] = null;
-  writeSave(); renderLobby();
+  writeSave();
 }
 
-function setBagSort(mode) { bagSortMode = (bagSortMode === mode) ? 'char' : mode; renderLobby(); }
-
-function debugDropLoot() {
-  const pool = ['white', 'white', 'green', 'blue', 'purple', 'gold'];
-  for (let i = 0; i < 5; i++) {
-    const r = pool[Math.floor(Math.random() * pool.length)];
-    saveData.bag.push(createUnidentifiedDrop(r, Math.min(62, Math.max(15, saveData.outLv + 10))));
-  }
-  writeSave(); renderLobby();
-}
-
-function hardResetSave() { localStorage.removeItem(SAVE_KEY); location.reload(); }
 function getWorkingAlloc() { return pendingAlloc || saveData.allocated; }
 function getWorkingFreePts() { return pendingFreePts !== null ? pendingFreePts : saveData.freePts; }
 function ensurePendingStats() { if (!pendingAlloc) { pendingAlloc = { ...saveData.allocated }; pendingFreePts = saveData.freePts; } }
@@ -260,13 +317,13 @@ function addStat(key) {
   ensurePendingStats();
   const nakedCur = getNakedStat(key), cost = getStatCost(key);
   if (nakedCur >= 255 || pendingFreePts < cost) return;
-  pendingFreePts -= cost; pendingAlloc[key]++; renderLobby();
+  pendingFreePts -= cost; pendingAlloc[key]++;
 }
 
 function subStat(key) {
   ensurePendingStats();
   if (pendingAlloc[key] <= 0) return;
-  pendingAlloc[key]--; pendingFreePts += getStatCost(key); renderLobby();
+  pendingAlloc[key]--; pendingFreePts += getStatCost(key);
 }
 
 function maxOutStat(key) {
@@ -276,36 +333,23 @@ function maxOutStat(key) {
     if (nakedCur >= 255 || pendingFreePts < cost) break;
     pendingFreePts -= cost; pendingAlloc[key]++;
   }
-  renderLobby();
 }
 
 function confirmStats() {
   if (!pendingAlloc) return;
   saveData.allocated = { ...pendingAlloc }; saveData.freePts = pendingFreePts;
   pendingAlloc = null; pendingFreePts = null;
-  writeSave(); renderLobby();
+  writeSave();
 }
 
-function cancelStats() { pendingAlloc = null; pendingFreePts = null; renderLobby(); }
+function cancelStats() { pendingAlloc = null; pendingFreePts = null; }
 function resetStats() {
   ensurePendingStats();
   let refund = 0;
   for (const k of Object.keys(pendingAlloc)) {
     while (pendingAlloc[k] > 0) { pendingAlloc[k]--; refund += getStatCost(k); }
   }
-  pendingFreePts += refund; renderLobby();
-}
-
-function debugAddExp() { addOutExpAndSeed(getNextOutExp(saveData.outLv), 500); renderLobby(); }
-
-function debugMaxLv60() {
-  while (saveData.outLv < MAX_OUT_LV) {
-    saveData.outLv++;
-    applyAutoLevelGrowth();
-    saveData.freePts += getLevelPts(saveData.outLv);
-  }
-  checkLv15WingQuest();
-  saveData.seed += 250000; writeSave(); renderLobby();
+  pendingFreePts += refund;
 }
 
 function getLobbyTooltipEl() {
@@ -397,144 +441,15 @@ function renderPaperDoll() {
   if (saveData.equip.weapon) { c.strokeStyle = RARITIES[saveData.equip.weapon.rarity].color; c.lineWidth = 4; c.beginPath(); c.moveTo(cx + 12, cy); c.lineTo(cx + 32, cy - 16); c.stroke(); }
 }
 
-function renderLobby() {
-  hideLobbyTooltip();
-  const d = getDerivedCombatStats(), st = d.st, curFree = getWorkingFreePts(), alloc = getWorkingAlloc();
-  const ch = getCurrentCharData(), vInfo = getCurrentCharVariant(), rule = getCurrentArchetypeRule();
-  const pendingTag = pendingAlloc ? ' <span style="color:#fde047;">(預覽微調中)</span>' : '';
-
-  const charBtns = ['lucien', 'tichiel'].map(cid => {
-    const cObj = CHARACTERS[cid], active = saveData.charId === cid;
-    return `<button class="stat-btn" style="width:auto;padding:2px 8px;background:${active ? '#eab308' : '#334155'};color:${active ? '#0f172a' : '#f8fafc'};font-weight:bold;" onclick="switchCharacterVariant('${cid}')">${cObj.name.split('．')}</button>`;
-  }).join('');
-  const varBtns = Object.entries(ch.variants).map(([vid, v]) => {
-    const active = saveData.variantId === vid;
-    return `<button class="stat-btn" style="width:auto;padding:2px 6px;font-size:11px;background:${active ? '#38bdf8' : '#1e293b'};color:${active ? '#0f172a' : '#cbd5e1'};border:1px solid #475569;" onclick="switchCharacterVariant('${ch.id}','${vid}')">${v.wName}(${v.archetype})</button>`;
-  }).join('');
-
-  document.getElementById('lobbyHeader').innerHTML = `
-    <div style="display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:6px;margin-bottom:4px;">
-      <span>角色切換：${charBtns}</span> ｜ <span>型態：${varBtns}</span>
-    </div>
-    <div>${ch.name} [${rule.name}・${vInfo.wName}] ｜ 局外等級：LV.${saveData.outLv}/${MAX_OUT_LV} ｜ 剩餘配點：<strong>${curFree}</strong>${pendingTag} ｜ Seed：${saveData.seed}</div>`;
-
-  const fullLabels = { S: 'STAB', H: 'HACK', I: 'INT', DEF: 'DEF', MR: 'MR', DEX: 'DEX', AGI: 'AGI' };
-  const rowsHtml = Object.keys(fullLabels).map(k => {
-    const nakedVal = getNakedStat(k), totalVal = st[k], cost = getStatCost(k);
-    const disPlus = (nakedVal >= 255 || curFree < cost) ? 'disabled' : '';
-    const disMinus = (alloc[k] || 0) <= 0 ? 'disabled' : '';
-    return `<div class="stat-row">
-      <span style="cursor:help;border-bottom:1px dashed #64748b;" onmouseenter="showLobbyStatTooltip(event,'${k}')" onmousemove="moveLobbyTooltip(event)" onmouseleave="hideLobbyTooltip()"><strong>${fullLabels[k]}</strong>：<strong>${totalVal}</strong></span>
-      <span style="display:flex;align-items:center;gap:3px;">
-        <span style="font-size:11px;color:${cost === 1 ? '#4ade80' : '#f87171'};">(${cost}pt)</span>
-        <button class="stat-btn" style="background:#64748b;color:#fff;" ${disMinus} onclick="subStat('${k}')">-</button>
-        <button class="stat-btn" ${disPlus} onclick="addStat('${k}')">+</button>
-        <button class="stat-btn" style="width:auto;padding:0 5px;background:#facc15;font-size:11px;" ${disPlus} onclick="maxOutStat('${k}')">MAX</button>
-      </span>
-    </div>`;
-  }).join('');
-  const confirmBarHtml = pendingAlloc
-    ? `<div style="display:flex;gap:6px;margin-top:8px;padding-top:8px;border-top:1px dashed #ca8a04;">
-        <button class="stat-btn" style="flex:1;padding:6px;background:#22c55e;color:#052e16;font-weight:bold;font-size:12px;" onclick="confirmStats()">✅ 確認配點</button>
-        <button class="stat-btn" style="flex:1;padding:6px;background:#475569;color:#f8fafc;font-size:12px;" onclick="cancelStats()">↩️ 取消微調</button>
-      </div>` : '';
-  document.getElementById('statRows').innerHTML = rowsHtml + confirmBarHtml;
-
-  const slotsHtml = Object.entries(SLOT_NAMES).map(([sk, sName]) => {
-    const it = saveData.equip[sk];
-    if (!it) return `<div class="eq-slot"><span>[${sName}]</span> <span style="color:#64748b;">未裝備</span></div>`;
-    const r = RARITIES[it.rarity] || RARITIES.white, enhTag = it.enhanceLv ? ` +${it.enhanceLv}` : '';
-    return `<div class="eq-slot" style="border-left:3px solid ${r.color};display:flex;justify-content:space-between;align-items:center;cursor:help;" onmouseenter="showLobbyEquipTooltip(event,'equip','${sk}')" onmousemove="moveLobbyTooltip(event)" onmouseleave="hideLobbyTooltip()">
-      <span style="color:${r.color};font-weight:bold;">[${sName}] ${it.name}${enhTag} <span style="font-size:11px;color:#94a3b8;font-weight:normal;">(LV.${it.reqLv || 1})</span></span>
-      <button class="stat-btn" style="width:auto;padding:1px 7px;background:#475569;color:#f8fafc;font-size:11px;" onclick="event.stopPropagation();unequipSlot('${sk}')">卸下</button>
-    </div>`;
-  }).join('');
-
-  const miniBox = 'background:rgba(15,23,42,0.75);border:1px solid #334155;border-radius:4px;padding:3px 6px;display:flex;justify-content:space-between;align-items:center;white-space:nowrap;';
-  document.getElementById('lobbyPreview').innerHTML = `
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
-      <canvas id="paperDollCanvas" width="76" height="92" style="background:#0f172a;border:1px solid #475569;border-radius:8px;flex-shrink:0;"></canvas>
-      <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:11px;">
-        <div style="${miniBox}"><span style="color:#94a3b8;">❤️ 生命</span><strong>${d.maxHp}</strong></div>
-        <div style="${miniBox}"><span style="color:#94a3b8;">👟 移速</span><strong>${Math.round(d.moveSpeed)}</strong></div>
-        <div style="${miniBox}"><span style="color:#94a3b8;">🛡️ 物減</span><strong style="color:#4ade80;">${d.physReducePct}%</strong></div>
-        <div style="${miniBox}"><span style="color:#94a3b8;">💠 魔減</span><strong style="color:#38bdf8;">${d.magReducePct}%</strong></div>
-        <div style="${miniBox}"><span style="color:#94a3b8;">💥 暴率</span><strong>${(d.critRate * 100).toFixed(1)}%</strong></div>
-        <div style="${miniBox}"><span style="color:#94a3b8;">🔥 暴傷</span><strong>${Math.round(d.critDmg * 100)}%</strong></div>
-        <div style="${miniBox}"><span style="color:#94a3b8;">⚔️ 連擊</span><strong>${(d.doubleHitChance * 100).toFixed(1)}%</strong></div>
-        <div style="${miniBox}"><span style="color:#94a3b8;">✨ 異常率</span><strong style="color:#4ade80;">+${(d.statusChanceBonus * 100).toFixed(1)}%</strong></div>
-      </div>
-    </div>
-    <div>${slotsHtml}</div>`;
-  renderPaperDoll();
-
-  const bagEl = document.getElementById('bagList');
-  if (bagEl) {
-    const bagWrap = bagEl.parentElement;
-    if (bagWrap) {
-      bagWrap.style.cssText = 'max-height:365px;overflow-y:auto;overflow-x:hidden;padding-right:4px;box-sizing:border-box;';
-    }
-    let bagBar = document.getElementById('bagToolbarFixed');
-    if (!bagBar && bagWrap) {
-      bagBar = document.createElement('div');
-      bagBar.id = 'bagToolbarFixed';
-      bagWrap.insertBefore(bagBar, bagEl);
-    }
-    const sortBtns = [
-      { id: 'rarity', label: '⭐ 品級' }, { id: 'lv', label: '📊 等級' }, { id: 'slot', label: '📦 部位' }
-    ].map(b => `<button class="stat-btn" style="flex:1;padding:4px 3px;font-size:11px;white-space:nowrap;background:${bagSortMode === b.id ? '#eab308' : '#334155'};color:${bagSortMode === b.id ? '#0f172a' : '#e2e8f0'};font-weight:${bagSortMode === b.id ? 'bold' : 'normal'};" onclick="setBagSort('${b.id}')">${b.label}</button>`).join('');
-    const clearBtn = `<button class="stat-btn" style="padding:4px 6px;font-size:11px;white-space:nowrap;background:#dc2626;color:#fff;width:auto;" onclick="clearBag()">🧹 清空</button>`;
-    if (bagBar) {
-      bagBar.style.cssText = 'position:sticky;top:0;z-index:10;background:#0f172a;padding:2px 0 6px 0;margin-bottom:6px;border-bottom:1px solid #334155;box-sizing:border-box;width:100%;';
-      bagBar.innerHTML = `<div style="display:flex;gap:4px;width:100%;box-sizing:border-box;">${sortBtns}${clearBtn}</div>`;
-    }
-
-    const rarOrder = { gold: 5, purple: 4, blue: 3, green: 2, white: 1 };
-    const slotOrder = { weapon: 1, sub: 2, head: 3, armor: 4, gloves: 5, shoes: 6, back: 7, relic: 8 };
-    const charTags = ch.equipTags || [];
-    const isCharFit = (it) => {
-      const wSub = it.slot === 'weapon'
-        ? ((it.subType && it.subType !== 'weapon') ? it.subType : ((it.type && it.type !== 'weapon') ? it.type : it.equipTag))
-        : null;
-      const tag = wSub || it.equipTag || 'all';
-      return tag === 'all' || charTags.includes(tag);
-    };
-    const sortedBag = [...saveData.bag].sort((a, b) => {
-      if (!a.identified !== !b.identified) return a.identified ? 1 : -1;
-      const fitA = isCharFit(a) ? 1 : 0, fitB = isCharFit(b) ? 1 : 0;
-      if (fitA !== fitB) return fitB - fitA; // 永遠優先顯示本職可穿戴裝備
-      if (bagSortMode === 'rarity') return ((rarOrder[b.rarity] || 0) - (rarOrder[a.rarity] || 0)) || ((b.reqLv || 1) - (a.reqLv || 1));
-      if (bagSortMode === 'lv') return ((b.reqLv || 1) - (a.reqLv || 1)) || ((rarOrder[b.rarity] || 0) - (rarOrder[a.rarity] || 0));
-      if (bagSortMode === 'slot') return ((slotOrder[a.slot] || 9) - (slotOrder[b.slot] || 9)) || ((rarOrder[b.rarity] || 0) - (rarOrder[a.rarity] || 0));
-      return (rarOrder[b.rarity] || 0) - (rarOrder[a.rarity] || 0);
-    });
-
-    bagEl.innerHTML = sortedBag.length === 0
-      ? '<div style="color:#64748b;font-size:13px;">背包空空如也（可按上方測試掉落裝備）</div>'
-      : sortedBag.map(it => {
-          const r = RARITIES[it.rarity] || RARITIES.white;
-          if (!it.identified) {
-            const cost = ID_COST[it.rarity] || 10;
-            return `<div class="bag-item" style="border-left:3px solid ${r.color};"><span style="color:${r.color};">❓ [未鑑定] ${r.name}${SLOT_NAMES[it.slot]}袋</span><button class="stat-btn" style="width:auto;padding:2px 8px;" onclick="identifySingle(${it.uid})">🔍 鑑定 (${cost} Seed)</button></div>`;
-          }
-          const fit = isCharFit(it);
-          const canEq = fit && (typeof canEquipItem !== 'function' || canEquipItem(it).ok);
-          const opacityStyle = canEq ? '' : 'opacity:0.42;background:rgba(15,23,42,0.85);';
-          const unfitTag = !fit ? '<span style="font-size:10px;color:#f87171;margin-left:4px;">[適性不符]</span>' : (!canEq ? '<span style="font-size:10px;color:#fbbf24;margin-left:4px;">[能力不足]</span>' : '');
-          const btnStyle = canEq ? 'background:#22c55e;color:#052e16;' : 'background:#1e293b;color:#64748b;border:1px solid #334155;cursor:not-allowed;';
-          return `<div class="bag-item" style="border-left:3px solid ${r.color};cursor:help;${opacityStyle}" onmouseenter="showLobbyEquipTooltip(event,'bag','${it.uid}')" onmousemove="moveLobbyTooltip(event)" onmouseleave="hideLobbyTooltip()"><div><strong style="color:${r.color};">${it.name}</strong> <span style="font-size:11px;color:#94a3b8;">(LV.${it.reqLv || 1})</span>${unfitTag}</div><button class="stat-btn" style="width:auto;padding:2px 10px;${btnStyle}" ${canEq ? '' : 'disabled'} onclick="event.stopPropagation();equipFromBag(${it.uid})">${canEq ? '穿戴' : '不可穿'}</button></div>`;
-        }).join('');
-  }
-}
-
 // 片段 C：startBattle() 內讀取武器初始技能並綁定所選關卡與 4 階難度倍率
-function startBattle(stageId, diffKey) {
-  if (pendingAlloc) { alert('請先按下「✅ 確認配點」或「↩️ 取消微調」後再出發冒險！'); return; }
+function startBattle(stageId, diffKey, { sandbox = false } = {}) {
+  if (pendingAlloc) { alert('請先按下「✅ 確認配點」或「↩️ 取消微調」後再出發冒險！'); return false; }
+  resetBattleRun();
   const stList = (typeof STAGE_SELECT_LIST !== 'undefined' && Array.isArray(STAGE_SELECT_LIST)) ? STAGE_SELECT_LIST : [];
   const diffMap = (typeof DIFFICULTY_MODIFIERS !== 'undefined') ? DIFFICULTY_MODIFIERS : {};
   const chosenStage = stList.find(s => s.id === (stageId || saveData.currentStageId)) || stList[0] || { id: 'penine_forest', tier: 1, name: '貝那茵森林', minLv: 1, maxLv: 16, baseExpMult: 1.0, boss: { name: '果凍雞王' }, elites: ['【菁英】食人花', '【菁英】多多熊'], monsters: ['小花貓', '綠葉果凍雞', '葉精', '香菇', '食人花', '多多熊'] };
   const chosenDiff = diffMap[diffKey || saveData.currentDifficultyKey] || diffMap.normal || { key: 'normal', name: '🟢 普通', hpMult: 1.0, dmgMult: 1.0, spawnMult: 1.0, expMult: 1.0, dropMult: 1.0 };
-  window.ACTIVE_STAGE_RUN = { stage: chosenStage, diff: chosenDiff };
+  window.ACTIVE_STAGE_RUN = { stage: chosenStage, diff: chosenDiff, charId: saveData.charId, variantId: saveData.variantId, sandbox };
 
   const d = getDerivedCombatStats(), w = saveData.equip.weapon || { name: '徒手', type: 'longsword', startSkill: 'senku' }, ch = getCurrentCharData();
 
@@ -566,12 +481,13 @@ function startBattle(stageId, diffKey) {
   }
 
   const hudName = document.getElementById('hudCharName'), hudWep = document.getElementById('weaponText');
-  if (hudName) hudName.textContent = `${ch.name}｜${chosenStage.name}(${chosenDiff.name.replace(/^[^\s]+\s/, '')})`; if (hudWep) hudWep.textContent = w.name;
+  if (hudName) hudName.textContent = sandbox ? `${ch.name}｜木樁修鍊場` : `${ch.name}｜${chosenStage.name}(${chosenDiff.name.replace(/^[^\s]+\s/, '')})`;
+  if (hudWep) hudWep.textContent = w.name;
   if (typeof player !== 'undefined') {
     player.maxHp = d.maxHp; player.hp = player.maxHp; player.regen = d.regen; player.baseSpeed = d.moveSpeed; player.pickupRange = d.pickupRange;
     player.cdMult = Math.max(0.35, 1 - (d.cdReduce || 0)); player.areaMult = 1.0; player.speedMult = 1.0; player.dmgMult = 1.0;
     player.bonusCritRate = 0; player.bonusDoubleHit = 0; player.superCritMult = 1.5; player.resonanceDmgMult = 1.0;
-    player.dropRateMult = chosenDiff.dropMult || 1.0; player.expMult = d.expBonusMult; player.curseMult = 1.0; player.seedMult = 1.0; player.angelUsed = false;
+    player.dropRateMult = 1.0; player.expMult = d.expBonusMult; player.curseMult = 1.0; player.seedMult = 1.0; player.angelUsed = false;
   }
   if (typeof ownedSkills !== 'undefined') {
     for (const k of Object.keys(ownedSkills)) delete ownedSkills[k];
@@ -579,6 +495,6 @@ function startBattle(stageId, diffKey) {
     ownedSkills[sigSkill] = { lv: startLv, evolved: false, disabled: false };
   }
   if (typeof ownedPassives !== 'undefined') { for (const k of Object.keys(ownedPassives)) delete ownedPassives[k]; }
-  document.getElementById('lobbyModal').style.display = 'none';
-  if (typeof isPaused !== 'undefined') isPaused = false;
+  if (!sandbox) enterBattleScene();
+  return true;
 }

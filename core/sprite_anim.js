@@ -42,7 +42,12 @@ const SpriteAnimManager = {
       const rawImg = new Image();
       const entry = { meta, img: rawImg, loaded: false, loading: true };
       rawImg.onload = () => {
-        entry.img = this.stripColorKey(rawImg); // 載入完成立即自動去背
+        try {
+          entry.img = this.stripColorKey(rawImg);
+        } catch (error) {
+          // 本機檔案環境可能禁止讀回像素，透明 PNG 仍可直接繪製。
+          if (error.name !== 'SecurityError') throw error;
+        }
         entry.loaded = true;
         entry.loading = false;
       };

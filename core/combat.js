@@ -272,8 +272,7 @@ function getSkillRawDmg(id, lv, evolved) {
         const gapInfo = typeof getStageLevelGapInfo === 'function' ? getStageLevelGapInfo(playerLv, st) : { dropRateMult: 1.0, maxRarIdx: 4 };
         const lvRange = typeof getStageDropLvRange === 'function' ? getStageDropLvRange(st) : { minLv: 0, maxLv: st.maxLv || 16 };
 
-        const stageDropBase = st.baseDropRate || 0.025;
-        const mobDropChance = stageDropBase * (diff.dropMult || 1.0) * (gapInfo.dropRateMult ?? 1.0) * (player.dropRateMult || 1.0);
+        const mobDropChance = getMobEquipmentDropChance(st, diff, gapInfo, player.dropRateMult ?? 1);
         const enemyTier = e.isFinalBoss ? 'final' : (e.isMegaBoss ? 'mega' : (e.isElite ? 'elite' : 'mob'));
 
         if (!e.isDummy && (e.isFinalBoss || e.isMegaBoss || e.isElite || Math.random() < mobDropChance)) {
@@ -300,26 +299,17 @@ function getSkillRawDmg(id, lv, evolved) {
           }
         }
 
-        // 【首通成就金裝】每個關卡 × 4 難度各自獨立，首次通關額外必掉 1 件本職金色傳說裝備
-        if (e.isFinalBoss && typeof saveData !== 'undefined') {
-          saveData.stageFirstClears = saveData.stageFirstClears || {};
+        // 首通武器先記為待發獎勵，掃場結算時再與首通紀錄一起入庫。
+        if (e.isFinalBoss && !e.isDummy && runCfg) {
           const clearKey = `${st.id}_${diff.key}`;
-          if (!saveData.stageFirstClears[clearKey]) {
-            saveData.stageFirstClears[clearKey] = true;
-            if (typeof writeSave === 'function') writeSave();
-            const firstClearGold = typeof createUnidentifiedDrop === 'function'
-              ? createUnidentifiedDrop('gold', lvRange.maxLv, null, true, lvRange.minLv)
-              : null;
-            if (firstClearGold) {
-              lootBags.push({
-                x: e.x,
-                y: e.y - 28,
-                item: firstClearGold,
-                color: RARITIES.gold.color,
-                rarName: '首通傳說'
-              });
-            }
-            showBanner(`🏆 達成【${st.name}（${diff.name}）】首次通關！獲得首通金色傳說寶箱！`);
+          if (!saveData.stageFirstClears?.[clearKey]) {
+            const pending = (saveData.pendingFirstClearRewards ||= {});
+            const firstClearGold = (pending[clearKey] ||= createFirstClearWeapon(runCfg.charId, runCfg.variantId, lvRange));
+            try { writeSave(); }
+            catch (e) { console.warn('無法保存待發首通獎勵，將於結算重試', e); }
+            lootBags.push({
+              x: e.x, y: e.y - 28, item: firstClearGold, color: RARITIES.gold.color, rarName: '首通傳說'
+            });
           }
 
           // 【預留窗口】BOSS 專屬合成素材掉落接口（後續實裝消耗品／素材系統後啟用）
@@ -357,7 +347,12 @@ function getSkillRawDmg(id, lv, evolved) {
                 if (!e.isDummy && typeof fieldItems !== 'undefined' && Math.random() < 0.016) {
                   const itemKinds = ['potion', 'magnet', 'bomb', 'goldbag'];
                   const pickedKind = itemKinds[Math.floor(Math.random() * itemKinds.length)];
-                  fieldItems.push({ x: e.x, y: e.y, kind: pickedKind, life: 45 });
+                  const item = { x: e.x, y: e.y, kind: pickedKind, life: 45 };
+                  if (pickedKind === 'goldbag') {
+                    const baseSeed = 3 + Math.floor(Math.random() * 4);
+                    item.val = Math.max(1, Math.round(baseSeed * (st.tier || 1) * (diff.dropMult || 1) * (player.seedMult || 1)));
+                  }
+                  fieldItems.push(item);
                 }
                 const curIdx = enemies.indexOf(e);
         if (curIdx !== -1) enemies.splice(curIdx, 1);
@@ -446,5 +441,3 @@ function getSkillRawDmg(id, lv, evolved) {
     function findNearestEnemy(maxDist) {
       return findTargetEnemy(maxDist, 'nearest');
     }
-    
-    

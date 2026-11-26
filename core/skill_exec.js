@@ -2,6 +2,30 @@
 // core/skill_exec.js — 主動技能發射器與技能狀態動態計算
 // ============================================================================
 
+function getBonusSkillProjectiles(tags = [], stats) {
+  return (tags.includes('射彈') || tags.includes('projectile')) ? (stats.extraProj || 0) : 0;
+}
+
+function getIceCrystalStats(level, config = GLOBAL_SKILL_POOL.ice3.iceCrystal) {
+  const upgraded = level >= config.upgradeLv;
+  return {
+    ...config,
+    orbCount: upgraded ? config.upgradedOrbCount : config.baseOrbCount,
+    scatterDamageMult: upgraded ? config.upgradedScatterDamageMult : config.scatterDamageMult
+  };
+}
+
+function getThunderBallStats(level, config = GLOBAL_SKILL_POOL.thunder3.thunderBall) {
+  const extraBallsAndBounces = Math.floor(level / config.ballAndBounceEveryLv);
+  return {
+    ...config,
+    ballCount: config.baseBallCount + extraBallsAndBounces,
+    hitCount: config.baseHitCount + extraBallsAndBounces,
+    arcCount: level >= config.extraArcLv ? config.upgradedArcCount : config.baseArcCount,
+    arcHits: level >= config.extraJumpLv ? config.upgradedArcHits : config.baseArcHits
+  };
+}
+
 // [第 1 段：被動／主動技能升級預覽與目前狀態敘述計算（第 1 ～ 105 行）]
 function getPassiveGainText(id, lv) {
     const map = {
@@ -79,8 +103,17 @@ function getPassiveGainText(id, lv) {
     if (id === 'thunder5') gains.push('落雷道數 +1 道、雷擊範圍擴大');
     if (id === 'holypoly') gains.push('聖光漩渦半徑擴大');
     if (id === 'ice2') gains.push('冰霧領域範圍 +6%');
-    if (id === 'ice3' && nextLv === 4) gains.push('單次發射巨型寒冰球提升至 2 顆、散射冰彈威力提升至 60%');
-    if (id === 'thunder3' && nextLv === 4) gains.push('撞擊引動連鎖電弧提升至 2 條');
+    if (id === 'ice3' && nextLv === sk.iceCrystal.upgradeLv) {
+      const ice = getIceCrystalStats(nextLv, sk.iceCrystal);
+      gains.push(`基礎寒冰球增至 ${ice.orbCount} 顆、散射傷害提升至冰彈術基傷的 ${Math.round(ice.scatterDamageMult * 100)}%`);
+    }
+    if (id === 'thunder3') {
+      const previous = getThunderBallStats(nextLv - 1, sk.thunderBall);
+      const thunder = getThunderBallStats(nextLv, sk.thunderBall);
+      if (thunder.ballCount !== previous.ballCount) gains.push(`基礎雷球增至 ${thunder.ballCount} 顆，每顆最多命中 ${thunder.hitCount} 名敵人`);
+      if (thunder.arcCount !== previous.arcCount) gains.push(`每次撞擊最多引動 ${thunder.arcCount} 條電弧`);
+      if (thunder.arcHits !== previous.arcHits) gains.push(`每條電弧最多命中 ${thunder.arcHits} 名敵人`);
+    }
     if ((id === 'windblade' || id === 'firearrow' || id === 'thunder') && nextLv % 3 === 0) gains.push('落雷數量 +1');
     if (id === 'armorbreak') {
       gains.push('扇形範圍 +4%');
@@ -133,16 +166,20 @@ function getPassiveGainText(id, lv) {
     if (id === 'ice1') parts.push(`單次投射 ${1 + Math.floor(lv / 4)} 發（每發可彈跳 ${1 + Math.floor(lv / 2)} 次）`);
     if (id === 'ice2') parts.push(`領域範圍 +${(lv - 1) * 6}%｜基礎凍結觸發率 15%（受 MR 加成）`);
     if (id === 'fire2') parts.push(`單次投射 ${1 + Math.floor(lv / 3)} 發`);
-    if (id === 'ice3') parts.push(`單次投射 ${lv >= 4 ? 2 : 1} 顆巨型寒冰球（每 0.60s 散射 ${lv >= 4 ? 60 : 45}% 威力彈跳冰彈）`);
+    if (id === 'ice3') {
+      const ice = getIceCrystalStats(lv, sk.iceCrystal);
+      const bonus = getBonusSkillProjectiles(sk.behaviorTags, getDerivedCombatStats());
+      parts.push(`寒冰球 ${ice.orbCount + bonus} 顆${bonus ? `（基礎 ${ice.orbCount} ＋ 額外 ${bonus}）` : ''}，每次碾壓為冰晶術基傷的 ${Math.round(ice.crushDamageMult * 100)}%`);
+      parts.push(`有敵人時，每顆寒冰球約 ${ice.firstScatterDelay.toFixed(2)} 秒後首次散射，之後每 ${ice.scatterInterval.toFixed(2)} 秒發射 1 顆冰彈，傷害為冰彈術 LV.${ownedSkills.ice1?.lv || 1} 基傷的 ${Math.round(ice.scatterDamageMult * 100)}%`);
+    }
     if (id === 'fire4' || id === 'ice4') parts.push(`單次召喚 ${1 + Math.floor(lv / 3)} 顆隕石`);
     if (id === 'thunder1') parts.push(`單次落下 ${3 + Math.floor(lv / 2)} 道單體落雷`);
     if (id === 'thunder2') parts.push(`雙段電環極限半徑 +${(lv - 1) * 5}%（0.7s 擴散／0.3s 回縮）`);
     if (id === 'thunder3') {
-      const balls = 1 + Math.floor(lv / 4);
-      const bounces = 1 + Math.floor(lv / 4);
-      const arcs = lv >= 4 ? 2 : 1;
-      const jumps = lv >= 5 ? 3 : 2;
-      parts.push(`單次投射 ${balls} 顆（彈跳 ${bounces} 次｜撞擊射出 ${arcs} 條連跳 ${jumps} 敵）`);
+      const thunder = getThunderBallStats(lv, sk.thunderBall);
+      const bonus = getBonusSkillProjectiles(sk.behaviorTags, getDerivedCombatStats());
+      parts.push(`雷球 ${thunder.ballCount + bonus} 顆${bonus ? `（基礎 ${thunder.ballCount} ＋ 額外 ${bonus}）` : ''}，每顆最多命中 ${thunder.hitCount} 名敵人`);
+      parts.push(`每次撞擊最多引動 ${thunder.arcCount} 條電弧，每條最多命中 ${thunder.arcHits} 名敵人，傷害為該顆雷球基傷的 ${Math.round(thunder.arcDamageMult * 100)}%`);
     }
 
     if (id === 'thunder4') parts.push(`單次落下 ${4 + Math.floor(lv / 2)} 道神雷`);
@@ -226,7 +263,7 @@ function triggerSkills(dt) {
       const sTags = Array.isArray(sk.statusTags) ? sk.statusTags : [];
       const isMeleeSkill = bTags.includes('melee') || bTags.includes('近戰');
       const areaFactor = (bTags.includes('範圍') || bTags.includes('aoe')) ? player.areaMult : 1.0;
-      const bonusProj = (bTags.includes('射彈') || bTags.includes('projectile')) ? (cs.extraProj || 0) : 0;
+      const bonusProj = getBonusSkillProjectiles(bTags, cs);
       const rawDmg = getSkillRawDmg(id, st.lv, st.evolved);
       const partnerId = sk.resonancePartner || sk.resonanceSkill;
       const hasResonance = (st.evolved || sk.isSuperWeapon) && partnerId && ownedSkills[partnerId] && !ownedSkills[partnerId].disabled;
@@ -564,12 +601,15 @@ function triggerSkills(dt) {
           continue;
         }
   
+        const iceCrystal = id === 'ice3' ? getIceCrystalStats(st.lv, sk.iceCrystal) : null;
+        const thunderBall = id === 'thunder3' ? getThunderBallStats(st.lv, sk.thunderBall) : null;
         const baseCount = (id === 'fire1' || id === 'fire5' || id === 'ice5') ? (1 + Math.floor(st.lv / 2))
           : (id === 'fire3' ? (4 + Math.floor(st.lv / 2))
-          : ((id === 'ice1' || id === 'thunder3') ? (1 + Math.floor(st.lv / 4))
-          : (id === 'ice3' ? (st.lv >= 4 ? 2 : 1)
+          : (id === 'ice1' ? (1 + Math.floor(st.lv / 4))
+          : (thunderBall ? thunderBall.ballCount
+          : (iceCrystal ? iceCrystal.orbCount
           : (id === 'thunder1' ? (3 + Math.floor(st.lv / 2))
-          : ((id === 'thunder4' || id === 'thunder5') ? (4 + Math.floor(st.lv / 2)) : (1 + Math.floor(st.lv / 3)))))));
+          : ((id === 'thunder4' || id === 'thunder5') ? (4 + Math.floor(st.lv / 2)) : (1 + Math.floor(st.lv / 3))))))));
         const count = baseCount + bonusProj;
         const mainTarget = findTargetEnemy(750, tMode);
         const mainAng = mainTarget ? Math.atan2(mainTarget.y - player.y, mainTarget.x - player.x) : player.facingAngle;
@@ -654,17 +694,18 @@ function triggerSkills(dt) {
               dmg: rawDmg, pierce: 1, life: fallDur + 0.1, hitSet: new Set()
             });
           } else {
-            const isOrb = id === 'ice3', isIceBounce = id === 'ice1', isThunderBall = id === 'thunder3', isFireOrb = id === 'fire3';
+            const isOrb = !!iceCrystal, isIceBounce = id === 'ice1', isThunderBall = !!thunderBall, isFireOrb = id === 'fire3';
             const spd = isIceBounce ? 680 : (isThunderBall ? 620 : (isOrb ? 210 : (isFireOrb ? 420 : 520)));
             const baseRad = isOrb ? 22 : (isFireOrb ? 18 : (isThunderBall ? 14 : (id.endsWith('4') || id.endsWith('5') ? 26 : 11)));
-            const pierceCount = isOrb ? 99 : (isIceBounce ? (2 + Math.floor(st.lv / 2)) : (isThunderBall ? (2 + Math.floor(st.lv / 4)) : 1));
+            const pierceCount = isOrb ? 99 : (isIceBounce ? (2 + Math.floor(st.lv / 2)) : (thunderBall?.hitCount ?? 1));
             projectiles.push({
               type: elem, elem, skillId: id, lv: st.lv, isBounce: isIceBounce || isThunderBall, speed: spd,
               x: player.x, y: player.y,
               vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd,
               radius: baseRad * areaFactor,
               dmg: rawDmg, pierce: pierceCount,
-              life: isOrb ? 2.8 : 1.5, orbShootCd: 0.45,
+              life: iceCrystal?.orbLifetime ?? 1.5,
+              ...(iceCrystal && { orbShootCd: iceCrystal.firstScatterDelay }),
               hitSet: new Set(), crushCds: new Map()
             });
           }
@@ -673,5 +714,3 @@ function triggerSkills(dt) {
       }
     }
   }
-
-  

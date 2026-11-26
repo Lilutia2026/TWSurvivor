@@ -22,9 +22,9 @@ const CHARACTERS = {
       wind:      { vortexDur: 2.0, unbalanceDur: 1.0, widthBonus: [0.15, 0.20, 0.25], lv3SuppressBonus: 0.15, cutPct: 0.12 }
     },
     variants: {
-      longsword: { wName: '長劍', archetype: 'S+H', initHp: 220, defaultTpl: 'w_long_1', baseStats: { S: 4, H: 3, I: 1, DEF: 2, MR: 1, DEX: 2, AGI: 1 } },
-      blade:     { wName: '彎刀', archetype: 'H',   initHp: 240, defaultTpl: 'w_bld_1',  baseStats: { S: 3, H: 4, I: 1, DEF: 2, MR: 1, DEX: 2, AGI: 1 } },
-      rapier:    { wName: '細劍', archetype: 'S',   initHp: 200, defaultTpl: 'w_rap_1',  baseStats: { S: 4, H: 3, I: 1, DEF: 3, MR: 1, DEX: 1, AGI: 1 } }
+      longsword: { wName: '長劍', archetype: 'S+H', initHp: 220, defaultTpl: 'w_long_0', baseStats: { S: 4, H: 3, I: 1, DEF: 2, MR: 1, DEX: 2, AGI: 1 } },
+      blade:     { wName: '彎刀', archetype: 'H',   initHp: 240, defaultTpl: 'w_bld_0',  baseStats: { S: 3, H: 4, I: 1, DEF: 2, MR: 1, DEX: 2, AGI: 1 } },
+      rapier:    { wName: '細劍', archetype: 'S',   initHp: 200, defaultTpl: 'w_rap_0',  baseStats: { S: 4, H: 3, I: 1, DEF: 3, MR: 1, DEX: 1, AGI: 1 } }
     }
   },
 

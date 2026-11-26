@@ -1,0 +1,212 @@
+// 玩家與敵方投射物更新。傷害結算由 combat.js 負責。
+function updatePlayerProjectiles(dt, cs, spellBase) {
+  const spawnedProjectiles = [];
+  projectiles = projectiles.filter(p => {
+    if (p.isDivinePrayer) {
+      if (p.hoverTimer > 0) {
+        p.hoverTimer -= dt;
+        p.offY -= 24 * dt;
+        p.x = player.x + p.offX;
+        p.y = player.y + p.offY;
+        if (p.hoverTimer <= 0) {
+          p.startX = p.x;
+          p.startY = p.y;
+          if (p.targetObj && !p.targetObj.isDead) {
+            p.targetX = p.targetObj.x;
+            p.targetY = p.targetObj.y;
+          }
+          const dist = Math.hypot(p.targetX - p.startX, p.targetY - p.startY);
+          p.flightDur = Math.max(0.28, Math.min(0.65, dist / 640));
+          p.flightTime = 0;
+        }
+        return true;
+      }
+      if (p.targetObj && !p.targetObj.isDead) {
+        p.targetX = p.targetObj.x;
+        p.targetY = p.targetObj.y;
+      }
+      p.flightTime += dt;
+      const t = Math.min(1, p.flightTime / (p.flightDur || 0.4));
+      const baseX = p.startX + (p.targetX - p.startX) * t;
+      const baseY = p.startY + (p.targetY - p.startY) * t - Math.sin(t * Math.PI) * 58;
+      const pathAng = Math.atan2(p.targetY - p.startY, p.targetX - p.startX);
+      const perpX = -Math.sin(pathAng), perpY = Math.cos(pathAng);
+      const sway = Math.sin(t * Math.PI * 2) * 22 * (1 - t) * (p.waveSign || 1);
+      p.x = baseX + perpX * sway;
+      p.y = baseY + perpY * sway;
+      if (t >= 1) {
+        slashes.push({ type: 'holywave', x: p.targetX, y: p.targetY, range: p.boomRadius, arc: Math.PI * 2, life: 0.20, maxLife: 0.20 });
+        damageArea(p.targetX, p.targetY, p.boomRadius, 0, Math.PI * 2, p.dmg, 0, {
+          element: 'holy',
+          onTargetHit: (target) => {
+            applyStatusTagsOnHit(target, 'holy', spellBase, cs, { isMelee: false });
+          }
+        });
+        return false;
+      }
+      return true;
+    }
+    if (p.isMeteor) {
+      p.elapsed += dt;
+      const prog = Math.min(1, p.elapsed / p.fallDur);
+      const ease = prog * prog;
+      p.x = p.startX + (p.targetX - p.startX) * ease;
+      p.y = p.startY + (p.targetY - p.startY) * ease;
+      if (prog >= 1) {
+        const boomR = p.boomRadius || (120 * player.areaMult);
+        slashes.push({ type: p.elem === 'ice' ? 'holywave' : 'fireboom', x: p.targetX, y: p.targetY, range: boomR, arc: Math.PI * 2, life: 0.30 });
+        damageArea(p.targetX, p.targetY, boomR, 0, Math.PI * 2, p.dmg, 22, {
+          element: p.elem,
+          onTargetHit: (target) => applyStatusTagsOnHit(target, p.elem, spellBase, cs, { isMelee: false })
+        });
+        if (p.skillId === 'fire5') zones.push({ kind: 'fire_sea', x: p.targetX, y: p.targetY, radius: 105 * player.areaMult, life: 3.0, tickTimer: 0.5, dmg: p.dmg * 0.35, lv: 1 });
+        if (p.skillId === 'ice5') zones.push({ kind: 'ice5_mist', x: p.targetX, y: p.targetY, radius: 135 * player.areaMult, life: 3.0, tickTimer: 0.5, dmg: 0, lv: 1 });
+        return false;
+      }
+      return true;
+    }
+    if (p.isLob) {
+      p.elapsed += dt;
+      const prog = Math.min(1, p.elapsed / p.flightDur);
+      p.x = p.startX + (p.targetX - p.startX) * prog;
+      p.y = p.startY + (p.targetY - p.startY) * prog;
+      p.z = 4 * p.arcHeight * prog * (1 - prog);
+      if (prog >= 1) {
+        if (p.targetObj && !p.targetObj.isDead) {
+          const tIdx = enemies.indexOf(p.targetObj);
+          if (tIdx !== -1 && Math.hypot(p.targetObj.x - p.targetX, p.targetObj.y - p.targetY) <= p.radius + p.targetObj.radius + 20) {
+            applyStatusTagsOnHit(p.targetObj, 'fire', spellBase, cs, { isMelee: false });
+            hitEnemy(tIdx, p.dmg * 0.35, { element: 'fire' });
+          }
+        }
+        const boomR = 78 * player.areaMult;
+        slashes.push({ type: 'fireboom', x: p.targetX, y: p.targetY, range: boomR, arc: Math.PI * 2, life: 0.22 });
+        damageArea(p.targetX, p.targetY, boomR, 0, Math.PI * 2, p.dmg, 12, {
+          element: 'fire',
+          onTargetHit: (target) => applyStatusTagsOnHit(target, 'fire', spellBase, cs, { isMelee: false })
+        });
+        return false;
+      }
+      return true;
+    }
+    p.x += p.vx * dt; p.y += p.vy * dt; if ((p.life -= dt) <= 0) return false;
+    const iceCrystal = p.skillId === 'ice3' ? GLOBAL_SKILL_POOL.ice3.iceCrystal : null;
+    if (iceCrystal && (p.orbShootCd -= dt) <= 0 && enemies.length > 0) {
+      p.orbShootCd = iceCrystal.scatterInterval;
+      const t = enemies[Math.floor(Math.random() * enemies.length)];
+      const a = Math.atan2(t.y - p.y, t.x - p.x);
+      const ice1St = ownedSkills.ice1 || { lv: 1, evolved: false };
+      const { scatterDamageMult } = getIceCrystalStats(p.lv || 1, iceCrystal);
+      const ice1Dmg = getSkillRawDmg('ice1', ice1St.lv, ice1St.evolved) * scatterDamageMult;
+      const ice1Pierce = 2 + Math.floor(ice1St.lv / 2);
+      spawnedProjectiles.push({
+        type: 'ice', elem: 'ice', skillId: 'ice1', isBounce: true, speed: 680,
+        x: p.x, y: p.y, vx: Math.cos(a) * 680, vy: Math.sin(a) * 680,
+        radius: 10 * player.areaMult, dmg: ice1Dmg, pierce: ice1Pierce,
+        life: 1.4, hitSet: new Set()
+      });
+    }
+    if (p.crushCds) {
+      for (const [enemyObj, cdVal] of p.crushCds.entries()) {
+        if (cdVal - dt <= 0) p.crushCds.delete(enemyObj);
+        else p.crushCds.set(enemyObj, cdVal - dt);
+      }
+    }
+    for (let j = enemies.length - 1; j >= 0; j--) {
+      const e = enemies[j];
+      const alreadyHit = iceCrystal ? (p.crushCds && p.crushCds.has(e)) : p.hitSet.has(e);
+      if (!alreadyHit && Math.hypot(e.x - p.x, e.y - p.y) <= p.radius + e.radius) {
+        if (iceCrystal && p.crushCds) p.crushCds.set(e, iceCrystal.crushHitInterval);
+        else p.hitSet.add(e);
+
+        const pTags = (p.statusTags && p.statusTags.length > 0) ? p.statusTags : (p.elem || 'none');
+        applyStatusTagsOnHit(e, pTags, spellBase, cs, { isMelee: false });
+        const hitDmg = iceCrystal ? (p.dmg * iceCrystal.crushDamageMult) : p.dmg;
+        hitEnemy(j, hitDmg, { element: p.elem || 'none' });
+        if (p.skillId === 'fire3') {
+          const orbBoomR = 72 * player.areaMult;
+          slashes.push({ type: 'fireboom', x: p.x, y: p.y, range: orbBoomR, arc: Math.PI * 2, life: 0.20 });
+          damageArea(p.x, p.y, orbBoomR, 0, Math.PI * 2, p.dmg * 0.65, 8, {
+            element: 'fire',
+            onTargetHit: (target) => { if (target !== e) applyStatusTagsOnHit(target, 'fire', spellBase, cs, { isMelee: false }); }
+          });
+        }
+        if (p.skillId === 'thunder3') {
+          const thunder = getThunderBallStats(p.lv || 1);
+          const usedStarts = new Set([e]);
+          for (let aIdx = 0; aIdx < thunder.arcCount; aIdx++) {
+            let firstTarget = null, minFirstD = thunder.firstArcRange;
+            for (const cand of enemies) {
+              if (!usedStarts.has(cand) && !cand.isDead) {
+                const d = Math.hypot(cand.x - e.x, cand.y - e.y);
+                if (d < minFirstD) { minFirstD = d; firstTarget = cand; }
+              }
+            }
+            if (!firstTarget) break;
+            usedStarts.add(firstTarget);
+            let cur = e, next = firstTarget;
+            const chainVisited = new Set([e]);
+            for (let jump = 0; jump < thunder.arcHits; jump++) {
+              if (!next || next.isDead) break;
+              chainVisited.add(next);
+              const nIdx = enemies.indexOf(next);
+              lightnings.push({ x1: cur.x, y1: cur.y, x2: next.x, y2: next.y, life: 0.22, kind: 'normal' });
+              if (nIdx !== -1) {
+                applyStatusTagsOnHit(next, 'lightning', spellBase, cs, { isMelee: false });
+                hitEnemy(nIdx, p.dmg * thunder.arcDamageMult, { element: 'lightning', isChain: true });
+              }
+              cur = next;
+              next = null;
+              let minJumpD = thunder.nextArcRange;
+              for (const cand of enemies) {
+                if (!chainVisited.has(cand) && !cand.isDead) {
+                  const d = Math.hypot(cand.x - cur.x, cand.y - cur.y);
+                  if (d < minJumpD) { minJumpD = d; next = cand; }
+                }
+              }
+            }
+          }
+        }
+
+        if (--p.pierce <= 0) return false;
+        if (p.isBounce) {
+          let nextE = null, minD = 300;
+          for (const cand of enemies) {
+            if (!p.hitSet.has(cand) && !cand.isDead) {
+              const d = Math.hypot(cand.x - p.x, cand.y - p.y);
+              if (d < minD) { minD = d; nextE = cand; }
+            }
+          }
+          if (nextE) {
+            const bAng = Math.atan2(nextE.y - p.y, nextE.x - p.x);
+            p.vx = Math.cos(bAng) * (p.speed || 680);
+            p.vy = Math.sin(bAng) * (p.speed || 680);
+          } else {
+            return false; // 周圍已無其他可彈跳目標時立即消散，不空飛出畫面
+          }
+        }
+      }
+    }
+    return true;
+  });
+
+  if (spawnedProjectiles.length > 0) projectiles.push(...spawnedProjectiles);
+}
+
+function updateEnemyProjectiles(dt, isSandbox, magRedMult) {
+  enemyProjectiles = enemyProjectiles.filter(ep => {
+    if (!battleSceneActive) return false;
+    ep.x += ep.vx * dt; ep.y += ep.vy * dt;
+    if ((ep.life -= dt) <= 0) return false;
+    if (Math.hypot(player.x - ep.x, player.y - ep.y) <= player.size * 0.65 + ep.radius) {
+      let taken = Math.max(1, Math.round(ep.dmg * magRedMult));
+      damageTexts.push({ x: player.x, y: player.y - 26, txt: `🔮-${taken}`, color: '#c084fc', life: 0.6 });
+      if (player.shield > 0) { const abs = Math.min(player.shield, taken); player.shield -= abs; taken -= abs; }
+      if (taken > 0) player.hp -= taken;
+      if (isSandbox && SANDBOX_STATE.godMode && player.hp < 1) player.hp = player.maxHp;
+      if (player.hp <= 0) { endGame(false); return false; }
+      return false;
+    }
+    return true;
+  });
+}

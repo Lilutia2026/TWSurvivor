@@ -59,15 +59,7 @@ const AudioManager = {
                const onHide = () => {
                 this.isBlurred = true;
                 this._pausePlayback();
-                const isVisible = (id) => {
-                    const el = document.getElementById(id);
-                    return el && el.style.display !== 'none' && el.style.display !== '';
-                };
-                const inNonBattleScreen = isVisible('login-select-view') || isVisible('town-clad-view')
-                    || isVisible('stage-select-view') || isVisible('lobbyModal') || isVisible('levelModal');
-                if (!inNonBattleScreen && typeof isPaused !== 'undefined' && typeof gameOver !== 'undefined' && !isPaused && !gameOver) {
-                    if (typeof togglePause === 'function') togglePause();
-                }
+                if (battleSceneActive && !isPaused && !gameOver) togglePause();
             };
             const onShow = () => {
                 this.isBlurred = false;

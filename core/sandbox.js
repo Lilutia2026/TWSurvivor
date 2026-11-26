@@ -125,24 +125,13 @@ const SANDBOX_STATE = {
       alert('請先按下「✅ 確認配點」或「↩️ 取消微調」後再進入測試場！');
       return;
     }
-    if (typeof leaveTownClad === 'function') leaveTownClad();
-
-    // 先借用 startBattle 初始化角色素質、裝備與起始技能，再切換為純淨沙盒狀態
-    if (typeof startBattle === 'function') startBattle();
+    if (battleSceneActive || !startBattle(undefined, undefined, { sandbox: true })) return;
+    leaveTownClad();
     resetSandboxState(true);
-  
-    if (typeof enemies !== 'undefined') enemies.length = 0;
-    if (typeof gems !== 'undefined') gems.length = 0;
-    if (typeof chests !== 'undefined') chests.length = 0;
-    if (typeof lootBags !== 'undefined') lootBags.length = 0;
-    if (typeof runLoot !== 'undefined') runLoot.length = 0;
-    if (typeof gameTime !== 'undefined') gameTime = 0;
-  
-    player.x = 0;
-    player.y = 0;
     spawnSandboxDummy('normal', 160, 0);
     renderSandboxPanel();
     updateSandboxHud();
+    enterBattleScene();
     if (typeof showBanner === 'function') showBanner('🎯 已進入【木樁測試場】！本模式不影響存檔與掉落');
   }
   
@@ -495,20 +484,16 @@ function maxAllOwnedSandboxSkills() {
 
         <div style="border-top:1px solid #334155;padding-top:6px;display:flex;gap:4px;">
           <button onclick="restoreSandboxDefaults()" style="flex:1;padding:6px;background:#eab308;color:#0f172a;font-weight:bold;border:none;border-radius:6px;cursor:pointer;">🔄 恢復預設</button>
-          <button onclick="exitSandboxToLobby()" style="padding:6px 8px;background:#dc2626;color:#fff;font-weight:bold;border:none;border-radius:6px;cursor:pointer;">🚪 離開</button>
+          <button onclick="exitSandboxToTown()" style="padding:6px 8px;background:#dc2626;color:#fff;font-weight:bold;border:none;border-radius:6px;cursor:pointer;">返回雷蒂亞</button>
         </div>
       </div>`;
   }
 
-  function exitSandboxToLobby() {
+  function exitSandboxToTown() {
+    if (!SANDBOX_STATE.active) return;
     resetSandboxState(false);
-    isPaused = true;
-    if (typeof enemies !== 'undefined') enemies.length = 0;
-    if (typeof zones !== 'undefined') zones.length = 0;
-    if (typeof projectiles !== 'undefined') projectiles.length = 0;
-    const lobby = document.getElementById('lobbyModal');
-    if (lobby) lobby.style.display = 'flex';
-    if (typeof renderLobby === 'function') renderLobby();
+    leaveBattleScene();
+    enterTownClad(true);
   }
 
   (function initSandboxDom() {
@@ -522,21 +507,4 @@ function maxAllOwnedSandboxSkills() {
       document.body.appendChild(layer);
     }
 
-    const buttons = document.querySelectorAll('button');
-    for (const btn of buttons) {
-      if (btn.textContent && btn.textContent.includes('出發冒險') && !document.getElementById('btnEnterSandbox')) {
-        const sbBtn = document.createElement('button');
-        sbBtn.id = 'btnEnterSandbox';
-        sbBtn.type = 'button';
-        sbBtn.textContent = '🎯 木樁測試場';
-        sbBtn.style.cssText = btn.style.cssText || 'padding:10px 20px;font-size:15px;font-weight:bold;border-radius:8px;cursor:pointer;';
-        sbBtn.style.background = 'linear-gradient(135deg,#0284c7,#0369a1)';
-        sbBtn.style.color = '#f0f9ff';
-        sbBtn.style.border = '1.5px solid #38bdf8';
-        sbBtn.style.marginLeft = '10px';
-        sbBtn.onclick = enterSandboxArena;
-        btn.parentElement.appendChild(sbBtn);
-        break;
-      }
-    }
   })();

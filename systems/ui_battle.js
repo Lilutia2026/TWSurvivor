@@ -54,9 +54,34 @@ function upgradeClassicHud() {
     document.getElementById('levelModal').style.display = 'flex';
   }
   
-  function levelUp() {
+  function canOfferBattleEvolution() {
+    return !isFirstStageBalanceTrial() || gameTime >= 600;
+  }
+
+  function getMainRouteCards(pool, signatureId) {
+    for (const [id, skill] of Object.entries(ACTIVE_SKILLS)) {
+      if (!skill.canEvolve) continue;
+      const path = [{ id, level: skill.maxLv || 10 }];
+      let step = skill;
+      while (path[0].id !== signatureId && step.reqSkill && ACTIVE_SKILLS[step.reqSkill]) {
+        if (path.some(entry => entry.id === step.reqSkill)) break;
+        path.unshift({ id: step.reqSkill, level: step.reqSkillLv || 2 });
+        step = ACTIVE_SKILLS[step.reqSkill];
+      }
+      if (path[0].id !== signatureId || ownedSkills[id]?.disabled || ownedSkills[id]?.evolved) continue;
+      const next = path.find(entry => (ownedSkills[entry.id]?.lv || 0) < entry.level);
+      return pool.filter(card => (card.kind === 'skill' && card.id === next?.id)
+        || (card.kind === 'passive' && card.id === skill.reqPassive && !ownedPassives[card.id])
+        || (card.kind === 'evolve' && card.id === id));
+    }
+    return [];
+  }
+
+  function levelUp(isReroll = false) {
     hideSkillTooltip();
-    isPaused = true; const pool = [], activePassives = getActivePassivePool();
+    setBattlePaused(true);
+    if (!isReroll) routeOffer = null;
+    const pool = [], activePassives = getActivePassivePool();
     const hasAngel = !!ownedPassives.angelWish;
     const passiveToSkillMap = {};
     for (const skObj of Object.values(ACTIVE_SKILLS)) {
@@ -75,8 +100,8 @@ function upgradeClassicHud() {
       if (sk.reqSkill && (!ownedSkills[sk.reqSkill] || ownedSkills[sk.reqSkill].lv < (sk.reqSkillLv || 2))) continue;
       const o = ownedSkills[k], maxL = sk.maxLv || 10;
 
-      // 【方案 A：唯一超武昇華】達 LV.10 滿級 ＋ 擁有對應專屬被動 ＋ 符合武器條件時，高權重進入三選一卡池
-      if (o && !o.disabled && !o.evolved && o.lv >= maxL && sk.canEvolve && sk.reqPassive && ownedPassives[sk.reqPassive]) {
+      // 滿級、專屬被動與適用武器皆符合時，昇華卡以高權重入池。
+      if (canOfferBattleEvolution() && o && !o.disabled && !o.evolved && o.lv >= maxL && sk.canEvolve && sk.reqPassive && ownedPassives[sk.reqPassive]) {
         const charEvo = (sk.evoByChar && sk.evoByChar[curCharId]) ? sk.evoByChar[curCharId] : null;
         const targetEvoId = charEvo ? charEvo.evoSkillId : sk.evoSkillId;
         const evoSk = targetEvoId ? (ACTIVE_SKILLS[targetEvoId] || (typeof GLOBAL_SKILL_POOL !== 'undefined' ? GLOBAL_SKILL_POOL[targetEvoId] : null)) : null;
@@ -127,10 +152,10 @@ function upgradeClassicHud() {
     if (!pool.length) {
       currentChoices = [
         { kind: 'heal', title: '💚 女神聖光祝福（回復 40% 生命）', desc: '<strong style="color:#4ade80;">▲ 立即恢復 40% 最大生命值</strong>', tag: '生存補給' },
-        { kind: 'seed', title: '💰 黃金種子袋（獲得 +50 Seed）', desc: '<strong style="color:#fde047;">▲ 局外錢包 Seed +50</strong>', tag: '資源農裝' }
       ];
+      if (!SANDBOX_STATE.active) currentChoices.push({ kind: 'seed', title: '💰 黃金種子袋（獲得 +50 Seed）', desc: '<strong style="color:#fde047;">▲ 局外錢包 Seed +50</strong>', tag: '資源農裝' });
       updateRerollButtonState(false);
-      renderChoiceModal(`目前等級 LV.${player.lv}（全技能滿級突破獎勵）｜ 按 1 / 2 選擇`);
+      renderChoiceModal(`目前等級 LV.${player.lv}（全技能滿級突破獎勵）｜ 按 ${SANDBOX_STATE.active ? '1' : '1 / 2'} 選擇`);
       return;
     }
 
@@ -148,7 +173,15 @@ function upgradeClassicHud() {
       currentChoices.push(tempPool[pickedIdx]);
       tempPool.splice(pickedIdx, 1);
     }
-    updateRerollButtonState(true);
+    if (isFirstStageBalanceTrial()) {
+      const routeCards = getMainRouteCards(pool, sigSkill);
+      if (routeCards.length) {
+        const hasRouteCard = currentChoices.some(card => routeCards.includes(card));
+        if (!hasRouteCard && routeUpgradeMisses >= 2) currentChoices[currentChoices.length - 1] = routeCards[0];
+        routeOffer = routeOffer || hasRouteCard || routeUpgradeMisses >= 2;
+      }
+    }
+    updateRerollButtonState(!SANDBOX_STATE.active);
     renderChoiceModal(`目前等級 LV.${player.lv} ｜ 技能欄 ${Object.keys(ownedSkills).length}/${MAX_ACTIVE_SKILLS} 主動・${Object.keys(ownedPassives).length}/${MAX_PASSIVE_SKILLS} 被動`);
   }
 
@@ -179,6 +212,7 @@ function upgradeClassicHud() {
   }
 
   function rerollUpgradeChoices() {
+    if (SANDBOX_STATE.active) return;
     const maxReroll = 3;
     if (typeof rerollCount === 'undefined') window.rerollCount = 0;
     if (rerollCount >= maxReroll) return;
@@ -196,11 +230,15 @@ function upgradeClassicHud() {
       if (typeof saveData !== 'undefined') { saveData.seed -= rem; if (typeof writeSave === 'function') writeSave(); }
     }
     rerollCount++;
-    levelUp();
+    levelUp(true);
   }
 
   function selectUpgrade(idx) {
     const c = currentChoices[idx]; if (!c) return;
+    if (routeOffer !== null) {
+      routeUpgradeMisses = routeOffer ? 0 : routeUpgradeMisses + 1;
+      routeOffer = null;
+    }
     if (c.kind === 'evolve') {
       const sk = ACTIVE_SKILLS[c.id];
       if (ownedSkills[c.id] && sk) {
@@ -245,7 +283,7 @@ function upgradeClassicHud() {
       if (typeof saveData !== 'undefined') { saveData.seed = (saveData.seed || 0) + 50; writeSave(); }
       showBanner('💰 獲得黃金種子袋！局外錢包 Seed +50！');
     } else { player.hp = Math.min(player.maxHp, player.hp + player.maxHp * 0.4); }
-    document.getElementById('levelModal').style.display = 'none'; isPaused = false;
+    document.getElementById('levelModal').style.display = 'none'; setBattlePaused(false);
   }
   
   function openChest(kind) {
@@ -254,7 +292,11 @@ function upgradeClassicHud() {
       if (upgradable.length > 0) {
         const [id] = upgradable[Math.floor(Math.random() * upgradable.length)];
         ownedSkills[id].lv++; showBanner(`🎁 白銀寶箱！【${ACTIVE_SKILLS[id].name}】提升至 LV.${ownedSkills[id].lv}！`);
-      } else { saveData.seed += 50; writeSave(); showBanner('🎁 白銀寶箱！全技能已滿，轉換為 Seed +50！'); }
+      } else {
+        if (victoryVacuumActive) runSeed += 50;
+        else if (!SANDBOX_STATE.active) { saveData.seed += 50; writeSave(); }
+        if (!SANDBOX_STATE.active) showBanner('🎁 白銀寶箱！全技能已滿，轉換為 Seed +50！');
+      }
       return;
     }
     const curW = (typeof saveData !== 'undefined' && saveData.equip) ? saveData.equip.weapon : null;
@@ -265,7 +307,7 @@ function upgradeClassicHud() {
 
     const ready = Object.entries(ownedSkills).filter(([k, st]) => {
       const sk = ACTIVE_SKILLS[k];
-      if (!sk || !sk.canEvolve || st.evolved || st.disabled || st.lv < sk.maxLv) return false;
+      if (!canOfferBattleEvolution() || !sk || !sk.canEvolve || st.evolved || st.disabled || st.lv < sk.maxLv) return false;
       if (!sk.reqPassive || !ownedPassives[sk.reqPassive]) return false;
       const charEvo = (sk.evoByChar && sk.evoByChar[curCharId]) ? sk.evoByChar[curCharId] : null;
       const targetEvoId = charEvo ? charEvo.evoSkillId : sk.evoSkillId;
@@ -279,7 +321,7 @@ function upgradeClassicHud() {
     });
 
     if (ready.length > 0) {
-      hideSkillTooltip(); isPaused = true;
+      hideSkillTooltip(); setBattlePaused(true);
       currentChoices = ready.slice(0, 3).map(([id]) => {
         const sk = ACTIVE_SKILLS[id];
         const charEvo = (sk.evoByChar && sk.evoByChar[curCharId]) ? sk.evoByChar[curCharId] : null;
@@ -289,6 +331,7 @@ function upgradeClassicHud() {
         const cleanDesc = (evoSk && evoSk.desc) ? evoSk.desc : (sk.evoDesc || sk.desc);
         return { kind: 'evolve', id, targetEvoId, title: `🌟 技能昇華【${titleName}】`, desc: cleanDesc, tag: '唯一超武昇華' };
       });
+      if (victoryVacuumActive) { selectUpgrade(0); return; }
       updateRerollButtonState(false);
       renderChoiceModal('📦 開啟金色昇華寶箱！請選擇要昇華的技能（按 1 / 2 / 3）');
       return;
@@ -379,10 +422,12 @@ function getSkillTooltipEl() {
   function hideSkillTooltip() { const tip = document.getElementById('skillTooltip'); if (tip) tip.style.display = 'none'; }
   // [第 3 段：ESC 即時狀態面板 togglePause 與遊戲結算 endGame（接續第 238 行至檔案結尾）]
 function togglePause() {
+    if (!battleSceneActive || gameOver) return;
     hideSkillTooltip();
     const modal = document.getElementById('pauseModal');
     if (!isPaused) {
-      isPaused = true;
+      setBattlePaused(true);
+      document.getElementById('abandonBattleBtn').textContent = SANDBOX_STATE.active ? '返回雷蒂亞' : '放棄戰鬥（撤退結算）';
       const s = typeof getTotalStats === 'function' ? getTotalStats() : {};
       const cs = typeof getDerivedCombatStats === 'function' ? getDerivedCombatStats() : {};
       const activePassives = getActivePassivePool();
@@ -424,7 +469,7 @@ function togglePause() {
           <div style="width:36px;height:36px;border-radius:6px;background:rgba(30,41,59,0.95);border:1px solid #475569;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">${iconChar}</div>
           <div style="flex:1;min-width:0;">
             <div style="display:flex;justify-content:space-between;align-items:center;"><strong style="font-size:13px;color:#fef08a;">${dispName}</strong><span style="font-size:11px;font-weight:bold;color:${isMax ? '#4ade80' : '#38bdf8'};">${lvText}</span></div>
-            <div style="font-size:11px;color:#4ade80;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;">目前狀態：${curStatus}</div>
+            <div style="font-size:11px;color:#4ade80;margin-top:2px;${k === 'ice3' || k === 'thunder3' ? '' : 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'}">目前狀態：${curStatus}</div>
             <div style="font-size:11px;color:#cbd5e1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;">${sk.desc || ''}</div>
           </div>
         </div>`;
@@ -451,21 +496,22 @@ function togglePause() {
         <div class="status-sec"><h3>🔥 主動技能欄（${Object.keys(ownedSkills).length}/${MAX_ACTIVE_SKILLS}）</h3><div style="display:flex;flex-direction:column;gap:6px;margin-top:6px;">${skillBadges}</div></div>
         <div class="status-sec"><h3>🔮 被動輔助欄（${Object.keys(ownedPassives).length}/${MAX_PASSIVE_SKILLS}）</h3><div style="display:flex;flex-direction:column;gap:6px;margin-top:6px;">${passiveBadges}</div></div>`;
         modal.style.display = 'flex';
-      } else { modal.style.display = 'none'; isPaused = false; }
+      } else { modal.style.display = 'none'; setBattlePaused(false); }
     }
   
     function abandonBattle() {
-      if (gameOver) return;
+      if (gameOver || victoryVacuumActive) return;
+      if (SANDBOX_STATE.active) { exitSandboxToTown(); return; }
       if (!confirm('確定要放棄本次戰鬥並撤退嗎？\n（將保留局內已拾取的裝備與 Seed，並依目前進度結算 70% 經驗值）')) return;
       hideSkillTooltip();
       const pauseEl = document.getElementById('pauseModal');
       if (pauseEl) pauseEl.style.display = 'none';
-      isPaused = false;
-      endGame(false);
+      if (!endGame(false)) setBattlePaused(false);
     }
       
   function endGame(win) {
-    gameOver = true;
+    if (gameOver || (!win && victoryVacuumActive)) return false;
+    if (SANDBOX_STATE.active) { exitSandboxToTown(); return true; }
     const runCfg = window.ACTIVE_STAGE_RUN || null;
     const st = runCfg ? runCfg.stage : { name: '貝那茵森林', tier: 1, minLv: 1, maxLv: 16, baseExpMult: 1.0, boss: { name: '果凍雞王' } };
     const diff = runCfg ? runCfg.diff : { name: '🟢 普通', expMult: 1.0, dropMult: 1.0 };
@@ -486,8 +532,22 @@ function togglePause() {
     const clearBonusSeed = Math.round((survMins * 15 + (win ? 300 : 0)) * (st.tier || 1) * (diff.dropMult || 1.0) * (player.seedMult || 1.0));
     const totalSeedGain = pickedSeed + clearBonusSeed;
 
-    if (typeof addOutExpAndSeed === 'function') addOutExpAndSeed(expGain, totalSeedGain);
-    if (runLoot.length > 0 && typeof saveData !== 'undefined') { saveData.bag.push(...runLoot); writeSave(); }
+    const previousSave = JSON.parse(JSON.stringify(saveData));
+    const clearKey = win && runCfg ? `${st.id}_${diff.key}` : null;
+    const firstClearReward = clearKey ? deliverFirstClearReward(saveData, clearKey) : null;
+    for (const item of runLoot) {
+      if (item.uid !== firstClearReward?.uid) saveData.bag.push(item);
+    }
+    try {
+      addOutExpAndSeed(expGain, totalSeedGain);
+    } catch (e) {
+      saveData = previousSave;
+      showBanner('⚠️ 結算存檔失敗，請確認瀏覽器儲存空間。');
+      console.warn('戰鬥結算存檔失敗', e);
+      return false;
+    }
+    gameOver = true;
+    setBattlePaused(true);
 
     const bossTitle = st.boss?.name || '關卡首領';
     document.getElementById('endTitle').textContent = win
@@ -497,6 +557,8 @@ function togglePause() {
       `出征獵場：<b>${st.name}</b>（${diff.name}） ｜ <span style="color:${gapInfo.color};font-weight:bold;">${gapInfo.label}</span><br>` +
       `存活時間：${document.getElementById('timeText').textContent} ｜ 總擊殺：${kills} ｜ 局內最高：LV.${player.lv} ｜ 勝負係數：${win ? '100%' : '70%'}<br>` +
       `<span style="color:#fde047;font-weight:bold;">💰 結算獲得：局外經驗 +${expGain.toLocaleString()} ｜ 總計 Seed +${totalSeedGain.toLocaleString()}</span><br>` +
-      `<span style="font-size:12px;color:#cbd5e1;">（局內拾取 ${pickedSeed.toLocaleString()} Seed ＋ 目標結算獎金 ${clearBonusSeed.toLocaleString()} Seed｜已自動存檔）</span>`;
+      `<span style="font-size:12px;color:#cbd5e1;">（局內拾取 ${pickedSeed.toLocaleString()} Seed ＋ 目標結算獎金 ${clearBonusSeed.toLocaleString()} Seed｜已自動存檔）</span>` +
+      (firstClearReward ? '<br><strong style="color:#facc15;">首通獎勵：未鑑定金色武器已放入背包</strong>' : '');
     document.getElementById('endModal').style.display = 'flex';
+    return true;
   }

@@ -49,7 +49,7 @@ function enterTownClad(keepPos = false) {
     const townView = document.getElementById('town-clad-view');
     if (!townView) return;
 
-    ['login-select-view', 'stage-select-view', 'lobby'].forEach(id => {
+    ['login-select-view', 'stage-select-view'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });
@@ -540,7 +540,7 @@ function updateTownHeaderInfo() {
         `<button onclick="toggleTownShortcutModal('party')" style="${btnCss}border-color:#4ade80;color:#4ade80;">👥 組隊 [P]</button>` +
         `<button onclick="openTownMailbox()" style="${btnCss}border-color:#f59e0b;color:#fbbf24;">📬 信箱 (${mailLen})</button>` +
         `<button onclick="openTownCardPoolModal()" style="${btnCss}border-color:#a855f7;background:#581c87;color:#f3e8ff;">🃏 卡池</button>` +
-        `<button onclick="openDevLobbyModal()" style="${btnCss}border-color:#0284c7;background:#0369a1;color:#fff;">🧪 測試</button>` +
+        `<button onclick="enterSandboxArena()" style="${btnCss}border-color:#0284c7;background:#0369a1;color:#fff;">🧪 木樁修鍊場</button>` +
         `<button onclick="logoutToCharacterSelect()" style="${btnCss}">🚪 登出</button>`;
 }
 
@@ -668,6 +668,7 @@ function openTownBagModal() {
     }).join('');
 
     openNpcModalShell('🎒 隨身背包與即時紙娃娃 [I]', '按 I 或 ESC 關閉（移上裝備可查看屬性）', '#38bdf8', `
+        ${saveData.legacyBag?.length ? `<button type="button" onclick="openLegacyBagRecoveryModal()" style="padding:6px 10px;margin-bottom:10px;border:1px solid #38bdf8;border-radius:5px;background:#0f172a;color:#bae6fd;cursor:pointer;">舊背包領取區（${saveData.legacyBag.length}）</button>` : ''}
         <div style="display:grid;grid-template-columns:1.1fr 1fr;gap:12px;align-items:stretch;">
             <div style="background:#1e293b;padding:10px;border-radius:8px;">
                 <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #334155;">
@@ -686,6 +687,26 @@ function openTownBagModal() {
     const box = document.getElementById('npc-modal-box');
     if (box) box.style.maxWidth = '860px';
     if (typeof renderPaperDoll === 'function') renderPaperDoll();
+}
+
+function openLegacyBagRecoveryModal() {
+    const items = saveData.legacyBag || [];
+    const rows = items.map((item, index) => {
+        if (!item) return '';
+        const slot = SLOT_NAMES[item.slot] || '裝備';
+        const rarity = RARITIES[item.rarity];
+        const title = item.identified === false ? `[未鑑定] ${rarity?.name || ''}${slot}` : (item.name || slot);
+        const safeTitle = title.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+        return `<div class="bag-item">
+            <span style="color:${rarity?.color || '#f8fafc'};">${safeTitle}${Number(item.reqLv) > 0 ? '（LV.' + Number(item.reqLv) + '）' : ''}</span>
+            <button type="button" class="stat-btn" style="width:auto;padding:0 8px;" data-item-uid="${encodeURIComponent(String(item.uid))}"
+                onclick="if(claimLegacyBagItem(${index}, decodeURIComponent(this.dataset.itemUid))) openLegacyBagRecoveryModal()">領取</button>
+        </div>`;
+    }).join('');
+    openNpcModalShell('舊背包領取區', `目前領取角色為 ${saveData.charName}`, '#38bdf8', `
+        <p style="font-size:13px;color:#cbd5e1;margin-bottom:10px;">道具會移入目前角色的背包。切換角色後，可以分配剩餘的道具。</p>
+        <div style="max-height:360px;overflow-y:auto;">${rows || '<p>所有舊背包道具已領取。</p>'}</div>
+        <button type="button" class="stat-btn" style="width:auto;padding:0 8px;margin-top:10px;" onclick="openTownBagModal()">返回背包</button>`);
 }
 
 // 隨身背包單件商店回收出售（支援已鑑定與未鑑定裝備）
@@ -729,7 +750,7 @@ function openTownStatsModal() {
     const bar = (typeof pendingAlloc !== 'undefined' && pendingAlloc) ? `<div style="display:flex;gap:6px;margin-top:8px;">
         <button onclick="confirmStats();openTownStatsModal();" style="flex:1;padding:6px;background:#22c55e;color:#052e16;font-weight:bold;border:none;border-radius:6px;cursor:pointer;">✅ 確認配點</button>
         <button onclick="cancelStats();openTownStatsModal();" style="flex:1;padding:6px;background:#475569;color:#fff;border:none;border-radius:6px;cursor:pointer;">↩️ 取消微調</button>
-    </div>` : '';
+    </div>` : '<button type="button" class="stat-btn" style="width:auto;padding:0 8px;margin-top:8px;" onclick="resetStats();openTownStatsModal()">洗點</button>';
 
     const detailItems = [
         ['物理減傷', `${d.physReducePct || 0}%`, '#4ade80'], ['魔法減傷', `${d.magReducePct || 0}%`, '#38bdf8'],
@@ -779,27 +800,3 @@ function openTownStatsModal() {
                     ${listHtml}
                 </div>`);
         }
-        function openDevLobbyModal() {
-            const lobby = document.getElementById('lobbyModal');
-            if (!lobby) return;
-            lobby.style.zIndex = '920';
-            lobby.style.display = 'flex';
-            if (typeof renderLobby === 'function') renderLobby();
-            const sbBtn = document.getElementById('btnEnterSandbox');
-            if (sbBtn) sbBtn.style.display = 'inline-block';
-        
-            const header = document.getElementById('lobbyHeader');
-            if (header && !document.getElementById('btnBackToTownClad')) {
-                const backBtn = document.createElement('button');
-                backBtn.id = 'btnBackToTownClad';
-                backBtn.textContent = '⬅ 返回卡雷德自由市場';
-                backBtn.style.cssText = 'margin-top:6px;padding:4px 12px;background:#334155;color:#facc15;border:1px solid #facc15;border-radius:6px;cursor:pointer;font-size:12px;';
-                backBtn.onclick = () => {
-                    lobby.style.display = 'none';
-                    if (typeof updateTownHeaderInfo === 'function') updateTownHeaderInfo();
-                };
-                header.appendChild(backBtn);
-            }
-        }
-        
-    

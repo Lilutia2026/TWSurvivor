@@ -136,7 +136,13 @@ const TICHIEL_SKILLS = {
       name: '冰晶術', icon: '💠', reqChar: ['tichiel'], skillTags: ['tichiel_magic'], reqWeaponTypes: ['wand'], wandElem: 'ice', tier: 3, reqSkill: 'ice2', reqSkillLv: 3,
       type: 'magic', element: 'ice', statusTags: ['ice'], statTags: ['INT'], behaviorTags: ['projectile', 'aoe'], maxLv: 5,
       baseDmg: 34, perLv: 18, baseCd: 4.80, canEvolve: false,
-      desc: '【冰系魔法・魔法・INT・射彈・範圍】推出緩慢前進的巨型寒冰球碾壓並自動散射冰彈，機率附加【凍結】。'
+      iceCrystal: {
+        upgradeLv: 4, baseOrbCount: 1, upgradedOrbCount: 2, orbLifetime: 2.8,
+        crushDamageMult: 0.55, crushHitInterval: 0.40,
+        firstScatterDelay: 0.45, scatterInterval: 0.60,
+        scatterDamageMult: 0.45, upgradedScatterDamageMult: 0.60
+      },
+      desc: '【冰系魔法・魔法・INT・射彈・範圍】巨型寒冰球會碾壓敵人，各自朝敵人散射一顆彈跳冰彈，機率附加【凍結】。額外射彈只增加寒冰球數量。'
     },
     ice4: {
       name: '冰之散晶術', icon: '🏔️', evoName: '極凍冰土・太陰', evoIcon: '❄️', reqChar: ['tichiel'], skillTags: ['tichiel_magic'], reqWeaponTypes: ['wand'], wandElem: 'ice', tier: 4, reqSkill: 'ice3', reqSkillLv: 4,
@@ -171,6 +177,12 @@ const TICHIEL_SKILLS = {
     name: '雷球術', icon: '🔮', reqChar: ['tichiel'], skillTags: ['tichiel_magic'], reqWeaponTypes: ['wand'], wandElem: 'thunder', tier: 3, reqSkill: 'thunder2', reqSkillLv: 3,
     type: 'magic', element: 'lightning', statusTags: ['lightning'], statTags: ['INT'], behaviorTags: ['ranged', 'projectile'], maxLv: 5,
     baseDmg: 16, perLv: 9, baseCd: 3.40, canEvolve: false,
+    thunderBall: {
+      baseBallCount: 1, baseHitCount: 2, ballAndBounceEveryLv: 4,
+      extraArcLv: 4, baseArcCount: 1, upgradedArcCount: 2,
+      extraJumpLv: 5, baseArcHits: 2, upgradedArcHits: 3,
+      arcDamageMult: 0.28, firstArcRange: 240, nextArcRange: 220
+    },
     desc: '【雷系魔法・魔法・INT・遠程・射彈】發射高速敵間彈跳的高壓雷電球，每次撞擊皆引動連鎖電弧彈跳，機率附加【感電】。'
   },
   thunder4: {
