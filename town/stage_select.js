@@ -4,6 +4,7 @@
 
 let selectedStageId = 'penine_forest';
 let selectedDifficultyKey = 'normal';
+let stageLaunchPending = false;
 
 function openStageSelectPage() {
     if (typeof leaveTownClad === 'function') leaveTownClad();
@@ -144,6 +145,7 @@ function renderStageSelectCards() {
 
         <!-- 底部出發操作列 -->
         <div class="stage-launch">
+            <p class="stage-launch-error" role="alert" hidden></p>
             ${isUnder ? `<div style="font-size:12px;color:#fca5a5;margin-bottom:6px;text-align:center;">⚠️ 警告：當前等級低於本關建議等級（LV.${st.minLv}），強行出征將面臨極高風險！</div>` : ''}
             <button type="button" onclick="launchSelectedStage()" style="width:100%;padding:12px;font-size:16px;font-weight:bold;background:#0284c7;color:#fff;border:none;border-radius:10px;cursor:pointer;box-shadow:0 4px 12px rgba(2,132,199,0.4);">
                 ⚔️ 踏入傳送陣・出發前往【${st.name}（${diff.name}）】
@@ -152,22 +154,96 @@ function renderStageSelectCards() {
     `;
 }
 
-function launchSelectedStage() {
+async function launchSelectedStage() {
+    const stageView = document.getElementById('stage-select-view');
+    if (stageLaunchPending || battleSceneActive || MobileControls.portrait || stageView?.style.display !== 'flex') return;
     const st = STAGE_SELECT_LIST.find(s => s.id === selectedStageId) || STAGE_SELECT_LIST[0];
     const diff = DIFFICULTY_MODIFIERS[selectedDifficultyKey] || DIFFICULTY_MODIFIERS.normal;
-    if (!startBattle(st.id, diff.key)) return;
+    const loading = document.getElementById('stage-loading');
+    const progress = document.getElementById('stage-loading-progress');
+    const status = document.getElementById('stage-loading-status');
+    const error = stageView.querySelector('.stage-launch-error');
+    const launchButton = stageView.querySelector('.stage-launch button');
+    const paint = () => new Promise(resolve => requestAnimationFrame(resolve));
 
-    const stageView = document.getElementById('stage-select-view');
-    if (stageView) stageView.style.display = 'none';
-    if (typeof saveData !== 'undefined') {
-        saveData.currentStageId = st.id;
-        saveData.currentDifficultyKey = diff.key;
-    }
-    if (typeof AudioManager !== 'undefined') {
+    stageLaunchPending = true;
+    launchButton.disabled = true;
+    stageView.inert = true;
+    error.hidden = true;
+    let prepared = false, ready = false;
+    try {
+        document.getElementById('stage-loading-name').textContent = st.name;
+        document.getElementById('stage-loading-difficulty').textContent = diff.name;
+        progress.value = 0;
+        status.textContent = '載入角色圖像…';
+        loading.hidden = false;
+        await paint();
+        await paint();
+
+        const sprite = await prepareStageSprite(saveData.charId);
+        if (MobileControls.portrait) return;
+        progress.value = 1;
+        status.textContent = sprite?.loaded ? '準備出戰配置…' : '以簡易角色圖示準備出戰…';
+        await paint();
+
+        if (!startBattle(st.id, diff.key, { deferScene: true })) return;
+        prepared = true;
+        progress.value = 2;
+        status.textContent = '繪製戰場…';
+        await paint();
+        enterBattleScene({ resume: false });
+        stageView.style.display = 'none';
+        progress.value = 3;
+        status.textContent = '出征就緒';
+        await paint();
+        if (!matchMedia('(prefers-reduced-motion: reduce)').matches && typeof loading.animate === 'function') {
+            await loading.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 160, fill: 'forwards' }).finished;
+        }
+        if (MobileControls.portrait) return;
+
         if (Array.isArray(st.bgmList) && st.bgmList.length > 0 && typeof AudioManager.playPlaylist === 'function') {
             AudioManager.playPlaylist(st.bgmList, true);
         } else {
             AudioManager.play('battle');
         }
+        saveData.currentStageId = st.id;
+        saveData.currentDifficultyKey = diff.key;
+        ready = true;
+    } catch (err) {
+        console.warn('出征載入失敗', err);
+        error.textContent = '出征載入失敗，請再試一次。';
+        error.hidden = false;
+    } finally {
+        if (prepared && !ready) {
+            leaveBattleScene();
+            stageView.style.display = 'flex';
+        }
+        loading.hidden = true;
+        for (const animation of loading.getAnimations?.() || []) animation.cancel();
+        launchButton.disabled = false;
+        stageView.inert = false;
+        stageLaunchPending = false;
+        if (ready) {
+            setBattlePaused(false);
+            recordDevPlayCount('runs');
+        }
     }
+}
+
+async function prepareStageSprite(charId) {
+    const sprite = SpriteAnimManager.ensureLoaded(charId);
+    const decoding = sprite?.loading ? sprite.img.decode?.() : null;
+    if (!decoding) return sprite;
+    let timer;
+    try {
+        await Promise.race([
+            decoding,
+            new Promise(resolve => { timer = setTimeout(resolve, 8000); })
+        ]);
+    } catch {
+        // 載入失敗時，戰場沿用角色圖示的繪製備案。
+    } finally {
+        clearTimeout(timer);
+    }
+    return sprite;
 }

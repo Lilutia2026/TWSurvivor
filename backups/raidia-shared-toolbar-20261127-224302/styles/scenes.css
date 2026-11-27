@@ -1,0 +1,125 @@
+@font-face {
+  font-family: "Raidia Menu Serif";
+  src: url("../assets/fonts/noto-serif-tc-town-bold.woff2") format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
+
+#town-header-status {
+  width: 100%; max-width: 1280px; padding: 10px 16px; background: #1e293b;
+  border-bottom: 1px solid #334155; color: #f8fafc; font-size: 14px;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 4px;
+}
+.town-summary, .town-actions { display: flex; align-items: center; flex-wrap: wrap; }
+.town-session { font-size: 11px; color: #94a3b8; }
+.town-mobile-profile, .town-mobile-rail { display: none; }
+
+.mobile-layout #town-clad-view {
+  --town-rail-width: 46px;
+  --town-fold-height: 30px;
+  --town-tile-height: clamp(28px, calc((100dvh - var(--screen-top) - var(--screen-bottom) - var(--town-fold-height)) / 7), 42px);
+}
+.mobile-layout #town-header-status {
+  position: absolute; z-index: 1; inset: 0; max-width: none; padding: 0; border: 0;
+  display: block; background: none; pointer-events: none;
+}
+.mobile-layout .town-summary, .mobile-layout .town-actions, .mobile-layout .town-session { display: none; }
+
+.mobile-layout .town-mobile-profile {
+  position: absolute; top: var(--screen-top); left: var(--screen-left);
+  display: flex; align-items: center; gap: 7px; max-width: min(245px, 48vw);
+  padding: 4px 8px 4px 4px; color: #fff4e2;
+  border: 1px solid #a48a62; border-radius: 7px; background: #23273aeb;
+}
+.town-mobile-profile img { flex: none; border-radius: 3px; object-fit: cover; }
+.town-mobile-profile div { min-width: 0; }
+.town-mobile-profile strong, .town-mobile-profile span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.town-mobile-profile strong { font-size: 13px; }
+.town-mobile-profile span { font-size: 12px; color: #e8dbf2; }
+
+.mobile-layout .town-mobile-rail {
+  position: absolute; top: var(--screen-top); right: var(--screen-right);
+  display: flex; flex-direction: column; gap: 1px; width: var(--town-rail-width);
+}
+#town-mobile-actions {
+  display: grid; clip-path: inset(0); transform-origin: top;
+  transition: clip-path 250ms ease, transform 250ms ease;
+}
+#town-mobile-fold[aria-expanded=false] + #town-mobile-actions {
+  clip-path: inset(0 0 100%); transform: scaleY(.04);
+}
+.town-mobile-rail button {
+  display: grid; place-items: center; width: 100%; height: var(--town-tile-height);
+  position: relative; border: 0; padding: 0; background: transparent; color: #30234e;
+  cursor: pointer; pointer-events: auto; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+.town-mobile-rail button::before, .town-mobile-rail button::after {
+  content: ""; position: absolute; inset: 0;
+  clip-path: polygon(10% 0, 90% 0, 100% 15%, 100% 85%, 90% 100%, 10% 100%, 0 85%, 0 15%);
+  background: #33274e;
+}
+.town-mobile-rail button::after {
+  inset: 1px; background: linear-gradient(155deg, #cfc3e8, #aa96ca);
+  box-shadow: inset 0 1px #e9dcfa, inset 1px 0 #b5a0d5, inset 0 -2px #7a659d;
+}
+.town-mobile-rail button span, .town-mobile-fold i { z-index: 1; pointer-events: none; }
+.town-mobile-rail button span {
+  writing-mode: vertical-rl; text-orientation: upright;
+  font: 700 clamp(13px, 3.9dvh, 15px)/1 "Raidia Menu Serif", "Songti TC", PMingLiU, serif;
+  white-space: nowrap; text-shadow: 0 1px #e3d7f2;
+}
+.town-mobile-rail .town-mobile-fold { height: var(--town-fold-height); }
+.town-mobile-fold i {
+  border-inline: 7px solid transparent; border-bottom: 9px solid #3c285a;
+  transition: transform 200ms ease;
+}
+.town-mobile-fold[aria-expanded=false] i { transform: rotate(180deg); }
+.town-mobile-rail button:focus-visible { outline: 2px solid #fff0c8; outline-offset: 1px; z-index: 2; }
+@media (hover: hover) and (pointer: fine) {
+  .town-mobile-rail button:hover::after { background: #e4d9f5; box-shadow: inset 0 2px #fff5ff, inset 0 -2px #927cb5; }
+}
+.town-mobile-rail button:active::after { background: #e4d9f5; box-shadow: inset 0 2px #fff5ff, inset 0 -2px #927cb5; }
+@media (prefers-reduced-motion: reduce) {
+  #town-mobile-actions, .town-mobile-fold i { transition: none; }
+}
+
+.mobile-layout #town-canvas { flex: 1; min-height: 0; }
+.mobile-layout #mobile-town-interact:not([hidden]) {
+  display: block; position: absolute; z-index: 2; top: var(--screen-top);
+  right: calc(var(--screen-right) + var(--town-rail-width) + 8px);
+  pointer-events: auto; min-height: 44px; padding-inline: 12px; max-width: 38vw;
+  color: #fbf2d5; border: 1px solid #aa9368; border-radius: 8px;
+  background: linear-gradient(#726044, #433629); box-shadow: inset 0 1px #f3dca743, 0 2px 6px #10140e73;
+}
+.mobile-layout #mobile-town-interact, .mobile-layout #stage-select-view button {
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+.mobile-layout #mobile-town-interact:active, .mobile-layout #stage-select-view button:active { filter: brightness(1.12); }
+
+.town-settings-actions, .town-settings-dev { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.town-settings-dev { margin-top: 14px; padding-top: 12px; border-top: 1px solid #475569; color: #cbd5e1; }
+.town-settings-actions button, .town-settings-dev button {
+  padding: 6px 12px; color: #f3eafa; background: #302841; border: 1px solid #a68ec6; border-radius: 6px;
+}
+
+#stage-loading {
+  position: fixed; inset: 0; z-index: 1100; display: grid; place-items: center; color: #f8ebc9;
+  background: radial-gradient(ellipse at 50% 47%, #314138, #101b18 72%); padding: 18px;
+}
+#stage-loading[hidden] { display: none; }
+.stage-loading-card {
+  width: min(440px, 100%); border: 1px solid #ad945d; padding: clamp(18px, 6vh, 34px);
+  border-radius: 12px; text-align: center; background: #182520db; box-shadow: 0 14px 48px #070d0a85;
+}
+#stage-loading-difficulty { color: #d7c497; font-size: 13px; }
+#stage-loading-name { margin: 5px 0 18px; font-size: clamp(23px, 5vw, 33px); letter-spacing: .08em; }
+#stage-loading-progress {
+  display: block; width: 100%; height: 11px; margin: 0 auto; appearance: none;
+  overflow: hidden; border: 1px solid #82764b; border-radius: 7px;
+  background: #293930; accent-color: #f0c975;
+}
+#stage-loading-progress::-webkit-progress-bar { background: #293930; }
+#stage-loading-progress::-webkit-progress-value { background: #f0c975; }
+#stage-loading-progress::-moz-progress-bar { background: #f0c975; }
+#stage-loading-status { margin-top: 12px; min-height: 1.5em; font-size: 13px; color: #e5d9b8; }
+.stage-launch-error { margin-bottom: 6px; font-size: 12px; color: #fecaca; }

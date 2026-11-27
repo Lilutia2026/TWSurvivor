@@ -36,7 +36,7 @@ const TOWN_CLAD_MAP = {
     width: 1600,
     height: 1200,
     bgImage: 'assets/maps/raidia_day.png', // 對應原版 DTX_1312 完整底圖
-    spawnPoint: { x: 972, y: 578 },        // 玩家進入雷蒂亞中央廣場的預設出生點
+    spawnPoint: { x: 980, y: 569 },        // 玩家進入雷蒂亞中央廣場的預設出生點
     walkBounds: { minX: 0, maxX: 1590, minY: 241, maxY: 916 },
     walkablePolygon: [
         {x:937,y:247},{x:1032,y:342},{x:1074,y:340},{x:1125,y:371},{x:1172,y:398},{x:1256,y:413},{x:1294,y:432},{x:1360,y:448},{x:1380,y:452},{x:1468,y:484},
@@ -76,11 +76,15 @@ const TOWN_CLAD_MAP = {
 
     // 互動目標清單（靠近互動半徑內按 F 鍵或滑鼠點擊互動）
     interactables: [
-        { id: 'npc_aizuwen', type: 'npc', name: '愛祖文', subtitle: '🔮 青木魔法店・鑑定', x: 871, y: 405, radius: 72, color: '#c084fc', handler: 'openNpcAizuwen' },
-        { id: 'npc_feiya', type: 'npc', name: '菲雅', subtitle: '⚖️ 青木魔法店・拍賣', x: 787, y: 572, radius: 72, color: '#facc15', handler: 'openNpcFeiya' },
-        { id: 'npc_qiedeluo', type: 'npc', name: '挈德羅', subtitle: '⚒️ 雷蒂亞武器店', x: 1206, y: 598, radius: 72, color: '#fb923c', handler: 'openNpcQiedeluo' },
-        { id: 'npc_kalipa', type: 'npc', name: '卡麗帕', subtitle: '🏦 庫洛集散銀行', x: 1062, y: 723, radius: 72, color: '#4ade80', handler: 'openNpcKalipa' },
-        { id: 'portal_stage', type: 'portal', name: '雷蒂亞精靈傳送門', subtitle: '🌌 冒險關卡出征', x: 746, y: 838, radius: 85, color: '#38bdf8', handler: 'openStageSelectPage' }
+        { id: 'npc_aizuwen', type: 'npc', name: '愛祖文', subtitle: '🔮 青木魔法店・鑑定', x: 726, y: 544, radius: 80, color: '#c084fc', handler: 'openNpcAizuwen',
+          sprite: { src: 'assets/npcs/raidia/aizuwen.png', scale: 0.82, anchorX: 65 } },
+        { id: 'npc_feiya', type: 'npc', name: '菲雅', subtitle: '⚖️ 青木魔法店・拍賣', x: 1128, y: 618, radius: 72, color: '#facc15', handler: 'openNpcFeiya',
+          sprite: { src: 'assets/npcs/raidia/feiya.png', scale: 0.92 } },
+        { id: 'npc_qiedeluo', type: 'npc', name: '挈德羅', subtitle: '⚒️ 雷蒂亞武器店', x: 946, y: 465, radius: 80, color: '#fb923c', handler: 'openNpcQiedeluo',
+          sprite: { src: 'assets/npcs/raidia/qiedeluo.png', scale: 0.82, anchorX: 134 } },
+        { id: 'npc_kalipa', type: 'npc', name: '卡麗帕', subtitle: '🏦 庫洛集散銀行', x: 993, y: 737, radius: 72, color: '#4ade80', handler: 'openNpcKalipa',
+          sprite: { src: 'assets/npcs/raidia/kalipa.png', scale: 0.92 } },
+        { id: 'portal_stage', type: 'portal', name: '雷蒂亞精靈傳送門', subtitle: '🌌 冒險關卡出征', x: 719, y: 804, radius: 85, color: '#38bdf8', handler: 'openStageSelectPage' }
     ]
 };
 

@@ -473,7 +473,7 @@ function renderPaperDoll() {
 }
 
 // 片段 C：startBattle() 內讀取武器初始技能並綁定所選關卡與 4 階難度倍率
-function startBattle(stageId, diffKey, { sandbox = false } = {}) {
+function startBattle(stageId, diffKey, { sandbox = false, deferScene = false } = {}) {
   if (pendingAlloc) { alert('請先按下「✅ 確認配點」或「↩️ 取消微調」後再出發冒險！'); return false; }
   resetBattleRun();
   const stList = (typeof STAGE_SELECT_LIST !== 'undefined' && Array.isArray(STAGE_SELECT_LIST)) ? STAGE_SELECT_LIST : [];
@@ -526,7 +526,7 @@ function startBattle(stageId, diffKey, { sandbox = false } = {}) {
     ownedSkills[sigSkill] = { lv: startLv, evolved: false, disabled: false };
   }
   if (typeof ownedPassives !== 'undefined') { for (const k of Object.keys(ownedPassives)) delete ownedPassives[k]; }
-  if (!sandbox) {
+  if (!sandbox && !deferScene) {
     enterBattleScene();
     recordDevPlayCount('runs');
   }

@@ -23,9 +23,6 @@
   background: #152a35; color: #ecf8fa; font-size: 13px; font-weight: 700; pointer-events: auto;
 }
 .mobile-layout #mobile-battle-pause { display: inline-block; margin-left: 4px; }
-.mobile-layout #mobile-town-interact:not([hidden]) {
-  display: block; position: absolute; bottom: var(--screen-bottom); right: var(--screen-right);
-}
 
 .mobile-layout #login-select-view { padding: var(--screen-top) var(--screen-right) var(--screen-bottom) var(--screen-left); }
 .mobile-layout .login-layout { gap: 8px; }
@@ -44,14 +41,6 @@
 .mobile-layout .login-avatar { width: 23px; font-size: 13px; }
 .mobile-layout .login-roster-name { font-size: 10px; }
 
-.mobile-layout #town-header-status {
-  flex: none; flex-wrap: nowrap !important; gap: 5px; white-space: nowrap; overflow-x: auto;
-  padding: var(--screen-top) var(--screen-right) 4px var(--screen-left) !important;
-}
-.mobile-layout #town-header-status > * { flex: none; }
-.mobile-layout #town-header-status button { min-height: 40px; }
-.mobile-layout #town-header-status .town-training { order: -1; }
-.mobile-layout #town-canvas { flex: 1; min-height: 0; }
 
 .mobile-layout #hud { top: var(--screen-top); left: var(--screen-left); right: var(--screen-right); align-items: flex-start; }
 .mobile-layout #hud .hud-box { padding: 5px 7px; }

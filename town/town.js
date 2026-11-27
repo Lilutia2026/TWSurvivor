@@ -18,6 +18,9 @@ const TOWN_STATE = {
     bgImg: null,
     bgLoaded: false,
     bgLoadFailed: false,
+    npcImages: new Map(),
+    toolbarCollapsed: false,
+    localPlayerId: null,
     roomCode: 'RAID-' + Math.random().toString(36).substring(2, 6).toUpperCase(),
     roomMembers: [], // 預留私人房主世界（1~4 人）同步接口
     isNight: null,   // null = 自動同步真實時間（18:00~05:59 為星夜）；true/false = 手動切換
@@ -109,6 +112,13 @@ function enterTownClad(keepPos = false) {
         img.src = TOWN_CLAD_MAP.bgImage;
         TOWN_STATE.bgImg = img;
     }
+    for (const item of TOWN_CLAD_MAP.interactables) {
+        const src = item.sprite?.src;
+        if (!src || TOWN_STATE.npcImages.has(src)) continue;
+        const image = new Image();
+        image.src = src;
+        TOWN_STATE.npcImages.set(src, image);
+    }
 
     applyRaidiaBgm();
     if (typeof updateTownHeaderInfo === 'function') updateTownHeaderInfo();
@@ -143,20 +153,28 @@ function triggerTownInteractable(target) {
         console.warn(`[Town] 尚未掛載互動模組: ${target.handler}`);
     }
 }
+
+function getTownSpriteBounds(item) {
+    if (!item.sprite) return null;
+    const { src, scale, anchorX } = item.sprite;
+    const image = TOWN_STATE.npcImages.get(src);
+    if (!image?.complete || !image.naturalWidth) return null;
+    const width = image.naturalWidth * scale;
+    const height = image.naturalHeight * scale;
+    return { image, x: item.x - (anchorX ?? image.naturalWidth / 2) * scale, y: item.y - height, width, height };
+}
 // ============================================================================
 // 雷蒂亞畫布與操作
 // ============================================================================
 function syncTownViewportSize() {
     if (!TOWN_STATE.canvas) return;
-    const header = document.getElementById('town-header-status')?.parentElement;
-    if (header) header.style.flexShrink = '0';
     const rect = TOWN_STATE.canvas.getBoundingClientRect();
     const w = Math.round(rect.width) || window.innerWidth;
     const h = Math.round(rect.height) || (window.innerHeight - 52);
     TOWN_STATE.canvas.width = w;
     TOWN_STATE.canvas.height = h;
-    // 鎖定垂直視野約 650 單位：半螢幕時 zoom≈1.0，全螢幕時 zoom≈1.48，永遠保留鏡頭探索感
-    TOWN_STATE.zoom = Math.max(1, h / 650);
+    // 手機橫向保留廣場上下視野，讓櫃台和傳送門能同時進入畫面。
+    TOWN_STATE.zoom = MobileControls.enabled ? Math.max(0.55, h / 550) : Math.max(1, h / 650);
 }
 
 function bindTownEvents() {
@@ -210,8 +228,11 @@ function bindTownEvents() {
         e.preventDefault();
         const { mx, my } = recordTownMousePos(e);
         for (const item of TOWN_CLAD_MAP.interactables) {
-            if (Math.hypot(mx - item.x, my - item.y) <= 45 &&
-                Math.hypot(TOWN_STATE.player.x - item.x, TOWN_STATE.player.y - item.y) <= item.radius) {
+            if (Math.hypot(TOWN_STATE.player.x - item.x, TOWN_STATE.player.y - item.y) > item.radius) continue;
+            const sprite = getTownSpriteBounds(item);
+            const clickedSprite = sprite && mx >= sprite.x && mx <= sprite.x + sprite.width &&
+                my >= sprite.y && my <= sprite.y + sprite.height;
+            if (clickedSprite || Math.hypot(mx - item.x, my - item.y) <= 45) {
                 TOWN_STATE.isMouseDown = false;
                 TOWN_STATE.player.targetX = null;
                 TOWN_STATE.player.targetY = null;
@@ -414,6 +435,11 @@ function drawTownScene() {
             ctx.fillText(pName, p.x, p.y - nameOffsetY);
         } else {
             const it = ent.data, hi = TOWN_STATE.activeTarget?.id === it.id;
+            const sprite = getTownSpriteBounds(it);
+            if (sprite || MobileControls.enabled) {
+                drawTownMapMarker(ctx, it, hi, sprite);
+                continue;
+            }
             ctx.beginPath(); ctx.arc(it.x, it.y, it.radius, 0, Math.PI * 2);
             ctx.fillStyle = hi ? 'rgba(250,204,21,0.22)' : 'rgba(255,255,255,0.06)'; ctx.fill();
             ctx.strokeStyle = hi ? '#facc15' : 'rgba(255,255,255,0.25)'; ctx.lineWidth = hi ? 2.5 : 1; ctx.stroke();
@@ -426,7 +452,7 @@ function drawTownScene() {
             if (hi) {
                 ctx.fillStyle = '#0f172a'; ctx.strokeStyle = '#facc15'; ctx.lineWidth = 2;
                 ctx.beginPath(); ctx.roundRect(it.x - 52, it.y - 102, 104, 22, 6); ctx.fill(); ctx.stroke();
-                ctx.fillStyle = '#facc15'; ctx.font = 'bold 12px sans-serif'; ctx.fillText(MobileControls.enabled ? '可互動' : '[F] 互動開啟', it.x, it.y - 87);
+                ctx.fillStyle = '#facc15'; ctx.font = 'bold 12px sans-serif'; ctx.fillText('[F] 互動開啟', it.x, it.y - 87);
             }
         }
     }
@@ -463,29 +489,122 @@ function drawTownScene() {
     ctx.restore();
 }
 
+function drawTownMapMarker(ctx, item, nearby, sprite) {
+    const { x, y } = item;
+    ctx.save();
+    ctx.strokeStyle = nearby ? '#ffe29c' : '#a99063';
+    ctx.lineWidth = nearby ? 2 : 1;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    if (sprite) {
+        ctx.drawImage(sprite.image, sprite.x, sprite.y, sprite.width, sprite.height);
+        if (!MobileControls.enabled) {
+            ctx.font = 'bold 12px sans-serif';
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#20271e';
+            ctx.strokeText(item.subtitle, x, sprite.y - 34);
+            ctx.fillStyle = '#fef08a';
+            ctx.fillText(item.subtitle, x, sprite.y - 34);
+            ctx.strokeStyle = nearby ? '#ffe29c' : '#a99063';
+            ctx.lineWidth = nearby ? 2 : 1;
+        }
+    } else {
+        ctx.beginPath();
+        ctx.ellipse(x, y, 22, 9, 0, 0, Math.PI * 2);
+        ctx.fillStyle = nearby ? '#efc6787a' : '#20271eb0';
+        ctx.fill();
+        ctx.stroke();
+        ctx.font = '23px sans-serif';
+        ctx.fillStyle = item.color;
+        ctx.fillText(item.subtitle.split(' ')[0], x, y - 21);
+    }
+    const name = sprite && nearby && !MobileControls.enabled ? `[F] ${item.name}` : item.name;
+    const labelY = sprite ? sprite.y - 14 : y - 43;
+    ctx.font = 'bold 13px sans-serif';
+    const width = ctx.measureText(name).width + 16;
+    ctx.beginPath();
+    ctx.roundRect(x - width / 2, labelY - 11, width, 21, 6);
+    ctx.fillStyle = nearby ? '#554029' : '#26352dea';
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#fff4d6';
+    ctx.fillText(name, x, labelY);
+    ctx.restore();
+}
+
+function getTownPlayerId() {
+    if (saveData.accountId) return String(saveData.accountId);
+    if (!TOWN_STATE.localPlayerId) {
+        const key = 'tws_local_player_id';
+        const digits = crypto.getRandomValues(new Uint32Array(1))[0].toString(16).padStart(8, '0').toUpperCase();
+        TOWN_STATE.localPlayerId = `TW-${digits}`;
+        try {
+            const stored = localStorage.getItem(key);
+            if (stored) TOWN_STATE.localPlayerId = stored;
+            else localStorage.setItem(key, TOWN_STATE.localPlayerId);
+        } catch (e) { /* 本次遊戲仍可顯示本機 ID */ }
+    }
+    return TOWN_STATE.localPlayerId;
+}
+
+function toggleTownToolbar() {
+    const fold = document.getElementById('town-fold');
+    const actions = document.getElementById('town-actions');
+    if (!fold || !actions) return;
+    TOWN_STATE.toolbarCollapsed = !TOWN_STATE.toolbarCollapsed;
+    const collapsed = TOWN_STATE.toolbarCollapsed;
+    if (collapsed && actions.contains(document.activeElement)) fold.focus();
+    fold.setAttribute('aria-expanded', String(!collapsed));
+    fold.setAttribute('aria-label', collapsed ? '展開城鎮功能' : '收起城鎮功能');
+    actions.inert = collapsed;
+}
+
+function openTownSettings() {
+    const stats = DEV_ONLY ? getDevPlayCounts() : null;
+    openNpcModalShell('設定', '', '#c7aee9', `
+        <div class="town-settings-actions">
+            <button type="button" class="music-toggle" data-music-toggle onclick="AudioManager.toggle()">背景音樂</button>
+            <button type="button" onclick="toggleTownDayNight();openTownSettings()">城鎮時段 · ${getRaidiaNightMode() ? '星夜' : '白晝'}</button>
+            <button type="button" onclick="closeNpcModalShell();logoutToCharacterSelect()">登出</button>
+        </div>
+        ${stats ? `<div class="town-settings-dev">
+            <button type="button" onclick="closeNpcModalShell();enterSandboxArena()">木樁修鍊場</button>
+            <small>本機試玩 ${stats.sessions} 人次・出征 ${stats.runs} 場・通關 ${stats.clears} 場</small>
+        </div>` : ''}`);
+    AudioManager.syncToggleButtons(document.getElementById('npc-modal-box'));
+}
+
 function updateTownHeaderInfo() {
     const el = document.getElementById('town-header-status');
     if (!el || typeof saveData === 'undefined') return;
     const cName = saveData.charName || (typeof CHARACTERS !== 'undefined' && CHARACTERS[saveData.charId]?.name) || '冒險者';
-    const lv = saveData.outLv || 1;
-    const seedVal = saveData.seed ?? 0;
-    const mailLen = Array.isArray(saveData.mailbox) ? saveData.mailbox.length : 0;
-    const isNight = getRaidiaNightMode();
-    const stats = DEV_ONLY ? getDevPlayCounts() : null;
-    const btnCss = 'margin-left:6px;padding:4px 9px;border-radius:6px;background:#0f172a;color:#e2e8f0;border:1px solid #475569;cursor:pointer;font-size:12px;';
-    el.innerHTML = `<span>👤 <b>${cName}</b> (LV.${lv})</span>` +
-        `<span style="margin-left:10px;">💰 <b>${seedVal.toLocaleString()}</b></span>` +
-        `<button onclick="toggleTownDayNight()" title="點擊切換雷蒂亞白晝／星夜光影與BGM" style="${btnCss}border-color:${isNight ? '#818cf8' : '#facc15'};color:${isNight ? '#c7d2fe' : '#fde047'};">${isNight ? '🌙 雷蒂亞・星夜' : '☀️ 雷蒂亞・白晝'}</button>` +
-        '<button type="button" class="music-toggle" data-music-toggle onclick="AudioManager.toggle()" style="margin-left:6px;">🔊 音樂開</button>' +
-        `<button onclick="toggleTownShortcutModal('bag')" style="${btnCss}border-color:#38bdf8;color:#38bdf8;">🎒 背包 [I]</button>` +
-        `<button onclick="toggleTownShortcutModal('stats')" style="${btnCss}border-color:#facc15;color:#facc15;">📊 素質 [C]</button>` +
-        `<button onclick="toggleTownShortcutModal('party')" style="${btnCss}border-color:#4ade80;color:#4ade80;">👥 組隊 [P]</button>` +
-        `<button onclick="openTownMailbox()" style="${btnCss}border-color:#f59e0b;color:#fbbf24;">📬 信箱 (${mailLen})</button>` +
-        `<button onclick="openTownCardPoolModal()" style="${btnCss}border-color:#a855f7;background:#581c87;color:#f3e8ff;">🃏 卡池</button>` +
-        `<button class="town-training" onclick="enterSandboxArena()" style="${btnCss}border-color:#0284c7;background:#0369a1;color:#fff;">🧪 木樁修鍊場</button>` +
-        `<button onclick="logoutToCharacterSelect()" style="${btnCss}">🚪 登出</button>` +
-        (stats ? `<span style="margin-left:10px;color:#94a3b8;font-size:11px;">本機試玩 ${stats.sessions} 人次・出征 ${stats.runs} 場・通關 ${stats.clears} 場</span>` : '');
-    AudioManager.syncToggleButtons(el);
+    const collapsed = TOWN_STATE.toolbarCollapsed;
+    el.innerHTML = `<div class="town-profile">
+            <img alt="" width="36" height="40">
+            <div><strong></strong><span></span></div>
+        </div>
+        <nav class="town-rail" aria-label="城鎮功能">
+            <button type="button" id="town-fold" class="town-fold" aria-controls="town-actions"
+                aria-expanded="${!collapsed}" aria-label="${collapsed ? '展開城鎮功能' : '收起城鎮功能'}" onclick="toggleTownToolbar()">
+                <i aria-hidden="true"></i>
+            </button>
+            <div id="town-actions" ${collapsed ? 'inert' : ''}>
+                <button type="button" onclick="openTownStatsModal()"><span>角色</span></button>
+                <button type="button" onclick="openTownBagModal()"><span>背包</span></button>
+                <button type="button" onclick="openTownCardPoolModal()"><span>技能</span></button>
+                <button type="button" onclick="openNpcQiedeluo('enhance')"><span>強化</span></button>
+                <button type="button" onclick="openTownPartyModal(true)"><span>社交</span></button>
+                <button type="button" onclick="openTownMailbox()"><span>信箱</span></button>
+                <button type="button" onclick="openTownSettings()"><span>設定</span></button>
+            </div>
+        </nav>`;
+    const profile = el.querySelector('.town-profile');
+    const portrait = profile.querySelector('img');
+    const character = CHARACTERS[saveData.charId] || CHARACTERS.lucien;
+    portrait.addEventListener('error', () => { portrait.hidden = true; }, { once: true });
+    portrait.src = `assets/characters/portraits/${character.id}.png`;
+    profile.querySelector('strong').textContent = getTownPlayerId();
+    profile.querySelector('span').textContent = cName;
 }
 
 // 臨時功能：預覽當前角色與武器配置在局內可抽到的完整主動／被動卡池
@@ -522,7 +641,7 @@ function openTownCardPoolModal() {
         </div>`;
     }).join('') || '<div style="color:#64748b;font-size:12px;">無可用被動卡片</div>';
 
-    openNpcModalShell('🃏 當前配置局內卡池預覽（測試工具）', `角色：${saveData.charName || '冒險者'} ｜ 武器：${wName}`, '#c084fc', `
+    openNpcModalShell('技能・當前卡池', `角色：${saveData.charName || '冒險者'} ｜ 武器：${wName}`, '#c084fc', `
         <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:12px;">
             <div style="background:#1e293b;padding:10px;border-radius:8px;max-height:360px;overflow-y:auto;">
                 <div style="font-weight:bold;color:#38bdf8;margin-bottom:6px;">🔥 可選主動技能池 (${actEntries.length} 張)</div>
@@ -726,7 +845,7 @@ function openTownStatsModal() {
 }
         
         // [P] 組隊與我的世界成員列表視窗
-        function openTownPartyModal() {
+        function openTownPartyModal(fromSocial = false) {
             const hostName = saveData.charName || '冒險者';
             const members = TOWN_STATE.roomMembers || [];
             const listHtml = `
@@ -740,7 +859,7 @@ function openTownStatsModal() {
                         <button onclick="alert('發起與 ${m.name} 的面對面直接交易（連線接口就緒）')" style="padding:3px 10px;background:#eab308;color:#0f172a;font-weight:bold;border:none;border-radius:5px;cursor:pointer;">🤝 直接交易</button>
                     </div>`).join('')}
             `;
-            openNpcModalShell('👥 組隊與世界成員列表 [P]', `當前人數：${1 + members.length} / 4 ｜ 房間碼：${TOWN_STATE.roomCode}`, '#4ade80', `
+            openNpcModalShell(fromSocial ? '社交・組隊與世界成員' : '👥 組隊與世界成員列表 [P]', `當前人數：${1 + members.length} / 4 ｜ 房間碼：${TOWN_STATE.roomCode}`, '#4ade80', `
                 <div style="background:#1e293b;padding:12px;border-radius:8px;">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:12px;color:#cbd5e1;">
                         <span>分享房間邀請碼即可讓好友加入你的雷蒂亞村莊：</span>

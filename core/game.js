@@ -305,10 +305,10 @@ function resetBattleRun() {
   hideSkillTooltip();
 }
 
-function enterBattleScene() {
+function enterBattleScene({ resume = true } = {}) {
   battleSceneActive = true;
   draw();
-  setBattlePaused(false);
+  if (resume) setBattlePaused(false);
 }
 
 function leaveBattleScene() {

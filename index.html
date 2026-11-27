@@ -68,6 +68,7 @@
     }
   </style>
   <link rel="stylesheet" href="styles/mobile.css" />
+  <link rel="stylesheet" href="styles/scenes.css" />
 </head>
 <body>
     <!-- ==================== 1. 登入與角色選擇頁面 (town/login.js) ==================== -->
@@ -110,7 +111,7 @@
 
 <!-- ==================== 2. 樹上精靈村・雷蒂亞互動舞台 (town/town.js) ==================== -->
 <div id="town-clad-view" style="display:none;position:fixed;inset:0;background:#0b1120;z-index:850;flex-direction:column;align-items:center;justify-content:center;">
-  <div id="town-header-status" style="width:100%;max-width:1280px;padding:10px 16px;background:#1e293b;border-bottom:1px solid #334155;color:#f8fafc;font-size:14px;display:flex;align-items:center;flex-wrap:wrap;"></div>
+  <div id="town-header-status"></div>
   <canvas id="town-canvas" width="1280" height="820" style="width:100%;max-width:1280px;max-height:calc(100vh - 52px);background:#14281d;border:1px solid #334155;cursor:pointer;"></canvas>
   <button id="mobile-town-interact" class="mobile-action" type="button" hidden></button>
 </div>
@@ -185,6 +186,14 @@
   <div id="mobile-orientation" role="dialog" aria-modal="true" aria-labelledby="mobile-orientation-title" hidden>
     <div><h2 id="mobile-orientation-title">請將手機橫置遊玩</h2><p>橫放後即可繼續操作。</p></div>
   </div>
+  <aside id="stage-loading" aria-labelledby="stage-loading-name" hidden>
+    <div class="stage-loading-card">
+      <span id="stage-loading-difficulty"></span>
+      <h2 id="stage-loading-name"></h2>
+      <progress id="stage-loading-progress" max="3" value="0" aria-label="出征載入進度"></progress>
+      <p id="stage-loading-status" role="status"></p>
+    </div>
+  </aside>
 
   <!-- 結算視窗 -->
   <div id="endModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="endTitle">
