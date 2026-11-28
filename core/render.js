@@ -22,6 +22,19 @@ function draw() {
       ctx.beginPath(); ctx.arc(player.x, player.y, pRad, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       ctx.restore();
     }
+    const weakenLvRender = (typeof ownedPassives !== 'undefined' && ownedPassives.dark_weaken) || 0;
+    if (weakenLvRender > 0) {
+      const wRad = (130 + weakenLvRender * 15) * (player.areaMult || 1.0);
+      const pulse = 0.22 + 0.10 * Math.sin(gameTime * 6);
+      ctx.save();
+      ctx.strokeStyle = `rgba(168, 85, 247, ${pulse + 0.28})`;
+      ctx.fillStyle = `rgba(88, 28, 135, ${pulse * 0.30})`;
+      ctx.lineWidth = 2;
+      ctx.setLineDash(new Array(6, 5));
+      ctx.beginPath(); ctx.arc(player.x, player.y, wRad, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.restore();
+    }
+
     zones.forEach(z => {
       ctx.save();
       if (z.kind === 'spiral_hammer') {
@@ -328,20 +341,83 @@ slashes.forEach(s => {
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
+  } else if (s.type === 'boris_earth_x') {
+    const maxL = s.maxLife || 0.34;
+    ctx.globalAlpha = Math.max(0, Math.min(1, s.life / maxL));
+    ctx.translate(sx, sy); ctx.rotate(ang);
+    const len = s.length || 115, hw = (s.width || 48) / 2;
+    ctx.fillStyle = 'rgba(180, 83, 9, 0.34)';
+    ctx.strokeStyle = '#d97706'; ctx.lineWidth = 3;
+    ctx.fillRect(-len / 2, -hw, len, hw * 2);
+    ctx.strokeRect(-len / 2, -hw, len, hw * 2);
+    ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(-len * 0.48, 0); ctx.lineTo(len * 0.48, 0); ctx.stroke();
+  } else if (s.type === 'boris_earth_circle') {
+    const maxL = s.maxLife || 0.28;
+    ctx.globalAlpha = Math.max(0, Math.min(1, s.life / maxL));
+    ctx.fillStyle = 'rgba(180, 83, 9, 0.26)';
+    ctx.strokeStyle = '#d97706'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(sx, sy, s.range, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  } else if (s.type === 'boris_ice_wiper' || s.type === 'boris_shadow_wiper') {
+    const maxL = s.maxLife || 0.20;
+    const prog = 1 - Math.max(0, Math.min(1, s.life / maxL));
+    ctx.globalAlpha = Math.max(0, Math.min(1, s.life / maxL));
+    const arcSpan = s.arc || 1.95;
+    const startA = ang - (s.dir || -1) * (arcSpan / 2);
+    const curA = startA + (s.dir || -1) * arcSpan * Math.min(1, prog * 1.35);
+    const a1 = Math.min(startA, curA), a2 = Math.max(startA, curA);
+    const isShadow = s.type === 'boris_shadow_wiper';
+    ctx.fillStyle = isShadow ? 'rgba(126, 34, 206, 0.26)' : (s.isTiger ? 'rgba(251, 146, 60, 0.26)' : 'rgba(56, 189, 248, 0.28)');
+    ctx.strokeStyle = isShadow ? '#c084fc' : (s.isTiger ? '#fde047' : '#38bdf8');
+    ctx.lineWidth = s.isSuper ? 5 : 4;
+    ctx.beginPath(); ctx.moveTo(sx, sy); ctx.arc(sx, sy, s.range, a1, a2); ctx.closePath(); ctx.fill(); ctx.stroke();
+  } else if (s.type === 'boris_frost_wave') {
+    const maxL = s.maxLife || 0.28;
+    ctx.globalAlpha = Math.max(0, Math.min(1, s.life / maxL));
+    ctx.strokeStyle = '#60a5fa'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(sx, sy, s.range, 0, Math.PI * 2); ctx.stroke();
+  } else if (s.type === 'boris_dark_curse' || s.type === 'boris_dark_follow') {
+    const maxL = s.maxLife || 0.28;
+    ctx.globalAlpha = Math.max(0, Math.min(1, s.life / maxL));
+    ctx.strokeStyle = s.type === 'boris_dark_follow' ? '#e879f9' : '#9333ea';
+    ctx.fillStyle = 'rgba(88, 28, 135, 0.30)'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(sx, sy, s.range, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  } else if (s.type === 'boris_shadow_rect') {
+    const maxL = s.maxLife || 0.26;
+    ctx.globalAlpha = Math.max(0, Math.min(1, s.life / maxL));
+    ctx.translate(sx, sy); ctx.rotate(ang);
+    const len = s.length || 195, hw = (s.width || 54) / 2;
+    ctx.fillStyle = s.isClone ? 'rgba(107, 33, 168, 0.36)' : 'rgba(192, 132, 252, 0.32)';
+    ctx.strokeStyle = s.isClone ? '#a855f7' : '#f3e8ff'; ctx.lineWidth = 3;
+    ctx.fillRect(0, -hw, len, hw * 2); ctx.strokeRect(0, -hw, len, hw * 2);
+  } else if (s.type === 'boris_clone_ghost') {
+    const maxL = s.maxLife || 0.36;
+    ctx.globalAlpha = Math.max(0, Math.min(1, (s.life / maxL) * 0.72));
+    if (typeof SpriteAnimManager !== 'undefined') {
+      SpriteAnimManager.drawCharacter(ctx, 'boris', sx, sy + 14, { isMoving: false, dirInfo: s.dirInfo || player.dirInfo, scale: 0.92 });
+    }
   } else if (s.type === 'renga' || s.type === 'renga_fire') {
     const isFire = s.type === 'renga_fire';
-    ctx.globalAlpha = Math.max(0, Math.min(1, s.life / 0.20));
-    const arcSpan = s.arc || 1.85;
+    const maxL = s.maxLife || 0.20;
+    const prog = 1 - Math.max(0, Math.min(1, s.life / maxL));
+    ctx.globalAlpha = Math.max(0, Math.min(1, s.life / maxL));
+    const arcSpan = s.arc || 1.90;
+    const dir = s.dir || -1;
+    const startA = ang - dir * (arcSpan / 2);
+    const curA = startA + dir * arcSpan * Math.min(1, prog * 1.35);
+    const a1 = Math.min(startA, curA), a2 = Math.max(startA, curA);
     ctx.fillStyle = isFire ? 'rgba(249, 115, 22, 0.26)' : 'rgba(148, 163, 184, 0.24)';
     ctx.strokeStyle = isFire ? '#fdba74' : '#f8fafc';
     ctx.lineWidth = isFire ? 4 : 3.5;
     ctx.beginPath();
     ctx.moveTo(sx, sy);
-    ctx.arc(sx, sy, s.range, ang - arcSpan / 2, ang + arcSpan / 2);
+    ctx.arc(sx, sy, s.range, a1, a2);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
-  } else if (s.type === 'aurora' || (s.arc && s.arc <= 0.65)) {
+  }
+
+    else if (s.type === 'aurora' || (s.arc && s.arc <= 0.65)) {
     const ex = sx + Math.cos(ang) * s.range, ey = sy + Math.sin(ang) * s.range;
     ctx.strokeStyle = s.evolved ? 'rgba(250,204,21,0.9)' : 'rgba(125,211,252,0.85)';
     ctx.lineWidth = s.evolved ? 12 : 8; ctx.lineCap = 'round';

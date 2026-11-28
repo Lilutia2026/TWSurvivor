@@ -192,16 +192,17 @@
 .town-bag-list { flex: 1 1 auto; max-height: 274px; touch-action: pan-y; }
 .town-bag-list > p { padding: 8px 0; color: #c2b3d4; font-size: 12px; }
 .town-skill-list { max-height: 360px; }
-.town-bag-row { display: flex; gap: 4px; align-items: center; margin-bottom: 3px; min-width: 0; }
+.town-bag-row { display: grid; grid-template-columns: minmax(0,1fr) 60px; gap: 4px; margin-bottom: 3px; min-width: 0; }
 #npc-modal-box .town-bag-item {
-  display: grid; grid-template-columns: 22px minmax(0,1fr) auto; align-items: center; gap: 5px;
-  min-height: 28px; min-width: 0; flex: 1; padding: 2px 5px; text-align: left;
+  display: grid; grid-template-columns: 22px minmax(0,1fr) 52px; align-items: center; gap: 5px;
+  min-height: 28px; min-width: 0; padding: 2px 5px; text-align: left;
   background: #221b30; color: #fff0fc; border: 1px solid #625170; border-radius: 5px;
   cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
 }
 .town-bag-item img { width: 20px; height: 20px; object-fit: contain; pointer-events: none; }
 .town-bag-item strong, .town-bag-selected { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.town-bag-item strong { font-size: 12px; }.town-bag-item small { white-space: nowrap; font-size: 10px; color: #cabbd5; }
+.town-bag-item strong { font-size: 12px; }
+.town-bag-item small { white-space: nowrap; text-align: right; font-size: 10px; color: #cabbd5; }
 #npc-modal-box .town-bag-item[aria-pressed=true] { background: #403052; border-color: #e7d1fa; }
 #npc-modal-box .town-small-button, #npc-modal-box .town-stat-steps button {
   flex: none; min-height: 24px; padding: 2px 5px; border-radius: 4px; border: 1px solid #8b739f;
@@ -209,8 +210,13 @@
 }
 #npc-modal-box .town-small-button:disabled, #npc-modal-box .town-stat-steps button:disabled { opacity: .48; cursor: default; }
 #npc-modal-box .town-primary-button { color: #241a30; background: #d7bde9; border-color: #f0defc; font-weight: 700; }
-#npc-modal-box .town-bag-sell { color: #f7d79d; background: #4a3030; border-color: #82583c; }
+#npc-modal-box .town-bag-sell {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums;
+  color: #f7d79d; background: #4a3030; border-color: #82583c;
+}
 .town-bag-selected { flex: 1; font-size: 11px; color: #dfcbec; }
+.town-bag-full-price { flex: none; font-size: 11px; white-space: nowrap; color: #f7d79d; font-variant-numeric: tabular-nums; }
+.town-bag-full-price:empty { display: none; }
 
 .town-character-layout {
   grid-template-columns: minmax(105px,.72fr) minmax(166px,1.05fr) minmax(200px,1.34fr);

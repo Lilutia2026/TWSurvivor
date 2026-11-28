@@ -16,7 +16,7 @@ const CHARACTERS = {
     id: 'lucien', name: '路西安．卡爾茲', title: '卡雷德的貴公子', color: '#3b82f6', playable: true,
     defaultVariant: 'longsword',
     equipTags: ['all', 'heavy', 'shield', 'longsword', 'blade', 'rapier'],
-    skillTags: ['sword_art', 'common_elem', 'lucien_unique'],
+    skillTags: ['lucien_unique', 'aurorathrust', 'renga', 'senku', 'enbu', 'fire1', 'thunder1', 'windblade'],
     resonances: {
       lightning: { overloadHits:5, overloadCritDmg: [0.50, 0.60, 0.70], shockCritBonus: 0.15, arcPct: 0.10 },
       fire:      { sparkChance: [0.55, 0.65, 0.65], sparkPct: 0.12, brandDmgBonus: [0.16, 0.19, 0.22], burnExtraBonus: 0.08 },
@@ -47,15 +47,21 @@ const CHARACTERS = {
     }
 
   },
-
   boris: {
-    id: 'boris', name: '波里斯．貞奈曼', title: '冷徹的冬霜劍士', color: '#60a5fa', playable: false,
+    id: 'boris', name: '波里斯．貞奈曼', title: '冷徹的冬霜劍士', color: '#60a5fa', playable: true,
     defaultVariant: 'tachi',
-    equipTags: ['all', 'heavy', 'knuckle', 'tachi', 'greatsword', 'longsword'],
+    equipTags: ['all', 'heavy', 'knuckle', 'tachi', 'greatsword', 'longsword', 'blade'],
+    skillTags: ['boris_unique', 'earth_slash', 'ice_strike', 'dark_curse', 'renga', 'enbu', 'ice1'],
+    resonances: {
+      ice: { name: '❄️ 冬霜碎冰共鳴', mult: [1.4, 1.6, 1.8, 2.0, 2.2], desc: '同時持有【冰彈術】時啟動：冰系技能命中【凍結】目標時觸發純單體【碎冰處決】爆發' },
+      dark: { name: '🌑 暗影咒蝕共鳴', mult: [1.25, 1.35, 1.45, 1.55, 1.65], desc: '同時持有【暗咒術】時啟動：暗咒術對已帶異常狀態敵人的單體暗影追擊倍率提升' },
+      armor_break: { name: '🔨 裂地破甲共鳴', shatterMult: [0.45, 0.50, 0.55, 0.60, 0.65], desc: '同時持有【圓月斬】時啟動：太刀超武與圓月斬命中【破甲】目標時額外追加 45%～65%【碎甲震盪】物理傷害並無視 30% 抗性' }
+    },
+
     variants: {
-      tachi:      { wName: '太刀',   archetype: 'S+H', initHp: 200, defaultTpl: 'w_long_1', baseStats: { S: 3, H: 4, I: 1, DEF: 2, MR: 2, DEX: 1, AGI: 1 } },
-      greatsword: { wName: '雙手劍', archetype: 'H+I', initHp: 185, defaultTpl: 'w_bld_1',  baseStats: { S: 2, H: 4, I: 2, DEF: 2, MR: 2, DEX: 1, AGI: 1 } },
-      blade:      { wName: '彎刀',   archetype: 'H',   initHp: 220, defaultTpl: 'w_bld_1',  baseStats: { S: 2, H: 5, I: 1, DEF: 2, MR: 2, DEX: 1, AGI: 1 } }
+      tachi:      { wName: '太刀',   archetype: 'S+H', initHp: 200, defaultTpl: 'w_tach_0', baseStats: { S: 3, H: 4, I: 1, DEF: 2, MR: 2, DEX: 1, AGI: 1 } },
+      greatsword: { wName: '雙手劍', archetype: 'H+I', initHp: 185, defaultTpl: 'w_gs_0',   baseStats: { S: 2, H: 4, I: 2, DEF: 2, MR: 2, DEX: 1, AGI: 1 } },
+      blade:      { wName: '彎刀',   archetype: 'H',   initHp: 220, defaultTpl: 'w_bld_0',  baseStats: { S: 2, H: 5, I: 1, DEF: 2, MR: 2, DEX: 1, AGI: 1 } }
     }
   },
 

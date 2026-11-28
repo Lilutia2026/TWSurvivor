@@ -60,8 +60,15 @@ function getPassiveGainText(id, lv) {
       crimsonHeart:  `連擊觸發率 +${(2.5 * lv).toFixed(1)}%｜擊殺【點燃/破甲】敵人回復 ${(0.4 * lv).toFixed(1)}% 最大生命`,
       crimsonReaper: `攻擊命中獨立檢定 +${5 * lv}% 機率附加【點燃】、【點燃】燃燒傷 +${8 * lv}%`,
       provoke:       `挑釁光圈半徑 ${130 + 15 * lv}px｜每 0.33s 獨立 +${6 * lv}% 機率附加【破甲】`,
-      lanceCharge:   `移動速度 +${6 * lv}%、近戰範圍 +${5 * lv}%、遠程槍氣速距 +${8 * lv}%`,
-      bronzeBody:    `物理（碰撞）減傷 +${3 * lv}%、最大生命值 +${5 * lv}%`
+      lanceCharge:      `移動速度 +${6 * lv}%、近戰範圍 +${5 * lv}%、遠程槍氣速距 +${8 * lv}%`,
+      bronzeBody:       `物理（碰撞）減傷 +${3 * lv}%、最大生命值 +${5 * lv}%`,
+      dark_weaken:      `光環半徑擴大（${130 + 15 * lv}px）、敵受全傷 +${4 * lv}%、每 0.33 秒 +${6 * lv}% 機率附加【暗蝕】`,
+      guardian_warrior: `全技能最終傷害 +${5 * lv}%、物理與魔法減傷各 +${2 * lv}%`,
+      ice_mirror:       `冰屬性異常觸發率 +${6 * lv}%、對【凍結】目標暴擊傷害 +${6 * lv}%`,
+      sword_priest:     `全技能暴擊率 +${3 * lv}%、全技能冷卻縮減 +${3 * lv}%`,
+      jineman_survivor: `最大生命 +${5 * lv}%｜每擊殺 60 敵得 1 層披風（滿 5 層免死回 35% 血）`,
+      red_moon_oath:    `全傷 +${8 * lv}%、異常率 +${5 * lv}%｜每秒耗 ${(0.6 * lv).toFixed(1)}% 當前生命，擊殺異常怪回 ${(0.15 * lv).toFixed(2)}% 最大生命`,
+      ice_seal:         `冰系最終傷害 +${6 * lv}%、寒氣與凍結時間 +${10 * lv}%｜凍結時綻放冰花印記`
     };
     return map[id] || '';
   }
@@ -77,18 +84,24 @@ function getPassiveGainText(id, lv) {
       if (id === 'senku') gains.push('劍氣射速與射程 +25%');
       if (id === 'enbu') gains.push('360° 迴旋範圍 +15%');
       if (id === 'windblade') gains.push('風刃穿透力提升至 2 名敵人');
+      if (id === 'earth_slash') gains.push('X 型深黃地裂範圍擴大 +25%');
+      if (id === 'ice_strike') gains.push('雨刷橫掃範圍擴大 +20%、寒氣附加率 +10%');
+      if (id === 'dark_curse') gains.push('單體降咒鎖定目標增至 3 名');
     }
     if (nextLv === 6) {
       if (id === 'aurorathrust') gains.push('暴擊率 +12%');
       if (id === 'renga') gains.push('連擊觸發率 +12%');
       if (id === 'senku') gains.push('穿透衰減減半');
       if (id === 'enbu') gains.push('命中 ≥ 4 名敵人縮減 20% 冷卻');
+      if (id === 'ice_strike') gains.push('掃擊末端額外射出 2 枚寒冰錐刺');
     }
     if (nextLv === 8) {
       if (id === 'aurorathrust') gains.push('刺擊穿透增傷 +20%');
       if (id === 'renga') gains.push('第 3 斬終結傷害提升至 1.30x');
       if (id === 'senku') gains.push('同時發射 2 發平行穿透劍氣');
       if (id === 'enbu') gains.push('暴擊率 +15%');
+      if (id === 'earth_slash') gains.push('X 型交叉地裂附帶【破甲】檢定');
+      if (id === 'dark_curse') gains.push('單體降咒鎖定目標增至 4 名');
     }
     if (id === 'aurora_lightning') {
       if (nextLv === 2) gains.push('雷電超載暴傷倍率提升至 +60%、對感電暴擊 +15%');
@@ -178,6 +191,24 @@ function getPassiveGainText(id, lv) {
       if (nextLv === 3) gains.push('火龍連擊段數提升至 4 段');
     }
     if (id === 'red_dragon_sky' && nextLv === 3) gains.push('赤蓮神龍增至 3 條');
+    if (id === 'earth_quake') {
+      gains.push('圓形地裂範圍 +15%、對【破甲】目標暴傷提升至 +' + (nextLv === 2 ? '20%' : '25%'));
+    }
+    if (id === 'ice_strike_evo') {
+      gains.push('雨刷範圍 +15%、無傷害追蹤寒霜彈增至 ' + (nextLv === 2 ? '5' : '6') + ' 枚、單體碎冰傷提升至 ' + (nextLv === 2 ? '120%' : '140%'));
+    }
+    if (id === 'shadow_sword') {
+      gains.push('加長矩形長度 +15%、雙暗影分身追擊傷害提升至 ' + (nextLv === 2 ? '80%' : '90%'));
+    }
+    if (id === 'sky_earth_wave') {
+      gains.push('三道同心圓半徑擴大、已有【破甲】目標暴傷與無視抗性提升');
+    }
+    if (id === 'ice_breaker') {
+      gains.push('破魔冰刃範圍 +15%、單體碎冰額外傷提升至 ' + (nextLv === 2 ? '175%' : '200%'));
+    }
+    if (id === 'inherited_sword') {
+      gains.push('猛虎扇形範圍 +15%、第 5 段終結斬傷害提升至 ' + (nextLv === 2 ? '135%' : '150%'));
+    }
     return gains.join('、');
   }
 
@@ -298,6 +329,15 @@ function getPassiveGainText(id, lv) {
       parts.push(`自身 360° 火龍（半徑 ${rPx}px）${lv >= 3 ? 4 : 3} 段重擊｜擊殺【點燃】觸發紅蓮爆碎`);
     }
     if (id === 'red_dragon_sky') parts.push(`喚出 ${lv >= 3 ? 3 : 2} 條赤蓮神龍範圍轟炸`);
+    if (id === 'earth_slash') parts.push(`鎖定落點 X 型雙段深黃地裂（長度 +${Math.round((lv - 1) * (50 / 7))}%）${lv >= 8 ? '｜附帶【破甲】檢定' : ''}`);
+    if (id === 'ice_strike') parts.push(`藍色雨刷式左右雙向橫掃${lv >= 4 ? '｜範圍+20%、寒氣率+10%' : ''}${lv >= 6 ? '｜末端射 2 冰錐' : ''}`);
+    if (id === 'dark_curse') parts.push(`鎖定 ${lv >= 8 ? 4 : (lv >= 4 ? 3 : 2)} 名敵人單體降咒＋異常目標追加 75% 單體暗影追擊`);
+    if (id === 'earth_quake') parts.push(`鎖定目標圓形深黃地裂 2 段重擊（範圍 +${(lv - 1) * 15}%）｜對【破甲】目標暴傷 +${10 + lv * 5}%`);
+    if (id === 'ice_strike_evo') parts.push(`藍色雨刷雙掃＋散射 ${3 + lv} 枚無傷追蹤寒霜彈｜【凍結】目標單體碎冰傷 +${80 + lv * 20}%`);
+    if (id === 'shadow_sword') parts.push(`0.00s左掃➔0.14s右掃➔0.28s矩形重斬➔0.42s雙影分身動態交叉補刀（${50 + lv * 10}%×2）`);
+    if (id === 'sky_earth_wave') parts.push(`自身中心 3 道遞增震盪波（第 3 道 2 段傷）｜受擊前已【破甲】目標暴傷 +${30 + lv * 10}%`);
+    if (id === 'ice_breaker') parts.push(`3 道交錯藍色破魔冰刃｜【凍結】單體碎冰傷 +${125 + lv * 25}% 並擴散無傷寒氣波`);
+    if (id === 'inherited_sword') parts.push(`前方 5 段漸進猛虎劈砍（75%➔85%➔95%➔105%➔${lv >= 3 ? 150 : (lv >= 2 ? 135 : 120)}%）`);
     if (isEvo && !sk.isSuperWeapon) parts.push('昇華增傷 +45%');
   
     return parts.length > 0 ? parts.join(' ｜ ') : '基礎初始狀態（LV.1）';
@@ -468,6 +508,8 @@ function triggerSkills(dt) {
           else if (typeof delayedActions !== 'undefined') delayedActions.push({ delay: d * 0.15, fn: execRedSky });
         }
         sk.timer = sk.baseCd * cdFactor;
+      } else if (typeof triggerBorisSkill === 'function' && triggerBorisSkill(id, st, sk, rawDmg, cdFactor, areaFactor, spellBase, cs, tMode)) {
+        continue;
       } else if (id === 'aurorathrust') {
         const lenMult = (1 + (st.lv - 1) * 0.03) * (st.lv >= 4 ? 1.25 : 1.0);
         const range = 150 * lenMult * areaFactor;
@@ -519,14 +561,15 @@ function triggerSkills(dt) {
         for (let s = 0; s < swings; s++) {
           const isLast = (swings === 3 && s === 2);
           const sDmg = rawDmg * (isLast && st.lv >= 8 ? 1.30 : 1.0);
+          const dirSign = s % 2 === 0 ? -1 : 1; // 第 1 刀向左掃、第 2 刀向右回掃、第 3 刀再向左掃
           const execSlash = () => {
-            slashes.push({ type: 'renga', angle: aimAng + (s - 1) * 0.18, range, arc: 1.85, life: 0.18 });
-            damageArea(player.x, player.y, range, aimAng, 1.85, sDmg, 14, {
+            slashes.push({ type: 'renga', angle: aimAng, range, arc: 1.90, dir: dirSign, life: 0.20, maxLife: 0.20 });
+            damageArea(player.x, player.y, range, aimAng, 1.90, sDmg, 14, {
               element: 'physical', isPhysSkill: true
             });
           };
           if (s === 0) execSlash();
-          else if (typeof delayedActions !== 'undefined') delayedActions.push({ delay: s * 0.11, fn: execSlash });
+          else if (typeof delayedActions !== 'undefined') delayedActions.push({ delay: s * 0.14, fn: execSlash });
         }
         sk.timer = sk.baseCd * cdFactor;
       } else if (id === 'renga_fire') {
@@ -538,8 +581,9 @@ function triggerSkills(dt) {
         for (let s = 0; s < 4; s++) {
           const isLast = s === 3;
           const sDmg = rawDmg * (isLast && st.lv >= 3 ? 1.35 : 1.0);
+          const dirSign = s % 2 === 0 ? -1 : 1; // 4 連烈焰雨刷：左 ➔ 右 ➔ 左 ➔ 右
           const execFireSlash = () => {
-            slashes.push({ type: 'renga_fire', angle: aimAng + (s - 1.5) * 0.16, range, arc: 2.05, life: 0.20 });
+            slashes.push({ type: 'renga_fire', angle: aimAng, range, arc: 2.05, dir: dirSign, life: 0.20, maxLife: 0.20 });
             damageArea(player.x, player.y, range, aimAng, 2.05, sDmg, 14, {
               element: 'fire', isPhysSkill: true,
               onTargetHit: (e) => {
@@ -600,17 +644,25 @@ function triggerSkills(dt) {
           damageTexts.push({ x: vx, y: vy - 20, txt: '🌪️真空風渦！', color: '#6ee7b7', fontSize: 13, life: 0.75 });
         }
         sk.timer = sk.baseCd * cdFactor;
-      }
-
-      else if (id === 'enbu') {
+      
+      } else if (id === 'enbu') {
         const range = 128 * (1 + (st.lv - 1) * 0.04) * (st.lv >= 4 ? 1.15 : 1.0) * areaFactor;
+        const abRes = typeof getResonanceParams === 'function' ? getResonanceParams('armor_break') : null;
         let hitEnemies = 0;
         slashes.push({ type: 'enbu', angle: player.facingAngle, range, arc: Math.PI * 2, life: 0.22 });
         damageArea(player.x, player.y, range, 0, Math.PI * 2, rawDmg, st.lv >= 4 ? 42 : 28, {
           element: 'physical', isPhysSkill: true,
+          skyEarthIgnore: abRes ? 0.30 : 0,
           bonusCritFn: () => (st.lv >= 8 ? 0.15 : 0),
-          onTargetHit: () => { hitEnemies++; }
+          onTargetHit: (e) => {
+            hitEnemies++;
+            if (abRes && (e.armorBreakTimer || 0) > 0 && !e.isDead) {
+              const eIdx = enemies.indexOf(e);
+              if (eIdx !== -1) hitEnemy(eIdx, rawDmg * abRes.shatterMult, { element: 'physical', isPhysSkill: true, skyEarthIgnore: 0.30 });
+            }
+          }
         });
+
         const cdRefund = (st.lv >= 6 && hitEnemies >= 4) ? 0.80 : 1.0;
         sk.timer = sk.baseCd * cdFactor * cdRefund;
       } else if (id === 'windblade' || id === 'firearrow' || id === 'thunder') {

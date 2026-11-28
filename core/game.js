@@ -59,20 +59,22 @@ function getEffectivePhysReducePct(cs) {
   const wallLv = (typeof ownedPassives !== 'undefined' && ownedPassives.lightWall) ? ownedPassives.lightWall : 0;
   const guardLv = (typeof ownedPassives !== 'undefined' && ownedPassives.guard) ? ownedPassives.guard : 0;
   const bronzeLv = (typeof ownedPassives !== 'undefined' && ownedPassives.bronzeBody) ? ownedPassives.bronzeBody : 0;
+  const guardianLv = (typeof ownedPassives !== 'undefined' && ownedPassives.guardian_warrior) ? ownedPassives.guardian_warrior : 0;
   const crestLv = (typeof ownedPassives !== 'undefined' && ownedPassives.powerCrest) ? ownedPassives.powerCrest : 0;
   const rawMult = (1 - basePct / 100) * Math.pow(0.97, wallLv + guardLv + bronzeLv);
-  const netPct = Math.round((1 - rawMult) * 100) - crestLv * 4;
+  const netPct = Math.round((1 - rawMult) * 100) + guardianLv * 2 - crestLv * 4;
   return Math.max(0, Math.min(70, netPct));
 }
 
-// 計算魔法（射彈）減傷百分比（上限 70%，含小愛魔法盾牌、路西安萊格藍治之護與力量紋章代價）
+// 計算魔法（射彈）減傷百分比（上限 70%，含小愛魔法盾牌、路西安萊格藍治之護、護衛武士與力量紋章代價）
 function getEffectiveMagReducePct(cs) {
   const basePct = (cs && cs.magReducePct) ? cs.magReducePct : 0;
   const msLv = (typeof ownedPassives !== 'undefined' && ownedPassives.magicShield) ? ownedPassives.magicShield : 0;
   const guardLv = (typeof ownedPassives !== 'undefined' && ownedPassives.guard) ? ownedPassives.guard : 0;
+  const guardianLv = (typeof ownedPassives !== 'undefined' && ownedPassives.guardian_warrior) ? ownedPassives.guardian_warrior : 0;
   const crestLv = (typeof ownedPassives !== 'undefined' && ownedPassives.powerCrest) ? ownedPassives.powerCrest : 0;
   const rawMult = (1 - basePct / 100) * Math.pow(0.97, msLv) * Math.pow(0.985, guardLv);
-  const netPct = Math.round((1 - rawMult) * 100) - crestLv * 3;
+  const netPct = Math.round((1 - rawMult) * 100) + guardianLv * 2 - crestLv * 3;
   return Math.max(0, Math.min(70, netPct));
 }
 
@@ -167,8 +169,37 @@ function update(dt) {
   if (bannerTimer > 0 && (bannerTimer -= dt) <= 0) document.getElementById('banner').style.display = 'none';
   if (player.thornsCd > 0) player.thornsCd -= dt;
   if (player.crimsonHeartIcd > 0) player.crimsonHeartIcd -= dt;
+  if (player.cloakInvuln > 0) player.cloakInvuln -= dt;
   if (player.regen > 0) player.hp = Math.min(player.maxHp, player.hp + player.regen * dt);
 
+  // 【紅月之誓】每秒消耗 0.6%×等級 當前生命（最低保留 1 HP，不直接致死）
+  const redMoonLv = (typeof ownedPassives !== 'undefined' && ownedPassives.red_moon_oath) || 0;
+  if (redMoonLv > 0 && !victoryVacuumActive && player.hp > 1) {
+    const drain = player.hp * (0.006 * redMoonLv) * dt;
+    player.hp = Math.max(1, player.hp - drain);
+  }
+
+   // 【衰弱術】比照挑釁：每 0.33 秒發動一次獨立檢定（每級 +6%，滿級 30%）附加【暗蝕】，光環半徑每級擴大
+   const weakenLv = (typeof ownedPassives !== 'undefined' && ownedPassives.dark_weaken) || 0;
+   if (weakenLv > 0 && !victoryVacuumActive && enemies.length > 0) {
+     player.weakenTimer = (player.weakenTimer || 0) - dt;
+     if (player.weakenTimer <= 0) {
+       player.weakenTimer = 0.33;
+       const wRad = (130 + weakenLv * 15) * (player.areaMult || 1.0);
+       const durMult = (typeof getDerivedCombatStats === 'function' ? getDerivedCombatStats().statusDurMult : 1.0) || 1.0;
+       const sBase = getSpellBase();
+       const resMult = player.resonanceDmgMult || 1.0;
+       for (let i = 0; i < enemies.length; i++) {
+         const e = enemies[i];
+         if (!e || e.isDead || (e.statusImmuneTimer || 0) > 0) continue;
+         if (Math.hypot(e.x - player.x, e.y - player.y) <= wRad + e.radius && Math.random() < (weakenLv * 0.06)) {
+           e.darkTimer = Math.max(e.darkTimer || 0, 3.0 * durMult);
+           e.darkDps = Math.max(e.darkDps || 0, sBase * 0.32 * resMult);
+         }
+       }
+     }
+   }
+ 
   const provokeLv = (typeof ownedPassives !== 'undefined' && ownedPassives.provoke) || 0;
   if (provokeLv > 0 && !victoryVacuumActive && enemies.length > 0) {
     player.provokeTimer = (player.provokeTimer || 0) - dt;

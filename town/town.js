@@ -615,7 +615,7 @@ function updateTownHeaderInfo() {
                 <button type="button" onclick="openTownStatsModal()"><span>角色</span></button>
                 <button type="button" onclick="openTownBagModal()"><span>背包</span></button>
                 <button type="button" onclick="openTownCardPoolModal()"><span>技能</span></button>
-                <button type="button" onclick="openNpcQiedeluo('enhance')"><span>強化</span></button>
+                <button type="button" onclick="openTownMetaUpgradeModal()"><span>強化</span></button>
                 <button type="button" onclick="openTownPartyModal(true)"><span>社交</span></button>
                 <button type="button" onclick="openTownMailbox()"><span>信箱</span></button>
                 <button type="button" onclick="openTownSettings()"><span>設定</span></button>
@@ -704,6 +704,8 @@ const TOWN_BAG_SLOT_ICONS = {
 };
 const TOWN_BAG_WEAPON_ICONS = { spear: 'spear', polearm: 'spear', wand: 'wand', staff: 'wand', mace: 'wand' };
 const TOWN_BAG_RARITY = { gold: 5, purple: 4, blue: 3, green: 2, white: 1 };
+const TOWN_BAG_SHORT_PRICE = new Intl.NumberFormat('zh-TW', { notation: 'compact', maximumSignificantDigits: 3 });
+const TOWN_BAG_FULL_PRICE = new Intl.NumberFormat('zh-TW');
 const TOWN_BAG_VIEW = { filter: '', sort: '', selected: null, charId: null };
 
 function escapeTownText(value) {
@@ -802,20 +804,29 @@ function openTownBagModal(resetScroll = false) {
         `<button class="town-bag-filter" type="button" data-bag-filter="${id}" aria-label="${label}" aria-pressed="${view.filter === id || view.sort === id}">
             <img src="assets/ui/town-equipment/${icon}.png" alt=""><span class="town-filter-tip" aria-hidden="true">${label}</span>
         </button>`).join('');
-    const itemRows = entries.map(({ item, wear }, index) => {
-        const color = (RARITIES[item.rarity] || RARITIES.white).color;
-        const title = item.identified ? (item.name || '未知裝備') : `未鑑定・${SLOT_NAMES[item.slot] || '裝備'}`;
-        const status = wear.ok ? '可穿戴' : !item.identified ? '需鑑定'
-            : wear.reason?.includes('需要角色等級') ? `LV.${item.reqLv}可穿` : '不可穿戴';
-        return `<div class="town-bag-row" data-bag-row="${index}">
-            <button class="town-bag-item" type="button" aria-pressed="false" title="${escapeTownText(wear.reason || '')}">
-              ${getTownEquipmentIcon(item, item.slot)}
-              <strong style="color:${color}">${escapeTownText(title)}${item.tradable === false ? ' 🔒' : ''}</strong>
-              <small>${status}</small>
-            </button>
-            <button class="town-small-button town-bag-sell" type="button" aria-label="出售 ${escapeTownText(title)}">賣 ${getEquipSellPrice(item)}</button>
-        </div>`;
-    }).join('');
+        const itemRows = entries.map(({ item, wear }, index) => {
+            const color = (RARITIES[item.rarity] || RARITIES.white).color;
+            const srcSuffix = item.sourceStageName ? `・${item.sourceStageName}` : '';
+            const title = item.identified ? (item.name || '未知裝備') : `未鑑定${srcSuffix}・${SLOT_NAMES[item.slot] || '裝備'}`;
+            const status = wear.ok ? '可穿戴' : !item.identified ? '需鑑定'
+                : wear.reason?.includes('需要角色等級') ? `LV.${item.reqLv}可穿` : '不可穿戴';
+            const sellPrice = getEquipSellPrice(item);
+            const fullPrice = TOWN_BAG_FULL_PRICE.format(sellPrice);
+            const buttonPrice = sellPrice >= 10000 ? TOWN_BAG_SHORT_PRICE.format(sellPrice) : String(sellPrice);
+            const isLocked = !!item.locked;
+            return `<div class="town-bag-row" data-bag-row="${index}">
+                <button class="town-bag-item" type="button" aria-pressed="false" title="${escapeTownText(wear.reason || '')}">
+                  ${getTownEquipmentIcon(item, item.slot)}
+                  <strong style="color:${color}">${isLocked ? '🔒 ' : ''}${escapeTownText(title)}${item.tradable === false ? ' [綁]' : ''}</strong>
+                  <small>${status}</small>
+                </button>
+                <button class="town-small-button" type="button" data-bag-lock title="${isLocked ? '點擊解鎖裝備' : '點擊鎖定避免誤賣'}"
+                    style="padding:0 6px;${isLocked ? 'border-color:#facc15;color:#fde047;' : 'opacity:0.75;'}">${isLocked ? '🔒' : '🔓'}</button>
+                <button class="town-small-button town-bag-sell" type="button" ${isLocked ? 'disabled title="已鎖定，請先解鎖後再出售"' : `title="出售可獲得 ${fullPrice} Seed"`}
+                    aria-label="出售 ${escapeTownText(title)}">${isLocked ? '已鎖' : `賣 ${buttonPrice}`}</button>
+            </div>`;
+        }).join('');
+    
     openNpcModalShell('背包', '', '#d7c4eb', `
         <div class="town-bag-layout">
           <section class="town-window-panel">
@@ -831,6 +842,7 @@ function openTownBagModal(resetScroll = false) {
             <div class="town-bag-list" tabindex="0" aria-label="背包道具列表">${itemRows || '<p>此分類沒有裝備</p>'}</div>
             <div class="town-bag-footer">
               <span class="town-bag-selected" aria-live="polite"></span>
+              <small class="town-bag-full-price" aria-live="polite"></small>
               ${saveData.legacyBag?.length ? `<button class="town-small-button" type="button" onclick="openLegacyBagRecoveryModal()">舊背包（${saveData.legacyBag.length}）</button>` : ''}
               <button class="town-small-button town-primary-button" type="button" data-bag-equip>穿戴</button>
             </div>
@@ -847,6 +859,10 @@ function openTownBagModal(resetScroll = false) {
         }
         box.querySelector('.town-bag-selected').textContent = selected
             ? `${selected.item.name || '未鑑定裝備'} · ${SLOT_NAMES[selected.item.slot] || '裝備'}`
+            : '';
+        const price = selected ? getEquipSellPrice(selected.item) : 0;
+        box.querySelector('.town-bag-full-price').textContent = price >= 10000
+            ? `售價 ${TOWN_BAG_FULL_PRICE.format(price)} Seed`
             : '';
         equipButton.disabled = !selected?.wear.ok;
     };
@@ -897,6 +913,7 @@ function openTownBagModal(resetScroll = false) {
             selected = entry;
             equipSelected();
         };
+        row.querySelector('[data-bag-lock]').onclick = () => toggleBagItemLockByUid(entry.item.uid);
         row.querySelector('.town-bag-sell').onclick = () => sellBagItemByUid(entry.item.uid);
     }
     for (const button of box.querySelectorAll('[data-bag-filter]')) {
@@ -912,7 +929,6 @@ function openTownBagModal(resetScroll = false) {
     updateSelection();
     renderPaperDoll();
 }
-
 
 function openLegacyBagRecoveryModal() {
     const items = saveData.legacyBag || [];
@@ -934,22 +950,123 @@ function openLegacyBagRecoveryModal() {
         <button type="button" class="stat-btn" style="width:auto;padding:0 8px;margin-top:10px;" onclick="openTownBagModal()">返回背包</button>`);
 }
 
-// 隨身背包單件商店回收出售（支援已鑑定與未鑑定裝備）
+function toggleBagItemLockByUid(uid) {
+    if (!Array.isArray(saveData.bag)) return;
+    const target = saveData.bag.find(it => it && it.uid === uid);
+    if (!target) return;
+    target.locked = !target.locked;
+    if (typeof writeSave === 'function') writeSave();
+    openTownBagModal();
+}
+
 function sellBagItemByUid(uid) {
     if (!Array.isArray(saveData.bag)) return;
     const idx = saveData.bag.findIndex(it => it && it.uid === uid);
     if (idx === -1) return;
     const target = saveData.bag[idx];
+    if (target.locked) { alert('此裝備已鎖定 🔒，請先解鎖後再出售！'); return; }
     if (target.rarity === 'gold' && target.identified !== false) {
         if (!confirm(`確定要出售金色傳說裝備【${target.name}】嗎？`)) return;
     }
-    const gain = typeof getEquipSellPrice === 'function' ? getEquipSellPrice(target) : 15;
+    const gain = typeof getEquipSellPrice === 'function' ? getEquipSellPrice(target) : 100;
     saveData.bag.splice(idx, 1);
     saveData.seed = (saveData.seed || 0) + gain;
     if (typeof hideLobbyTooltip === 'function') hideLobbyTooltip();
     if (typeof writeSave === 'function') writeSave();
     if (typeof updateTownHeaderInfo === 'function') updateTownHeaderInfo();
     openTownBagModal();
+}
+
+let TOWN_META_SELECTED_ID = 'atk';
+
+function openTownMetaUpgradeModal() {
+    const cfg = typeof TOWN_ECONOMY_CONFIG !== 'undefined' ? TOWN_ECONOMY_CONFIG : {};
+    const list = Array.isArray(cfg.metaUpgrades) ? cfg.metaUpgrades : [];
+    const costs = Array.isArray(cfg.metaUpgradeCosts) ? cfg.metaUpgradeCosts : new Array(500, 1200, 2500, 5000, 10000, 20000, 35000, 55000, 80000, 120000);
+    const meta = (saveData.metaUpgrades ||= { atk: 0, hp: 0, def: 0, cdr: 0, crit: 0, move: 0, exp: 0, greed: 0 });
+    const seed = saveData.seed || 0;
+    const totalLv = list.reduce((s, u) => s + (meta[u.id] || 0), 0);
+    const maxTotalLv = list.reduce((s, u) => s + (u.maxLv || 10), 0);
+    const sel = list.find(u => u.id === TOWN_META_SELECTED_ID) || list;
+    const selLv = sel ? (meta[sel.id] || 0) : 0;
+    const selMax = sel ? (sel.maxLv || 10) : 10;
+    const nextCost = (sel && selLv < selMax) ? (costs[selLv] || 120000) : 0;
+
+    const gridHtml = list.map(u => {
+        const lv = meta[u.id] || 0;
+        const max = u.maxLv || 10;
+        const active = sel && sel.id === u.id;
+        const pips = Array.from({ length: max }, (_, i) =>
+            `<span style="display:inline-block;width:6px;height:6px;border-radius:1px;background:${i < lv ? '#facc15' : 'rgba(148,163,184,0.25)'};"></span>`
+        ).join('');
+        return `<button type="button" onclick="TOWN_META_SELECTED_ID='${u.id}';openTownMetaUpgradeModal()"
+            style="aspect-ratio:1/1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:8px;border-radius:10px;cursor:pointer;
+            background:${active ? 'rgba(126,34,206,0.32)' : 'rgba(15,23,42,0.72)'};
+            border:2px solid ${active ? '#facc15' : (lv > 0 ? '#a855f7' : 'rgba(148,163,184,0.28)')};color:#f8fafc;">
+            <span style="font-size:28px;line-height:1;">${u.icon}</span>
+            <strong style="font-size:13px;">${u.name}</strong>
+            <div style="display:flex;gap:2px;flex-wrap:wrap;justify-content:center;max-width:84px;">${pips}</div>
+            <small style="font-size:11px;color:${lv >= max ? '#fde047' : '#cbd5e1'};">${lv >= max ? 'MAX' : `LV.${lv}/${max}`}</small>
+        </button>`;
+    }).join('');
+
+    openNpcModalShell('強化', '', '#d7c4eb', `
+        <div style="display:flex;flex-direction:column;gap:12px;">
+            <div class="town-window-panel" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;">
+                <div style="display:flex;gap:18px;align-items:center;font-size:13px;">
+                    <span>持有 Seed：<strong style="color:#fde047;font-size:15px;">${seed.toLocaleString()}</strong></span>
+                    <span>已啟動強化：<strong style="color:#c084fc;">${totalLv} / ${maxTotalLv} 級</strong>（全角色永久共用）</span>
+                </div>
+                <button type="button" class="town-small-button" onclick="resetTownMetaUpgrades()">重置強化（全額退費）</button>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
+                ${gridHtml}
+            </div>
+            ${sel ? `<div class="town-window-panel" style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;gap:12px;">
+                <div>
+                    <div style="font-size:15px;font-weight:bold;color:#fde047;">${sel.icon} ${sel.name}（LV.${selLv} / ${selMax}）</div>
+                    <div style="font-size:12px;color:#cbd5e1;margin-top:3px;">效果：${sel.perLvText} ｜ 當前累計：<strong style="color:#4ade80;">+${Number((sel.perVal * selLv).toFixed(1))}${sel.unit}</strong></div>
+                </div>
+                <button type="button" class="town-small-button town-primary-button" style="padding:8px 16px;font-size:13px;white-space:nowrap;"
+                    onclick="buyTownMetaUpgrade('${sel.id}')" ${selLv >= selMax || seed < nextCost ? 'disabled' : ''}>
+                    ${selLv >= selMax ? '已達滿級 MAX' : `升級 (${nextCost.toLocaleString()} Seed)`}
+                </button>
+            </div>` : ''}
+        </div>`, 'profile');
+}
+
+function buyTownMetaUpgrade(id) {
+    const cfg = typeof TOWN_ECONOMY_CONFIG !== 'undefined' ? TOWN_ECONOMY_CONFIG : {};
+    const u = (cfg.metaUpgrades || []).find(item => item.id === id);
+    const costs = cfg.metaUpgradeCosts || new Array(500, 1200, 2500, 5000, 10000, 20000, 35000, 55000, 80000, 120000);
+    if (!u) return;
+    const meta = (saveData.metaUpgrades ||= {});
+    const lv = meta[id] || 0;
+    if (lv >= (u.maxLv || 10)) return;
+    const cost = costs[lv] || 120000;
+    if ((saveData.seed || 0) < cost) return alert('Seed 不足！');
+    saveData.seed -= cost;
+    meta[id] = lv + 1;
+    if (typeof writeSave === 'function') writeSave();
+    if (typeof updateTownHeaderInfo === 'function') updateTownHeaderInfo();
+    openTownMetaUpgradeModal();
+}
+
+function resetTownMetaUpgrades() {
+    const cfg = typeof TOWN_ECONOMY_CONFIG !== 'undefined' ? TOWN_ECONOMY_CONFIG : {};
+    const costs = cfg.metaUpgradeCosts || new Array(500, 1200, 2500, 5000, 10000, 20000, 35000, 55000, 80000, 120000);
+    const meta = saveData.metaUpgrades || {};
+    let refund = 0;
+    for (const u of (cfg.metaUpgrades || [])) {
+        const lv = meta[u.id] || 0;
+        for (let i = 0; i < lv; i++) refund += (costs[i] || 120000);
+        meta[u.id] = 0;
+    }
+    if (refund <= 0) return;
+    saveData.seed = (saveData.seed || 0) + refund;
+    if (typeof writeSave === 'function') writeSave();
+    if (typeof updateTownHeaderInfo === 'function') updateTownHeaderInfo();
+    openTownMetaUpgradeModal();
 }
 
 // [C] 角色素質與配點視窗（右側同步顯示完整即時戰鬥面板總覽）

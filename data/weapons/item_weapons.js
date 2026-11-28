@@ -47,7 +47,7 @@ const DEFAULT_START_SKILL_MAP = {
   longsword: 'senku',
   blade: 'renga',
   rapier: 'aurorathrust',
-  tachi: 'renga',
+  tachi: 'earth_slash',
   greatsword: 'senku',
   spear: 'sky_whirl_spear',
   polearm: 'shining_spear',
@@ -60,6 +60,22 @@ const DEFAULT_START_SKILL_MAP = {
   staff: 'holylight',
   mace: 'armorbreak'
 };
+
+// 角色專屬武器起始本命技能覆寫表（優先於 DEFAULT_START_SKILL_MAP）
+const CHAR_WEAPON_START_SKILL_MAP = {
+  boris: {
+    tachi: 'earth_slash',
+    greatsword: 'ice_strike',
+    blade: 'renga'
+  }
+};
+
+function getCharWeaponStartSkill(charId, weaponType) {
+  if (charId && CHAR_WEAPON_START_SKILL_MAP[charId] && CHAR_WEAPON_START_SKILL_MAP[charId][weaponType]) {
+    return CHAR_WEAPON_START_SKILL_MAP[charId][weaponType];
+  }
+  return DEFAULT_START_SKILL_MAP[weaponType] || 'senku';
+}
 
 // 全 15 種武器與防具類型中文譯名字典
 const EQUIP_TYPE_NAMES = {

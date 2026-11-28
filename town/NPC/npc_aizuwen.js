@@ -73,22 +73,22 @@ function openNpcAizuwen() {
 
     const used = saveData.aizuwenGamble.count;
     const max = (typeof TOWN_ECONOMY_CONFIG !== 'undefined' ? TOWN_ECONOMY_CONFIG.gambleDailyMax : 10);
-    const idCost = (typeof TOWN_ECONOMY_CONFIG !== 'undefined' ? TOWN_ECONOMY_CONFIG.identifyCostBase : 50);
-    const wCost = (typeof TOWN_ECONOMY_CONFIG !== 'undefined' ? TOWN_ECONOMY_CONFIG.gambleWeaponCost : 100);
-    const aCost = (typeof TOWN_ECONOMY_CONFIG !== 'undefined' ? TOWN_ECONOMY_CONFIG.gambleArmorCost : 100);
-    const accCost = (typeof TOWN_ECONOMY_CONFIG !== 'undefined' ? TOWN_ECONOMY_CONFIG.gambleAccCost : 100);
+    const wCost = (typeof TOWN_ECONOMY_CONFIG !== 'undefined' ? TOWN_ECONOMY_CONFIG.gambleWeaponCost : 500);
+    const aCost = (typeof TOWN_ECONOMY_CONFIG !== 'undefined' ? TOWN_ECONOMY_CONFIG.gambleArmorCost : 500);
+    const accCost = (typeof TOWN_ECONOMY_CONFIG !== 'undefined' ? TOWN_ECONOMY_CONFIG.gambleAccCost : 500);
+    const getCost = (it) => (typeof getEquipIdentifyCost === 'function' ? getEquipIdentifyCost(it) : 50);
 
     const bag = saveData.bag || [];
     const unidList = bag.filter(it => it && it.identified === false);
-    const totalCost = unidList.length * idCost;
+    const totalCost = unidList.reduce((sum, it) => sum + getCost(it), 0);
     const slotNames = typeof SLOT_NAMES !== 'undefined' ? SLOT_NAMES : { weapon: '武器', sub: '手飾', head: '頭盔', armor: '衣服', gloves: '手部', shoes: '腳部', back: '翅膀', relic: '面具' };
 
     const html = `
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
             <div style="background:#1e293b;padding:12px;border-radius:8px;border:1px solid #334155;">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-                    <div style="font-weight:bold;color:#e2e8f0;">🔍 未知裝備鑑定（單價：${idCost} Seed）</div>
-                    ${unidList.length > 0 ? `<button onclick="aizuwenIdentifyAllItems()" style="padding:3px 8px;background:#eab308;color:#0f172a;font-weight:bold;font-size:11px;border:none;border-radius:5px;cursor:pointer;">✨ 全部鑑定 (${totalCost})</button>` : ''}
+                    <div style="font-weight:bold;color:#e2e8f0;">🔍 未知裝備鑑定（依裝備等級計費）</div>
+                    ${unidList.length > 0 ? `<button onclick="aizuwenIdentifyAllItems()" style="padding:3px 8px;background:#eab308;color:#0f172a;font-weight:bold;font-size:11px;border:none;border-radius:5px;cursor:pointer;">✨ 全部鑑定 (${totalCost.toLocaleString()})</button>` : ''}
                 </div>
                 <div style="font-size:12px;color:#94a3b8;margin-bottom:8px;">鑑定後的關卡裝備保有「可交易」資格</div>
                 <div style="max-height:220px;overflow-y:auto;">
@@ -96,10 +96,12 @@ function openNpcAizuwen() {
                     unidList.map(it => {
                         const rCol = (typeof RARITIES !== 'undefined' && RARITIES[it.rarity]) ? RARITIES[it.rarity].color : '#c084fc';
                         const sLabel = slotNames[it.slot] || '神秘';
+                        const srcTag = it.sourceStageName ? `・${escapeTownText(it.sourceStageName)}` : '';
+                        const itemCost = getCost(it);
                         return `
-                        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px;background:#0f172a;border-left:3px solid ${rCol};border-radius:6px;margin-bottom:6px;">
-                            <span style="font-size:13px;color:${rCol};">❓ [未鑑定] 神秘${sLabel}</span>
-                            <button onclick="aizuwenIdentifyItem(${it.uid})" style="padding:3px 8px;background:#7e22ce;color:#fff;border:none;border-radius:4px;cursor:pointer;">鑑定</button>
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px;background:#0f172a;border-left:3px solid ${rCol};border-radius:6px;margin-bottom:6px;gap:6px;">
+                            <span style="font-size:12px;color:${rCol};">❓ [未鑑定${srcTag}] 神秘${sLabel}</span>
+                            <button onclick="aizuwenIdentifyItem(${it.uid})" style="padding:3px 8px;background:#7e22ce;color:#fff;border:none;border-radius:4px;cursor:pointer;white-space:nowrap;font-size:11px;">鑑定 (${itemCost})</button>
                         </div>`;
                     }).join('')}
                 </div>
@@ -119,21 +121,59 @@ function openNpcAizuwen() {
 }
 
 function aizuwenIdentifyItem(uid) {
-    const cost = (typeof TOWN_ECONOMY_CONFIG !== 'undefined' ? TOWN_ECONOMY_CONFIG.identifyCostBase : 50);
-    if ((saveData.seed || 0) < cost) return alert('Seed 不足！');
     const idx = (saveData.bag || []).findIndex(i => i && i.uid === uid && i.identified === false);
     if (idx === -1) return;
-
     const unidItem = saveData.bag[idx];
+    const cost = typeof getEquipIdentifyCost === 'function' ? getEquipIdentifyCost(unidItem) : 50;
+    if ((saveData.seed || 0) < cost) return alert(`Seed 不足！需要 ${cost.toLocaleString()} Seed`);
+
     const wasTradable = unidItem.tradable;
+    const wasLocked = !!unidItem.locked;
+    const srcStage = unidItem.sourceStageName;
     saveData.seed -= cost;
 
     if (typeof identifyEquipItem === 'function') {
         const identifiedObj = identifyEquipItem(unidItem);
         if (wasTradable === false) identifiedObj.tradable = false;
+        if (wasLocked) identifiedObj.locked = true;
+        if (srcStage) identifiedObj.sourceStageName = srcStage;
         saveData.bag[idx] = identifiedObj;
     } else {
         unidItem.identified = true;
+    }
+
+    if (typeof writeSave === 'function') writeSave();
+    openNpcAizuwen();
+}
+
+function aizuwenGambleSlot(category) {
+    const bag = saveData.bag || [];
+    const unidIndices = [];
+    let totalCost = 0;
+    for (let i = 0; i < bag.length; i++) {
+        if (bag[i] && bag[i].identified === false) {
+            unidIndices.push(i);
+            totalCost += typeof getEquipIdentifyCost === 'function' ? getEquipIdentifyCost(bag[i]) : 50;
+        }
+    }
+    if (unidIndices.length === 0) return;
+    if ((saveData.seed || 0) < totalCost) return alert(`Seed 不足！全部鑑定需要 ${totalCost.toLocaleString()} Seed。`);
+
+    saveData.seed -= totalCost;
+    for (const idx of unidIndices) {
+        const unidItem = bag[idx];
+        const wasTradable = unidItem.tradable;
+        const wasLocked = !!unidItem.locked;
+        const srcStage = unidItem.sourceStageName;
+        if (typeof identifyEquipItem === 'function') {
+            const identifiedObj = identifyEquipItem(unidItem);
+            if (wasTradable === false) identifiedObj.tradable = false;
+            if (wasLocked) identifiedObj.locked = true;
+            if (srcStage) identifiedObj.sourceStageName = srcStage;
+            bag[idx] = identifiedObj;
+        } else {
+            unidItem.identified = true;
+        }
     }
 
     if (typeof writeSave === 'function') writeSave();
@@ -211,6 +251,7 @@ function aizuwenGambleSlot(category) {
     saveData.aizuwenGamble.count += 1;
     newItem.identified = false;
     newItem.tradable = false; // 嚴格鎖定不可交易
+    newItem.sourceStageName = '青木神秘箱';
     saveData.bag = saveData.bag || [];
     saveData.bag.unshift(markEquipAcquired(newItem)); // 新抽出的裝備直接置頂於背包第一格
     if (typeof writeSave === 'function') writeSave();

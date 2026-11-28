@@ -99,7 +99,7 @@ function updateEnemies(dt, isSandbox, cs, spellBase, physRedMult) {
 
     if (e.hitPlayerCd > 0) e.hitPlayerCd -= dt;
     if (Math.hypot(player.x - e.x, player.y - e.y) < player.size * 0.75 + e.radius) {
-      if ((e.hitPlayerCd || 0) <= 0) {
+      if ((e.hitPlayerCd || 0) <= 0 && (player.cloakInvuln || 0) <= 0) {
         e.hitPlayerCd = 0.45;
         const runCfg = (!isSandbox && window.ACTIVE_STAGE_RUN) ? window.ACTIVE_STAGE_RUN : null;
         const stageDmgScale = runCfg ? (1 + (runCfg.stage.tier - 1) * 0.65) * (runCfg.diff.dmgMult || 1.0) : 1.0;
@@ -131,6 +131,13 @@ function updateEnemies(dt, isSandbox, cs, spellBase, physRedMult) {
       }
 
       if (player.hp <= 0) {
+        if ((ownedPassives.jineman_survivor || 0) > 0 && (player.cloakStacks || 0) >= 5) {
+          player.cloakStacks = 0;
+          player.cloakInvuln = 2.5;
+          player.hp = Math.max(1, Math.round(player.maxHp * 0.35));
+          showBanner('🧥 【貞奈曼的倖存者】消耗 5 層守護披風免死一次並回復 35% 生命！');
+          return false;
+        }
         if (ownedPassives.angelWish && !player.angelUsed) {
           player.angelUsed = true; player.hp = player.maxHp;
           enemies = enemies.filter(m => { if (m.isElite || m.isMegaBoss || m.isFinalBoss) { m.freezeTimer = 3.0; return true; } return false; });

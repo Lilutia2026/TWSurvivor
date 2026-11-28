@@ -66,15 +66,18 @@ function getSkillRawDmg(id, lv, evolved) {
         }
     
         const powerCrestMult = isPhysSkill ? (1 + (ownedPassives.powerCrest || 0) * 0.08) : 1.0;
+        const guardianMult = 1 + (ownedPassives.guardian_warrior || 0) * 0.05;
+        const redMoonMult = 1 + (ownedPassives.red_moon_oath || 0) * 0.08;
+        const iceSealMult = (sk.element === 'ice') ? (1 + (ownedPassives.ice_seal || 0) * 0.06) : 1.0;
         const blessMult = 1 + (ownedPassives.blessing || 0) * 0.03;
         const angelMult = ownedPassives.angelWish ? 0.90 : 1.0;
         const evoMult = (evolved && !sk.isSuperWeapon) ? 1.45 : 1.0;
         const rawBase = Array.isArray(sk.dmgCurve)
           ? sk.dmgCurve[Math.min(sk.dmgCurve.length - 1, Math.max(0, lv - 1))]
           : (sk.baseDmg + Math.max(0, lv - 1) * sk.perLv);
-        return (rawBase + statPower + defBonus) * player.dmgMult * dmgTypeMult * dualMasteryMult * powerCrestMult * blessMult * angelMult * evoMult;   
-      }   
-  
+        return (rawBase + statPower + defBonus) * player.dmgMult * dmgTypeMult * dualMasteryMult * powerCrestMult * guardianMult * redMoonMult * iceSealMult * blessMult * angelMult * evoMult;
+      }
+
   function getSpellBase() {
     const st = typeof getTotalStats === 'function' ? getTotalStats() : {};
     return (st.I || 1) * 1.0 + (st.MR || 1) * 0.3;
@@ -137,14 +140,16 @@ function getSkillRawDmg(id, lv, evolved) {
     const isStrikeOrLight = elem === 'holy' || opts.isStrike;
     const resBonusMult = 1 + (ownedPassives.resonance || 0) * 0.12;
   
-    const iceRes = (elem === 'ice' && e.freezeTimer > 0 && typeof getResonanceParams === 'function') ? getResonanceParams('ice') : null;
-    if (iceRes) { e.freezeTimer = 0; }
-  
     const mod = typeof calcStatusDamageMods === 'function' ? calcStatusDamageMods(e, elem, isStrikeOrLight) : { addMult: 1, endMult: 1 };
     const crimsonWaveIgnore = (opts.isCrimsonWave && (e.armorBreakTimer || 0) > 0) ? 0.40 : 0;
-    const physIgnore = opts.isPhysSkill ? ((ownedPassives.dualMastery || 0) * 0.03 + crimsonWaveIgnore) : 0;
+    const skyEarthIgnore = opts.skyEarthIgnore || 0;
+    const physIgnore = opts.isPhysSkill ? ((ownedPassives.dualMastery || 0) * 0.03 + crimsonWaveIgnore + skyEarthIgnore) : 0;
     const talentIgnore = Math.min(0.80, (ownedPassives.mageTalent || 0) * 0.03 + physIgnore);
     const bossResist = (e.isFinalBoss ? 0.20 : (e.isMegaBoss ? 0.12 : 0)) * (1 - talentIgnore);
+    const weakenLv = (typeof ownedPassives !== 'undefined' && ownedPassives.dark_weaken) || 0;
+    const weakenRad = (130 + weakenLv * 15) * (player.areaMult || 1.0);
+    const inWeakenAura = (weakenLv > 0 && Math.hypot(e.x - player.x, e.y - player.y) <= weakenRad + e.radius);
+    const weakenMult = inWeakenAura ? (1 + weakenLv * 0.04) : 1.0;
 
     // 劍傷灼印（烈焰連牙斬）與氣流撕裂（閃空翔烈破＋龍捲刃術）
     let lucienBrandMult = 1.0;
@@ -160,7 +165,7 @@ function getSkillRawDmg(id, lv, evolved) {
       hitEnemy(idx, windCutDmg, { element: 'wind', noCrit: true, isWindCutProc: true, hideText: true });
     }
 
-    let finalDmg = rawDmg * mod.addMult * lucienBrandMult * (1 - bossResist) * mod.endMult * (0.95 + Math.random() * 0.10);
+    let finalDmg = rawDmg * mod.addMult * weakenMult * lucienBrandMult * (1 - bossResist) * mod.endMult * (0.95 + Math.random() * 0.10);
   
     const staticGuideCrit = (opts.isPhysSkill && e.shockTimer > 0 && typeof ownedSkills !== 'undefined' && ownedSkills.aurora_lightning && ownedSkills.thunder1) ? 0.15 : 0;
     const extraCrit = ((typeof opts.bonusCritFn === 'function') ? (opts.bonusCritFn(e) || 0) : 0) + staticGuideCrit;
@@ -169,7 +174,9 @@ function getSkillRawDmg(id, lv, evolved) {
     let isSuperCrit = false;
     if (isCrit) {
       const crimsonWaveCritDmg = (opts.isCrimsonWave && (e.armorBreakTimer || 0) > 0) ? 0.35 : 0;
-      finalDmg *= ((cs.critDmg || 1.5) + (opts.bonusCritDmg || 0) + crimsonWaveCritDmg);
+      const iceMirrorCritDmg = ((e.freezeTimer || 0) > 0 && (ownedPassives.ice_mirror || 0) > 0) ? (ownedPassives.ice_mirror * 0.06) : 0;
+      const fnBonusCritDmg = (typeof opts.bonusCritDmgFn === 'function') ? (opts.bonusCritDmgFn(e) || 0) : 0;
+      finalDmg *= ((cs.critDmg || 1.5) + (opts.bonusCritDmg || 0) + crimsonWaveCritDmg + iceMirrorCritDmg + fnBonusCritDmg);
       const overflow = Math.max(0, totalCrit - 1.0);
       if (overflow > 0 && Math.random() < overflow) {
         isSuperCrit = true;
@@ -189,18 +196,21 @@ function getSkillRawDmg(id, lv, evolved) {
       damageTexts.push({ x: e.x, y: e.y - e.radius, txt: `${tagIcon}${dmgInt}`, color: tagColor, life: 0.55 });
     }
   
-    // 【碎冰處決】獨立爆發結算、碎冰波紋、醒目大字飄字，並賦予 2.0 秒異常免疫防永凍
-    if (iceRes && !isZeroMode) {
-      e.statusImmuneTimer = 2.0;
+         // 【冰系覺醒共鳴】對已凍結目標造成額外傷害時，觸發【碎冰處決】並解除凍結（之後 2 秒內免疫異常狀態）
+    const iceRes = typeof getResonanceParams === 'function' ? getResonanceParams('ice') : null;
+    const isBorisChar = (typeof saveData !== 'undefined' && saveData.charId === 'boris');
+    const allowIceShatter = !isBorisChar || !!opts.isBorisIceEvo;
+    if (iceRes && allowIceShatter && elem === 'ice' && (e.freezeTimer || 0) > 0 && !opts.isShatterProc && !opts.isDot && e.hp > 0) {
+      e.freezeTimer = 0;
       e.chillStacks = 0;
-      const shatterDmg = Math.max(1, Math.round(getSpellBase() * iceRes.mult * resBonusMult * mod.endMult));
-      e.hp -= shatterDmg;
-      if (isDummyLocked) e.hp = e.maxHp;
-      if (typeof recordSandboxDamage === 'function') recordSandboxDamage(shatterDmg);
-      slashes.push({ type: 'iceshatter', x: e.x, y: e.y, range: (e.radius + 48) * player.areaMult, arc: Math.PI * 2, life: 0.28 });
-      damageTexts.push({ x: e.x, y: e.y - e.radius - 18, txt: `❄️碎冰處決 ${shatterDmg}`, color: '#38bdf8', fontSize: 18, life: 0.80 });
-    }
-  
+      e.statusImmuneTimer = 2.0; // 解凍後 2 秒內免疫任何異常狀態（無法被重新凍結或上狀態）
+      const shatterBase = isBorisChar ? Math.max(rawDmg, (cs.st?.I || 0) * 1.2 + (cs.st?.H || 0) * 0.6) : getSpellBase();
+          const shatterDmg = Math.max(1, Math.round(shatterBase * iceRes.mult));
+          slashes.push({ type: 'iceshatter', x: e.x, y: e.y, range: e.radius + 32, arc: Math.PI * 2, life: 0.28 });
+          damageTexts.push({ x: e.x, y: e.y - e.radius - 16, txt: `❄️碎冰處決 ${shatterDmg}`, color: '#7dd3fc', fontSize: 15, life: 0.85 });
+          hitEnemy(idx, shatterDmg, { element: 'ice', noCrit: true, isShatterProc: true, hideText: true });
+        }
+    
         // 【V2.5 聖印雙條件引爆】必須同時滿足：滿 3 層聖印 ＋ 造成傷害 (dmgInt > 0) ＋ 成功觸發異常 (rollStatusChance)
         const dealtDamage = dmgInt > 0;
         if (opts.consumeSeal && typeof tryTriggerHolyResonance === 'function') {
@@ -258,15 +268,40 @@ function getSkillRawDmg(id, lv, evolved) {
       }
     
       if (isDummyLocked) e.hp = e.maxHp;
-      if (e.hp <= 0 && !e.isDead) {
-        e.isDead = true; // 標記已死亡，防止烈焰殉爆 AOE 再次命中同一具屍體造成無窮遞迴
-        const cHeartLv = (typeof ownedPassives !== 'undefined' && ownedPassives.crimsonHeart) || 0;
-        if (cHeartLv > 0 && ((e.burnTimer || 0) > 0 || (e.armorBreakTimer || 0) > 0) && (player.crimsonHeartIcd || 0) <= 0 && typeof player !== 'undefined') {
-          player.crimsonHeartIcd = 0.5;
-          const healAmt = Math.max(1, Math.round((player.maxHp || 200) * (cHeartLv * 0.004)));
-          player.hp = Math.min(player.maxHp, (player.hp || 0) + healAmt);
-          damageTexts.push({ x: player.x, y: player.y - 26, txt: `🐉+${healAmt}`, color: '#4ade80', fontSize: 13, life: 0.55 });
-        }
+           // 【凝影冰心】所有攻擊命中獨立檢定 +6%/級 機率附加【寒氣】
+           const iceMirrorLv = (typeof ownedPassives !== 'undefined' && ownedPassives.ice_mirror) || 0;
+           if (iceMirrorLv > 0 && !opts.isDot && e.hp > 0 && Math.random() < (iceMirrorLv * 0.06)) {
+             if (typeof applyStatusTagsOnHit === 'function') applyStatusTagsOnHit(e, ['ice'], getSpellBase(), cs, { isMelee: false });
+           }
+           if (e.hp <= 0 && !e.isDead) {
+             e.isDead = true; // 標記已死亡，防止烈焰殉爆 AOE 再次命中同一具屍體造成無窮遞迴
+             const cHeartLv = (typeof ownedPassives !== 'undefined' && ownedPassives.crimsonHeart) || 0;
+             if (cHeartLv > 0 && ((e.burnTimer || 0) > 0 || (e.armorBreakTimer || 0) > 0) && (player.crimsonHeartIcd || 0) <= 0 && typeof player !== 'undefined') {
+               player.crimsonHeartIcd = 0.5;
+               const healAmt = Math.max(1, Math.round((player.maxHp || 200) * (cHeartLv * 0.004)));
+               player.hp = Math.min(player.maxHp, (player.hp || 0) + healAmt);
+               damageTexts.push({ x: player.x, y: player.y - 26, txt: `🐉+${healAmt}`, color: '#4ade80', fontSize: 13, life: 0.55 });
+             }
+             // 【紅月之誓】擊殺異常狀態敵人無冷卻回復 0.15%×等級 最大生命
+             const redMoonLv = (typeof ownedPassives !== 'undefined' && ownedPassives.red_moon_oath) || 0;
+             const hasAnyStatus = ((e.freezeTimer || 0) > 0 || (e.chillStacks || 0) > 0 || (e.armorBreakTimer || 0) > 0 || (e.darkTimer || 0) > 0 || (e.burnTimer || 0) > 0 || (e.shockTimer || 0) > 0 || (e.windTimer || 0) > 0);
+             if (redMoonLv > 0 && hasAnyStatus && typeof player !== 'undefined') {
+               const rmHeal = Math.max(1, Math.round((player.maxHp || 200) * (redMoonLv * 0.0015)));
+               player.hp = Math.min(player.maxHp, (player.hp || 0) + rmHeal);
+             }
+             // 【貞奈曼的倖存者】每擊殺 60 名敵人獲得 1 層【守護披風】（上限 5 層）
+             const jinemanLv = (typeof ownedPassives !== 'undefined' && ownedPassives.jineman_survivor) || 0;
+             if (jinemanLv > 0 && !e.isDummy && typeof player !== 'undefined') {
+               player.cloakKills = (player.cloakKills || 0) + 1;
+               if (player.cloakKills >= 60) {
+                 player.cloakKills -= 60;
+                 if ((player.cloakStacks || 0) < 5) {
+                   player.cloakStacks = (player.cloakStacks || 0) + 1;
+                   damageTexts.push({ x: player.x, y: player.y - 38, txt: `🧥守護披風 (${player.cloakStacks}/5)`, color: '#60a5fa', fontSize: 13, life: 0.85 });
+                 }
+               }
+             }
+     
         const fireRes = (e.burnTimer > 0 && !opts.isMartyrBoom && typeof getResonanceParams === 'function') ? getResonanceParams('fire') : null;
         if (fireRes) {
           const boomR = fireRes.radius * player.areaMult;
@@ -306,6 +341,7 @@ function getSkillRawDmg(id, lv, evolved) {
             const forceSelf = (e.isFinalBoss || e.isMegaBoss) && d === 0;
             const dropItem = createBattleEquipmentDrop(rar, lvRange, forceSelf);
             if (dropItem) {
+              dropItem.sourceStageName = st.name || '未知領域';
               const ang = (Math.PI * 2 * d) / dropCount + Math.random() * 0.4;
               const spread = dropCount > 1 ? 26 : 0;
               lootBags.push({

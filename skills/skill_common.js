@@ -54,29 +54,35 @@ function getActiveSkillPool() {
   for (const [id, sk] of Object.entries(GLOBAL_SKILL_POOL)) {
     if (sk.reqJobTier && curJobTier < sk.reqJobTier) continue;
     if (Array.isArray(sk.reqChar) && !sk.reqChar.includes(cid)) continue;
-    if (Array.isArray(sk.skillTags) && sk.skillTags.length > 0) {
-      if (!sk.skillTags.some(t => charTags.includes(t))) continue;
-    }
+    const skTags = Array.isArray(sk.skillTags) ? sk.skillTags : [];
+    const matchByTag = skTags.includes(id) || skTags.some(t => charTags.includes(t)) || charTags.includes(id);
+    if ((skTags.length > 0 || charTags.length > 0) && !matchByTag) continue;
     if (Array.isArray(sk.reqWeaponTypes) && sk.reqWeaponTypes.length > 0) {
       if (!sk.reqWeaponTypes.includes(wType)) continue;
     }
     // 嚴格純化隔離：
     // 1. 小愛拿「魔杖 (wand)」時，禁用白魔/戰錘技能 (staff_mace)，且僅開放與魔杖元素一致的單系元素池
     if (cid === 'tichiel' && wType === 'wand') {
-      if (Array.isArray(sk.skillTags) && sk.skillTags.includes('staff_mace')) continue;
+      if (skTags.includes('staff_mace')) continue;
       if (sk.wandElem && (!w || w.wandElem !== sk.wandElem)) continue;
     }
     // 2. 小愛拿「權杖 (staff) 或 釘錘 (mace)」時，禁用元素魔杖卡池 (tichiel_magic)
     if (cid === 'tichiel' && (wType === 'staff' || wType === 'mace')) {
-      if (Array.isArray(sk.skillTags) && sk.skillTags.includes('tichiel_magic')) continue;
+      if (skTags.includes('tichiel_magic')) continue;
     }
-    pool[id] = { ...sk, timer: 0.2 };
+    const skCopy = { ...sk, timer: 0.2 };
+    if (cid === 'boris' && id === 'ice1') {
+      skCopy.maxLv = 10;
+      delete skCopy.wandElem;
+    }
+    pool[id] = skCopy;
   }
   return pool;
 }
+
 // 雙向標籤篩選：過濾出本局可選被動池（共通被動 ＋ 符合角色標籤的專屬被動）
 function getActivePassivePool() {
-  const ch = typeof getCurrentCharData === 'function' ? getCurrentCharData() : { id: 'lucien', skillTags: ['sword_art', 'common_elem', 'lucien_unique'] };
+  const ch = typeof getCurrentCharData === 'function' ? getCurrentCharData() : { id: 'lucien', skillTags: ['lucien_unique'] };
   const cid = ch.id || 'lucien';
   const charTags = ch.skillTags || [];
   const curJobTier = (typeof saveData !== 'undefined' && saveData.jobTier) ? saveData.jobTier : 1;
@@ -87,7 +93,7 @@ function getActivePassivePool() {
     if (Array.isArray(p.reqChar) && !p.reqChar.includes(cid)) continue;
     if (Array.isArray(p.skillTags) && p.skillTags.length > 0) {
       const isCommon = p.skillTags.includes('common');
-      if (!isCommon && !p.skillTags.some(t => charTags.includes(t))) continue;
+      if (!isCommon && !p.skillTags.some(t => charTags.includes(t)) && !charTags.includes(id)) continue;
     }
     pool[id] = p;
   }
@@ -100,15 +106,19 @@ const SIGNATURE_EVOLUTION_WEAPONS = new Set(['longsword', 'blade', 'rapier', 'ta
 function getSkillEvolutionRoutes(skillPool, passivePool) {
   const weapon = saveData?.equip?.weapon;
   const weaponType = weapon?.subType || weapon?.type;
-  const signature = getWeaponSignatureSkill(weapon);
   const charId = saveData?.charId || 'lucien';
+  const signature = (typeof getCharWeaponStartSkill === 'function' && weaponType)
+    ? getCharWeaponStartSkill(charId, weaponType)
+    : getWeaponSignatureSkill(weapon);
   const jobTier = saveData?.jobTier || 1;
   const routes = {};
 
   for (const [id, skill] of Object.entries(skillPool)) {
-    if (!skill.canEvolve || !skill.reqPassive || !passivePool[skill.reqPassive]) continue;
-    if (SIGNATURE_EVOLUTION_WEAPONS.has(weaponType) && signature && id !== signature) continue;
+    if (!skill.canEvolve) continue;
     const charEvolution = skill.evoByChar?.[charId];
+    const reqPassiveId = charEvolution?.reqPassive ?? skill.reqPassive;
+    if (!reqPassiveId || !passivePool[reqPassiveId]) continue;
+    if (SIGNATURE_EVOLUTION_WEAPONS.has(weaponType) && signature && id !== signature) continue;
     const targetId = charEvolution?.evoSkillId ?? skill.evoSkillId;
     const target = targetId ? skillPool[targetId] : null;
     if (targetId && !target) continue;
@@ -118,9 +128,11 @@ function getSkillEvolutionRoutes(skillPool, passivePool) {
     if (target?.wandElem && target.wandElem !== weapon?.wandElem) continue;
     routes[id] = {
       targetId,
+      reqPassive: reqPassiveId,
       name: charEvolution?.evoName || skill.evoName || target?.name || skill.name,
       desc: target?.desc || skill.evoDesc || skill.desc
     };
   }
   return routes;
 }
+

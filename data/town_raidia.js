@@ -4,29 +4,61 @@
 
 // 【集中式經濟參數配置區】後續全遊戲 Seed 經濟體系定案後，僅需調整此處即可全站同步
 const TOWN_ECONOMY_CONFIG = {
-    identifyCostBase: 50,       // 未知裝備基礎鑑定費用（待經濟平衡校準）
-    gambleWeaponCost: 100,      // 愛祖文：武器神秘箱費用（待經濟平衡校準）
-    gambleArmorCost: 100,       // 愛祖文：防具神秘箱費用（待經濟平衡校準）
-    gambleAccCost: 100,         // 愛祖文：副手與飾品箱費用（待經濟平衡校準）
+    identifyCostBase: 45,       // 未知裝備基礎鑑定係數（LV.1 起 47 Seed ➔ LV.90 封頂 1,674 Seed）
+    gambleWeaponCost: 500,      // 愛祖文：武器神秘箱費用
+    gambleArmorCost: 500,       // 愛祖文：防具神秘箱費用
+    gambleAccCost: 500,         // 愛祖文：副手與飾品箱費用
     gambleDailyMax: 10,         // 愛祖文：每日賭博總次數上限
-    enhanceBaseCost: 100,       // 挈德羅：白字強化基礎費用（待經濟平衡校準）
-    rerollBaseCost: 100,        // 挈德羅：副詞條洗煉基礎費用（待經濟平衡校準）
+    enhanceBaseCost: 100,       // 挈德羅：白字強化基礎費用
+    rerollBaseCost: 100,        // 挈德羅：副詞條洗煉基礎費用
     auctionFeeRate: 0.05,       // 菲雅：拍賣場成交手續費率（預設 5%）
-      // 裝備商店回收基礎價格表（後續經濟校準僅需修改此處；未鑑定與已鑑定裝備共用稀有度回收價）
-      sellPrices: {
-        white: 25,
-        green: 60,
-        blue: 150,
-        purple: 400,
-        gold: 1200
-    }
+    // 裝備商店回收基準價格表（LV.0 基準價，套用 Math.pow(1.0285, effLv) 逐級平滑成長至 LV.90 最高 12.55x）
+    sellPrices: {
+        white: 100,
+        green: 300,
+        blue: 800,
+        purple: 2500,
+        gold: 8000
+    },
+        // 局外強化（帳號共用 Seed 回收池・每項上限 LV.10・全滿共計 2,633,600 Seed）
+        metaUpgradeCosts: new Array(500, 1200, 2500, 5000, 10000, 20000, 35000, 55000, 80000, 120000),
+        metaUpgrades: [   
+        { id: 'atk',   icon: '⚔️', name: '攻擊強化', maxLv: 10, perVal: 4,   unit: '%', perLvText: '全技能最終傷害 +4%/級' },
+        { id: 'hp',    icon: '❤️', name: '生命強化', maxLv: 10, perVal: 40,  unit: '',  perLvText: '基礎最大生命 +40/級' },
+        { id: 'def',   icon: '🛡️', name: '堅韌護體', maxLv: 10, perVal: 1.5, unit: '%', perLvText: '物理與魔法減傷各 +1.5%/級' },
+        { id: 'cdr',   icon: '⚡', name: '迅捷詠唱', maxLv: 10, perVal: 2,   unit: '%', perLvText: '全技能冷卻縮減 +2%/級' },
+        { id: 'crit',  icon: '💥', name: '致命本能', maxLv: 10, perVal: 1.5, unit: '%', perLvText: '暴擊率 +1.5%/級、暴擊傷害 +6%/級' },
+        { id: 'move',  icon: '👟', name: '疾風步法', maxLv: 10, perVal: 3,   unit: '%', perLvText: '移動速度 +3%/級、拾取範圍 +8%/級' },
+        { id: 'exp',   icon: '📚', name: '博學多聞', maxLv: 10, perVal: 5,   unit: '%', perLvText: '局內經驗獲取 +5%/級' },
+        { id: 'greed', icon: '💰', name: '貪婪祝福', maxLv: 10, perVal: 8,   unit: '%', perLvText: '局內 Seed 獲取 +8%/級' }
+    ]
 };
 
-// 全域共用：取得單件裝備商店回收價格（未鑑定與已鑑定裝備共用稀有度邏輯）
+// 取得裝備有效經濟等級（LV.1～LV.90 逐級對應，90 級後屬於合成裝不再依掉落曲線計價）
+function getEquipEconLevel(it) {
+    if (!it) return 1;
+    let lv = Number(it.reqLv);
+    if (!Number.isFinite(lv) && it.tplId && typeof EQUIP_TEMPLATES !== 'undefined') {
+        const tpl = EQUIP_TEMPLATES.find(t => t.tplId === it.tplId);
+        if (tpl && Number.isFinite(Number(tpl.reqLv))) lv = Number(tpl.reqLv);
+    }
+    return Math.min(90, Math.max(0, Number.isFinite(lv) ? lv : 1));
+}
+
+// 全域共用：依裝備等級（LV.0～LV.90 逐級曲線）計算單件鑑定費用
+function getEquipIdentifyCost(it) {
+    const base = TOWN_ECONOMY_CONFIG.identifyCostBase ?? 45;
+    const effLv = getEquipEconLevel(it);
+    return Math.round(base * Math.pow(1.041, effLv));
+}
+
+// 全域共用：依稀有度 × 裝備等級（LV.0～LV.90 逐級曲線）計算單件裝備商店回收價格
 function getEquipSellPrice(it) {
     if (!it) return 0;
-    const prices = TOWN_ECONOMY_CONFIG.sellPrices || { white: 25, green: 60, blue: 150, purple: 400, gold: 1200 };
-    return prices[it.rarity] ?? 25;
+    const prices = TOWN_ECONOMY_CONFIG.sellPrices || { white: 100, green: 300, blue: 800, purple: 2500, gold: 8000 };
+    const base = prices[it.rarity] ?? 100;
+    const effLv = getEquipEconLevel(it);
+    return Math.round(base * Math.pow(1.0285, effLv));
 }
 
 // 樹上精靈村・雷蒂亞：原版 DTX_1312 (1600×1200) 精靈村木棧道無縫配置

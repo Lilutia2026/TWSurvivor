@@ -124,13 +124,13 @@ const TICHIEL_SKILLS = {
       resonanceDesc: '擊殺【點燃】敵人時觸發【烈焰殉爆】，對周圍敵群造成範圍火焰連環炸裂。',
       desc: '【火系魔法・魔法・INT・射彈・範圍・領域】天罰業火隕石引發二次烈焰爆發並殘留燃燒火海，機率附加【點燃】。'
     },
-    // === ❄️ 冰結系魔杖五階純化卡池（方案1：1~3階上限LV.5、4階上限LV.6，前置階梯 2 -> 3 -> 4 -> 6） ===
-    ice1: {
-      name: '冰彈術', icon: '❄️', reqChar: ['tichiel'], skillTags: ['tichiel_magic'], reqWeaponTypes: ['wand'], wandElem: 'ice', tier: 1,
-      type: 'magic', element: 'ice', statusTags: ['ice'], statTags: ['INT'], behaviorTags: ['ranged', 'projectile'], maxLv: 5,
-      baseDmg: 17, perLv: 9, baseCd: 1.30, canEvolve: false,
-      desc: '【冰系魔法・魔法・INT・遠程・射彈】射出高速彈跳的銳利冰晶箭彈，機率附加【凍結】。'
-    },
+      // === ❄️ 冰結系魔杖五階純化卡池（方案1：1~3階上限LV.5、4階上限LV.6，前置階梯 2 -> 3 -> 4 -> 6） ===
+      ice1: {
+        name: '冰彈術', icon: '❄️', skillTags: ['tichiel_magic', 'ice1'], reqWeaponTypes: ['wand', 'tachi', 'greatsword', 'blade', 'dagger', 'dual_blade', 'axe'], wandElem: 'ice', tier: 1,
+        type: 'magic', element: 'ice', statusTags: ['ice'], statTags: ['INT'], behaviorTags: ['ranged', 'projectile'], maxLv: 5,
+        baseDmg: 17, perLv: 9, baseCd: 1.30, canEvolve: false,
+        desc: '【冰系魔法・魔法・INT・遠程・射彈】射出高速彈跳的銳利冰晶箭彈，機率附加【凍結】。'
+      }, 
     ice2: {
       name: '冰霧術', icon: '🌫️', reqChar: ['tichiel'], skillTags: ['tichiel_magic'], reqWeaponTypes: ['wand'], wandElem: 'ice', tier: 2, reqSkill: 'ice1', reqSkillLv: 2,
       type: 'magic', element: 'ice', statusTags: ['ice'], statTags: ['INT'], behaviorTags: ['aoe', 'zone'], maxLv: 5,

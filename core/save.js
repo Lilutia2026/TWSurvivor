@@ -42,7 +42,8 @@ const DEFAULT_SAVE = {
     weapon: null,
     sub: null, head: null, armor: null, gloves: null, shoes: null, back: null, relic: null, cape: null
   },
-  bag: []
+  bag: [],
+  metaUpgrades: { atk: 0, hp: 0, def: 0, cdr: 0, crit: 0, move: 0, exp: 0, greed: 0 }
 };
 
 // 目前角色維持原有欄位供各模組讀取，其餘試玩角色獨立保存在 trialCharacters。
@@ -320,27 +321,45 @@ function getDerivedCombatStats() {
   const passiveDoubleHit = (typeof player !== 'undefined' && player.bonusDoubleHit) ? player.bonusDoubleHit : 0;
   const pCrestLv = (typeof ownedPassives !== 'undefined' && ownedPassives.powerCrest) || 0;
   const bBodyLv = (typeof ownedPassives !== 'undefined' && ownedPassives.bronzeBody) || 0;
-  const finalPhysRed = Math.max(0, Math.min(70, physReducePct - pCrestLv * 4 + bBodyLv * 3));
-  const finalMagRed = Math.max(0, Math.min(70, magReducePct - pCrestLv * 3));
+  const jinemanLv = (typeof ownedPassives !== 'undefined' && ownedPassives.jineman_survivor) || 0;
+  const priestLv = (typeof ownedPassives !== 'undefined' && ownedPassives.sword_priest) || 0;
+  const iceSealLv = (typeof ownedPassives !== 'undefined' && ownedPassives.ice_seal) || 0;
+  const redMoonLv = (typeof ownedPassives !== 'undefined' && ownedPassives.red_moon_oath) || 0;
+  const meta = (typeof saveData !== 'undefined' && saveData.metaUpgrades) ? saveData.metaUpgrades : {};
+  const metaDmgMult = 1 + (meta.atk || 0) * 0.04;
+  const metaHpBonus = (meta.hp || 0) * 40;
+  const metaDefBonus = (meta.def || 0) * 1.5;
+  const metaCdrBonus = (meta.cdr || 0) * 0.02;
+  const metaCritRate = (meta.crit || 0) * 0.015;
+  const metaCritDmg = (meta.crit || 0) * 0.06;
+  const metaMoveMult = 1 + (meta.move || 0) * 0.03;
+  const metaPickupMult = 1 + (meta.move || 0) * 0.08;
+  const metaExpBonus = (meta.exp || 0) * 0.05;
+  const metaSeedBonus = (meta.greed || 0) * 0.08;
+
+  const finalPhysRed = Math.max(0, Math.min(70, Math.round(physReducePct + metaDefBonus) - pCrestLv * 4 + bBodyLv * 3));
+  const finalMagRed = Math.max(0, Math.min(70, Math.round(magReducePct + metaDefBonus) - pCrestLv * 3));
+  const baseMaxHp = (variant.initHp || 200) + st.DEF * 3 + st.hp + metaHpBonus;
 
   return {
     st,
     doubleHitChance: Math.min(0.45, sCap * 0.0015 + passiveDoubleHit),
     knockbackMult: 1 + hCap * 0.004,
-    statusDurMult: 1 + iCap * 0.003,
-    statusChanceBonus: Math.min(0.45, mrCap * 0.0012 + (st.statusChance || 0) / 100),
-    maxHp: (variant.initHp || 200) + st.DEF * 3 + st.hp,
+    statusDurMult: (1 + iCap * 0.003) * (1 + iceSealLv * 0.10),
+    statusChanceBonus: Math.min(0.55, mrCap * 0.0012 + (st.statusChance || 0) / 100 + redMoonLv * 0.05),
+    maxHp: Math.round(baseMaxHp * (1 + jinemanLv * 0.05)),
     physReducePct: finalPhysRed, magReducePct: finalMagRed,
     defThornsDmg: Math.round(st.DEF * 0.8),
-    critRate: 0.05 + dexCap * 0.001 + (st.critRate || 0) / 100,
-    expBonusMult: 1 + dexCap * 0.001,
-    critDmg: 1.50 + agiCap * 0.006 + (st.critDmg || 0) / 100,
-    pickupRange: Math.round(115 * (1 + agiCap * 0.0015)),
-    moveSpeed: Math.round((235 + (st.spd || 0)) * (1 + (st.moveSpd || 0) / 100)),
-    physDmgMult: 1 + (st.physDmgPct || 0) / 100,
-    magDmgMult: 1 + (st.magDmgPct || 0) / 100,
+    critRate: 0.05 + dexCap * 0.001 + (st.critRate || 0) / 100 + priestLv * 0.03 + metaCritRate,
+    expBonusMult: 1 + dexCap * 0.001 + metaExpBonus,
+    seedBonusMult: 1 + metaSeedBonus,
+    critDmg: 1.50 + agiCap * 0.006 + (st.critDmg || 0) / 100 + metaCritDmg,
+    pickupRange: Math.round(115 * (1 + agiCap * 0.0015) * metaPickupMult),
+    moveSpeed: Math.round((235 + (st.spd || 0)) * (1 + (st.moveSpd || 0) / 100) * metaMoveMult),
+    physDmgMult: (1 + (st.physDmgPct || 0) / 100) * metaDmgMult,
+    magDmgMult: (1 + (st.magDmgPct || 0) / 100) * metaDmgMult,
     extraProj: st.extraProj || 0,
-    cdReduce: Math.min(0.40, (st.cdr || 0) / 100), areaBonus: 0, regen: 0
+    cdReduce: Math.min(0.50, (st.cdr || 0) / 100 + priestLv * 0.03 + metaCdrBonus), areaBonus: 0, regen: 0
   };
 }
 
@@ -447,9 +466,10 @@ function showLobbyEquipTooltip(e, source, keyOrUid) {
   const affixLines = (it.affixes && it.affixes.length > 0)
     ? `<div style="margin-top:5px;padding-top:4px;border-top:1px solid #334155;">${it.affixes.map(a => typeof a === 'object' ? `<span style="color:${a.color || '#4ade80'};">• ${a.label} +${a.val}${a.unit || ''}</span>` : `<span style="color:#4ade80;">• ${a}</span>`).join('<br>')}</div>`
     : `<div style="margin-top:4px;color:#64748b;font-size:11px;">無額外魔法詞綴</div>`;
-  const legLine = it.legendEffect ? `<div style="margin-top:5px;padding-top:4px;border-top:1px dashed #ca8a04;color:#fde047;font-weight:bold;">${it.legendEffect.desc}</div>` : '';
+    const legLine = it.legendEffect ? `<div style="margin-top:5px;padding-top:4px;border-top:1px dashed #ca8a04;color:#fde047;font-weight:bold;">${it.legendEffect.desc}</div>` : '';
+  const srcLine = it.sourceStageName ? `<div style="margin-top:4px;color:#94a3b8;font-size:11px;">📍 出處：${it.sourceStageName}</div>` : '';
   tip.style.borderColor = r.color;
-  tip.innerHTML = `<div style="font-weight:bold;color:${r.color};font-size:13px;">[${r.name}・${typeLabel}] ${it.name}</div>${reqLine}${startSkTag}${elemTag}${baseLines ? `<div style="margin-top:4px;font-weight:bold;">${baseLines}</div>` : ''}${affixLines}${legLine}`;
+  tip.innerHTML = `<div style="font-weight:bold;color:${r.color};font-size:13px;">[${r.name}・${typeLabel}] ${it.name}</div>${reqLine}${startSkTag}${elemTag}${baseLines ? `<div style="margin-top:4px;font-weight:bold;">${baseLines}</div>` : ''}${affixLines}${legLine}${srcLine}`;
   tip.style.display = 'block'; moveLobbyTooltip(e);
 }
 function moveLobbyTooltip(e) { const tip = getLobbyTooltipEl(); tip.style.left = Math.min(window.innerWidth - 310, e.clientX + 14) + 'px'; tip.style.top = Math.min(window.innerHeight - 160, e.clientY + 14) + 'px'; }
@@ -476,6 +496,9 @@ function startBattle(stageId, diffKey, { sandbox = false, deferScene = false } =
   w.type = realWType;
 
   let sigSkill = typeof getWeaponSignatureSkill === 'function' ? getWeaponSignatureSkill(w) : w.startSkill;
+  if (!w.customStartSkill && typeof getCharWeaponStartSkill === 'function' && saveData.charId === 'boris') {
+    sigSkill = getCharWeaponStartSkill('boris', realWType);
+  }
   if (saveData.charId === 'tichiel') {
     if (realWType === 'mace' && !w.customStartSkill) sigSkill = 'armorbreak';
     else if (realWType === 'staff' && !w.customStartSkill) sigSkill = 'holylight';
@@ -501,7 +524,7 @@ function startBattle(stageId, diffKey, { sandbox = false, deferScene = false } =
     player.maxHp = d.maxHp; player.hp = player.maxHp; player.regen = d.regen; player.baseSpeed = d.moveSpeed; player.pickupRange = d.pickupRange;
     player.cdMult = Math.max(0.35, 1 - (d.cdReduce || 0)); player.areaMult = 1.0; player.speedMult = 1.0; player.dmgMult = 1.0;
     player.bonusCritRate = 0; player.bonusDoubleHit = 0; player.superCritMult = 1.5; player.resonanceDmgMult = 1.0;
-    player.dropRateMult = 1.0; player.expMult = d.expBonusMult; player.curseMult = 1.0; player.seedMult = 1.0; player.angelUsed = false;
+    player.dropRateMult = 1.0; player.expMult = d.expBonusMult; player.curseMult = 1.0; player.seedMult = d.seedBonusMult || 1.0; player.angelUsed = false;
   }
   if (typeof ownedSkills !== 'undefined') {
     for (const k of Object.keys(ownedSkills)) delete ownedSkills[k];

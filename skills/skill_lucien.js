@@ -34,15 +34,19 @@ const LUCIEN_SKILLS = {
   },
   renga: {
     name: '連牙斬', icon: '⚔️', evoName: '烈焰連牙斬', evoIcon: '🔥',
-    reqChar: ['lucien'], skillTags: ['sword_art'], reqWeaponTypes: ['rapier', 'blade', 'longsword'],
+    skillTags: ['renga'], reqWeaponTypes: ['rapier', 'blade', 'longsword', 'tachi', 'greatsword', 'dagger', 'dual_blade', 'axe'],
     type: 'physical', element: 'physical', statusTags: [], statTags: ['H'], behaviorTags: ['melee', 'aoe'], maxLv: 8,
-    baseDmg: 24, perLv: 8, baseCd: 1.30, canEvolve: true, reqPassive: 'guard', evoSkillId: 'renga_fire', disableWhenEvo: true,
+    baseDmg: 24, perLv: 8, baseCd: 1.30, canEvolve: true, reqPassive: 'guard', evoSkillId: 'renga_fire',
+    evoByChar: {
+      boris: { reqPassive: 'dark_weaken', evoSkillId: 'shadow_sword', evoName: '殘影劍式', evoIcon: '👥' }
+    },
+    disableWhenEvo: true,
     evoDesc: '【刀技・物理・火・H・近戰・範圍】前方大扇形 4 連狂暴烈焰劈砍，高機率引爆火花並附加【劍傷灼印】放大物理連斬傷害。',
     desc: '【刀技・物理・H・近戰・範圍】高速揮刀連續劈砍前方扇形敵群，LV.4 升級為 3 連斬。'
   },
   senku: {
     name: '閃空烈破', icon: '🌙', evoName: '閃空翔烈破', evoIcon: '🌪️',
-    reqChar: ['lucien'], skillTags: ['sword_art'], reqWeaponTypes: ['rapier', 'blade', 'longsword'],
+    skillTags: ['senku'], reqWeaponTypes: ['rapier', 'blade', 'longsword'],
     type: 'physical', element: 'physical', statusTags: [], statTags: ['S', 'H'], behaviorTags: ['ranged', 'projectile'], maxLv: 8,
     baseDmg: 25, perLv: 9, baseCd: 1.15, canEvolve: true, reqPassive: 'dualMastery', evoSkillId: 'senku_wind', disableWhenEvo: true,
     evoDesc: '【劍技・物理・風・S+H・遠程・範圍】向前方扇形轟出多道金白色衝擊光柱，每 3 次施放捲起 2.0s【真空風渦】聚怪並擴寬光柱。',
@@ -50,11 +54,12 @@ const LUCIEN_SKILLS = {
   },
   enbu: {
     name: '圓月斬', icon: '🌀',
-    reqChar: ['lucien'], skillTags: ['sword_art'], reqWeaponTypes: ['rapier', 'blade', 'longsword'],
+    skillTags: ['enbu'], reqWeaponTypes: ['rapier', 'blade', 'longsword', 'tachi', 'greatsword'],
     type: 'physical', element: 'physical', statusTags: [], statTags: ['H'], behaviorTags: ['melee', 'aoe'], maxLv: 8,
     baseDmg: 20, perLv: 7, baseCd: 1.45, canEvolve: false,
     desc: '【刀技・物理・H・近戰・範圍】以自身為中心 360° 迴旋揮斬橫掃周身敵群。'
   },
+
     // === 路西安一轉元素昇華（每局依武器選定一條路線，持有對應元素法術才啟動共鳴） ===
     aurora_lightning: {
       name: '極光雷閃刺', icon: '⚡', reqChar: ['lucien'], skillTags: ['sword_art'], reqWeaponTypes: ['rapier'],

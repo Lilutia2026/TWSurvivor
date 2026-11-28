@@ -121,7 +121,12 @@ function updatePlayerProjectiles(dt, cs, spellBase) {
 
         const pTags = (p.statusTags && p.statusTags.length > 0) ? p.statusTags : (p.elem || 'none');
         if (pTags !== 'none' && pTags !== 'physical') {
-          applyStatusTagsOnHit(e, pTags, spellBase, cs, { isMelee: false });
+          const stackCs = p.noDamageStackOnly ? { ...cs, statusChanceBonus: (cs.statusChanceBonus || 0) + 0.45 } : cs;
+          applyStatusTagsOnHit(e, pTags, spellBase, stackCs, { isMelee: false });
+        }
+        if (p.noDamageStackOnly) {
+          if (--p.pierce <= 0) return false;
+          continue;
         }
         const hitDmg = iceCrystal ? (p.dmg * iceCrystal.crushDamageMult) : p.dmg;
         hitEnemy(j, hitDmg, { element: p.elem || 'none', isPhysSkill: !!p.isPhysSkill });
@@ -221,12 +226,22 @@ function updateEnemyProjectiles(dt, isSandbox, magRedMult) {
     ep.x += ep.vx * dt; ep.y += ep.vy * dt;
     if ((ep.life -= dt) <= 0) return false;
     if (Math.hypot(player.x - ep.x, player.y - ep.y) <= player.size * 0.65 + ep.radius) {
+      if ((player.cloakInvuln || 0) > 0) return false;
       let taken = Math.max(1, Math.round(ep.dmg * magRedMult));
       damageTexts.push({ x: player.x, y: player.y - 26, txt: `🔮-${taken}`, color: '#c084fc', life: 0.6 });
       if (player.shield > 0) { const abs = Math.min(player.shield, taken); player.shield -= abs; taken -= abs; }
       if (taken > 0) player.hp -= taken;
       if (isSandbox && SANDBOX_STATE.godMode && player.hp < 1) player.hp = player.maxHp;
-      if (player.hp <= 0) { endGame(false); return false; }
+      if (player.hp <= 0) {
+        if ((ownedPassives.jineman_survivor || 0) > 0 && (player.cloakStacks || 0) >= 5) {
+          player.cloakStacks = 0;
+          player.cloakInvuln = 2.5;
+          player.hp = Math.max(1, Math.round(player.maxHp * 0.35));
+          showBanner('🧥 【貞奈曼的倖存者】消耗 5 層守護披風免死一次並回復 35% 生命！');
+          return false;
+        }
+        endGame(false); return false;
+      }
       return false;
     }
     return true;
