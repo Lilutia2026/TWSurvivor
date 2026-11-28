@@ -100,6 +100,20 @@ const SpriteAnimManager = {
     return clip.frames.find(frame => elapsedMs < frame.endMs);
   },
 
+  getShowcasePose(charId) {
+    const meta = window.CHAR_ANIM_REGISTRY[charId];
+    if (!meta) return null;
+    const timed = meta.timedAnimations?.preview || meta.timedAnimations?.idle;
+    const clips = timed || meta.animations?.idle;
+    const base = ['down', 'downLeft', 'left', 'upLeft', 'up'].find(direction =>
+      (timed ? clips[direction]?.frames : clips?.[direction])?.length
+    );
+    if (!base) return null;
+    const labels = timed ? clips[base].frames.map(frame => frame.id) : clips[base];
+    const frames = labels.map(id => meta.frames?.[id]).filter(Boolean);
+    return frames.length ? { dirInfo: this.mapDirToBase(base), previewPose: true, frames } : null;
+  },
+
   // 繪製角色當前動畫幀（回傳 true 代表成功繪製精靈，false 代表未就緒需走方塊備案）
   drawCharacter(ctx, charId, x, y, opts = {}) {
     const entry = this.ensureLoaded(charId);

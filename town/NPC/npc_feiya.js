@@ -128,7 +128,7 @@ function claimSingleMail(idx) {
     if (!m) return;
     const sAmt = m.seed || m.gold || 0;
     if (sAmt) saveData.seed = (saveData.seed || 0) + sAmt;
-    if (m.item) { saveData.bag = saveData.bag || []; saveData.bag.push(m.item); }
+    if (m.item) { saveData.bag = saveData.bag || []; saveData.bag.push(markEquipAcquired(m.item)); }
     if (typeof writeSave === 'function') writeSave();
     openTownMailbox();
 }
@@ -138,7 +138,7 @@ function claimAllMailbox() {
         const m = saveData.mailbox.shift();
         const sAmt = m.seed || m.gold || 0;
         if (sAmt) saveData.seed = (saveData.seed || 0) + sAmt;
-        if (m.item) { saveData.bag = saveData.bag || []; saveData.bag.push(m.item); }
+        if (m.item) { saveData.bag = saveData.bag || []; saveData.bag.push(markEquipAcquired(m.item)); }
     }
     if (typeof writeSave === 'function') writeSave();
     openTownMailbox();

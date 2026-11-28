@@ -116,18 +116,11 @@ function renderLoginPreview(character) {
         still.src = `assets/characters/${character.previewImage}`;
     }
 
-    const meta = window.CHAR_ANIM_REGISTRY[character.id];
-    const timedIdle = meta?.timedAnimations?.preview || meta?.timedAnimations?.idle;
-    const idle = timedIdle || meta?.animations?.idle;
-    const base = ['down', 'downLeft', 'left', 'upLeft', 'up'].find(direction =>
-        (timedIdle ? idle[direction]?.frames : idle?.[direction])?.length
-    );
-    if (!base) return;
+    const pose = SpriteAnimManager.getShowcasePose(character.id);
+    if (!pose) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    const labels = timedIdle ? idle[base].frames.map(frame => frame.id) : idle[base];
-    const frames = labels.map(label => meta.frames?.[label]).filter(Boolean);
-    if (frames.length === 0) return;
+    const { dirInfo, previewPose, frames } = pose;
     const scale = Math.min(
         canvas.width * .58 / Math.max(...frames.map(frame => frame.w)),
         canvas.height * .63 / Math.max(...frames.map(frame => frame.h))
@@ -145,8 +138,8 @@ function renderLoginPreview(character) {
         }
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         const drawn = SpriteAnimManager.drawCharacter(ctx, character.id, canvas.width / 2, canvas.height * .78, {
-            dirInfo: SpriteAnimManager.mapDirToBase(base),
-            previewPose: true,
+            dirInfo,
+            previewPose,
             timeSec: reducedMotion ? 0 : now / 1000,
             animationState,
             scale,

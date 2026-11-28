@@ -1,6 +1,7 @@
 // 觸控輸入只提供方向與強度，移動仍由城鎮及戰鬥迴圈處理。
 const MobileControls = (() => {
   const coarse = matchMedia('(pointer: coarse)');
+  const portraitQuery = matchMedia('(orientation: portrait)');
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
   const movement = { active: false, x: 0, y: 0 };
   const angles = Array.from({ length: 56 }, (_, index) => index * Math.PI * 2 / 56);
@@ -112,7 +113,7 @@ const MobileControls = (() => {
   function syncLayout() {
     const mobile = coarse.matches;
     document.documentElement.classList.toggle('mobile-layout', mobile);
-    const nextPortrait = mobile && innerHeight > innerWidth;
+    const nextPortrait = mobile && portraitQuery.matches;
     orientation.hidden = !nextPortrait;
     if (nextPortrait && !portrait) {
       if (TOWN_STATE.active) {
@@ -148,7 +149,9 @@ const MobileControls = (() => {
       resize();
       if (TOWN_STATE.active) syncTownViewportSize();
     });
+    portraitQuery.addEventListener('change', syncLayout);
     window.addEventListener('resize', syncLayout);
+    window.visualViewport?.addEventListener('resize', syncLayout);
     window.addEventListener('blur', () => clear(true));
     document.addEventListener('visibilitychange', () => { if (document.hidden) clear(true); });
     syncLayout();

@@ -2,19 +2,25 @@
 // 《TW倖存者》NPC 獨立模組：愛祖文（裝備鑑定 & 每日限量部位賭博）(town/NPC/npc_aizuwen.js)
 // ============================================================================
 
-function openNpcModalShell(title, subtitle, accentColor, bodyHtml) {
+function openNpcModalShell(title, subtitle, accentColor, bodyHtml, panel = '') {
     const overlay = document.getElementById('npc-modal-overlay');
     const box = document.getElementById('npc-modal-box');
     if (!overlay || !box) return;
     MobileControls.clear(true);
+    hideLobbyTooltip();
+    box.dataset.panel = panel;
+    box.style.maxWidth = ({ bag: '820px', profile: '780px', skills: '880px' })[panel] || '720px';
     box.style.borderColor = accentColor || '#facc15';
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-modal', 'true');
+    box.setAttribute('aria-labelledby', 'npc-modal-title');
     box.innerHTML = `
-        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #334155;padding-bottom:10px;margin-bottom:12px;">
-            <div>
-                <span style="font-size:18px;font-weight:bold;color:${accentColor};">${title}</span>
-                <span style="font-size:12px;color:#94a3b8;margin-left:8px;">${subtitle}</span>
+        <div class="town-modal-header">
+            <div class="town-modal-heading">
+                <strong id="npc-modal-title" style="color:${accentColor || '#facc15'};">${title}</strong>
+                ${subtitle ? `<span>${subtitle}</span>` : ''}
             </div>
-            <button onclick="closeNpcModalShell()" style="background:#334155;color:#fff;border:none;border-radius:6px;padding:4px 10px;cursor:pointer;">✕ 關閉 (ESC)</button>
+            <button type="button" class="town-modal-close" aria-label="關閉" onclick="closeNpcModalShell()">×</button>
         </div>
         <div id="npc-modal-body">${bodyHtml}</div>
     `;
@@ -24,6 +30,7 @@ function openNpcModalShell(title, subtitle, accentColor, bodyHtml) {
 function closeNpcModalShell() {
     const overlay = document.getElementById('npc-modal-overlay');
     if (overlay) overlay.style.display = 'none';
+    hideLobbyTooltip();
     if (typeof updateTownHeaderInfo === 'function') updateTownHeaderInfo();
 }
 
@@ -205,7 +212,7 @@ function aizuwenGambleSlot(category) {
     newItem.identified = false;
     newItem.tradable = false; // 嚴格鎖定不可交易
     saveData.bag = saveData.bag || [];
-    saveData.bag.unshift(newItem); // 新抽出的裝備直接置頂於背包第一格
+    saveData.bag.unshift(markEquipAcquired(newItem)); // 新抽出的裝備直接置頂於背包第一格
     if (typeof writeSave === 'function') writeSave();
     openNpcAizuwen();
 }

@@ -6,6 +6,8 @@ const TOWN_STATE = {
     active: false,
     canvas: null,
     ctx: null,
+    viewWidth: 960,
+    viewHeight: 640,
     rafId: null,
     lastTime: 0,
     player: { x: 996, y: 586, speed: 240, flipX: false, walkTime: 0, targetX: null, targetY: null },
@@ -83,17 +85,13 @@ function enterTownClad(keepPos = false) {
    
        // 2. 動態貼合視窗實際像素 ＋ 維持原版 640px 視野距離感
        syncTownViewportSize();
-       if (!TOWN_STATE._resizeBound) {
-           TOWN_STATE._resizeBound = true;
-           window.addEventListener('resize', () => { if (TOWN_STATE.active) syncTownViewportSize(); });
-       }
    
        if (!keepPos || !TOWN_STATE.hasSpawned) {
            TOWN_STATE.player.x = TOWN_CLAD_MAP.spawnPoint.x;
            TOWN_STATE.player.y = TOWN_CLAD_MAP.spawnPoint.y;
            TOWN_STATE.hasSpawned = true;
-           const visW = TOWN_STATE.canvas.width / TOWN_STATE.zoom;
-           const visH = TOWN_STATE.canvas.height / TOWN_STATE.zoom;
+           const visW = TOWN_STATE.viewWidth / TOWN_STATE.zoom;
+           const visH = TOWN_STATE.viewHeight / TOWN_STATE.zoom;
            TOWN_STATE.camX = Math.max(0, Math.min(TOWN_CLAD_MAP.width - visW, TOWN_STATE.player.x - visW / 2));
            TOWN_STATE.camY = Math.max(0, Math.min(TOWN_CLAD_MAP.height - visH, TOWN_STATE.player.y - visH / 2));
        }
@@ -167,17 +165,39 @@ function getTownSpriteBounds(item) {
 // 雷蒂亞畫布與操作
 // ============================================================================
 function syncTownViewportSize() {
-    if (!TOWN_STATE.canvas) return;
-    const rect = TOWN_STATE.canvas.getBoundingClientRect();
-    const w = Math.round(rect.width) || window.innerWidth;
-    const h = Math.round(rect.height) || (window.innerHeight - 52);
-    TOWN_STATE.canvas.width = w;
-    TOWN_STATE.canvas.height = h;
+    const canvas = TOWN_STATE.canvas;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const w = rect.width || Math.max(1, window.innerWidth);
+    const h = rect.height || Math.max(1, window.innerHeight - 52);
     // 手機橫向保留廣場上下視野，讓櫃台和傳送門能同時進入畫面。
-    TOWN_STATE.zoom = MobileControls.enabled ? Math.max(0.55, h / 550) : Math.max(1, h / 650);
+    const zoom = MobileControls.enabled ? Math.max(0.55, h / 550) : Math.max(1, h / 650);
+    const { viewWidth, viewHeight, zoom: previousZoom } = TOWN_STATE;
+    if (w !== viewWidth || h !== viewHeight || zoom !== previousZoom) {
+        const visibleWidth = w / zoom, visibleHeight = h / zoom;
+        TOWN_STATE.camX = Math.max(0, Math.min(TOWN_CLAD_MAP.width - visibleWidth,
+            TOWN_STATE.camX + (viewWidth / previousZoom - visibleWidth) / 2));
+        TOWN_STATE.camY = Math.max(0, Math.min(TOWN_CLAD_MAP.height - visibleHeight,
+            TOWN_STATE.camY + (viewHeight / previousZoom - visibleHeight) / 2));
+    }
+    // 以 CSS 像素計算鏡頭和輸入，再依螢幕像素密度配置畫布。
+    TOWN_STATE.viewWidth = w;
+    TOWN_STATE.viewHeight = h;
+    TOWN_STATE.zoom = zoom;
+    const density = Math.min(window.devicePixelRatio || 1, 3);
+    const pixelWidth = Math.max(1, Math.round(w * density));
+    const pixelHeight = Math.max(1, Math.round(h * density));
+    if (canvas.width !== pixelWidth) canvas.width = pixelWidth;
+    if (canvas.height !== pixelHeight) canvas.height = pixelHeight;
 }
 
 function bindTownEvents() {
+    const syncActiveViewport = () => { if (TOWN_STATE.active) syncTownViewportSize(); };
+    // 旋轉時 Canvas 版面尺寸可能在視窗 resize 事件之後才更新。
+    const viewportObserver = new ResizeObserver(syncActiveViewport);
+    viewportObserver.observe(TOWN_STATE.canvas);
+    window.addEventListener('resize', syncActiveViewport);
+
     window.addEventListener('keydown', (e) => {
         if (!TOWN_STATE.active || MobileControls.portrait) return;
         const key = e.key.toLowerCase();
@@ -359,8 +379,8 @@ function updateTownPlayer(dt) {
 
     // 原版平滑鏡頭跟隨角色（含縮放倍率換算 ＋ 地圖四邊界夾緊）
     const z = TOWN_STATE.zoom || 1;
-    const viewW = (TOWN_STATE.canvas ? TOWN_STATE.canvas.width : 960) / z;
-    const viewH = (TOWN_STATE.canvas ? TOWN_STATE.canvas.height : 640) / z;
+    const viewW = TOWN_STATE.viewWidth / z;
+    const viewH = TOWN_STATE.viewHeight / z;
     const maxCamX = Math.max(0, TOWN_CLAD_MAP.width - viewW);
     const maxCamY = Math.max(0, TOWN_CLAD_MAP.height - viewH);
     const targetCamX = Math.max(0, Math.min(maxCamX, p.x - viewW / 2));
@@ -378,10 +398,11 @@ function updateTownPlayer(dt) {
 }
 
 function drawTownScene() {
-    const ctx = TOWN_STATE.ctx, W = TOWN_CLAD_MAP.width, H = TOWN_CLAD_MAP.height;
-    const viewW = TOWN_STATE.canvas.width, viewH = TOWN_STATE.canvas.height;
+    const { ctx, canvas, viewWidth: viewW, viewHeight: viewH } = TOWN_STATE;
+    const W = TOWN_CLAD_MAP.width, H = TOWN_CLAD_MAP.height;
     const z = TOWN_STATE.zoom || 1;
     const isNight = getRaidiaNightMode();
+    ctx.setTransform(canvas.width / viewW, 0, 0, canvas.height / viewH, 0, 0);
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
     ctx.clearRect(0, 0, viewW, viewH);
@@ -428,11 +449,13 @@ function drawTownScene() {
                 ctx.beginPath(); ctx.roundRect(p.x - 15, p.y - 44 - bob, 30, 44, 8); ctx.fill(); ctx.stroke();
             }
             const nameOffsetY = drewSprite ? 82 : (54 + bob);
+            ctx.save();
             ctx.textAlign = 'center'; ctx.font = 'bold 14px sans-serif'; ctx.fillStyle = charColor;
-            ctx.strokeStyle = 'rgba(15, 23, 42, 0.85)'; ctx.lineWidth = 3;
+            ctx.strokeStyle = 'rgba(15, 23, 42, 0.85)'; ctx.lineWidth = 3; ctx.lineJoin = 'round';
             const pName = saveData?.charName || (cObj && cObj.name) || '冒險者';
             ctx.strokeText(pName, p.x, p.y - nameOffsetY);
             ctx.fillText(pName, p.x, p.y - nameOffsetY);
+            ctx.restore();
         } else {
             const it = ent.data, hi = TOWN_STATE.activeTarget?.id === it.id;
             const sprite = getTownSpriteBounds(it);
@@ -641,19 +664,17 @@ function openTownCardPoolModal() {
         </div>`;
     }).join('') || '<div style="color:#64748b;font-size:12px;">無可用被動卡片</div>';
 
-    openNpcModalShell('技能・當前卡池', `角色：${saveData.charName || '冒險者'} ｜ 武器：${wName}`, '#c084fc', `
-        <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:12px;">
-            <div style="background:#1e293b;padding:10px;border-radius:8px;max-height:360px;overflow-y:auto;">
-                <div style="font-weight:bold;color:#38bdf8;margin-bottom:6px;">🔥 可選主動技能池 (${actEntries.length} 張)</div>
-                ${actHtml}
-            </div>
-            <div style="background:#1e293b;padding:10px;border-radius:8px;max-height:360px;overflow-y:auto;">
-                <div style="font-weight:bold;color:#4ade80;margin-bottom:6px;">🔮 可選被動輔助池 (${pasEntries.length} 張)</div>
-                ${pasHtml}
-            </div>
-        </div>`);
-    const box = document.getElementById('npc-modal-box');
-    if (box) box.style.maxWidth = '880px';
+    openNpcModalShell('技能・當前卡池', `角色：${escapeTownText(saveData.charName || '冒險者')} ｜ 武器：${escapeTownText(wName)}`, '#c084fc', `
+        <div class="town-skill-pools">
+            <section class="town-window-panel">
+                <h3>主動技能 (${actEntries.length} 張)</h3>
+                <div class="town-skill-list" tabindex="0" aria-label="主動技能">${actHtml}</div>
+            </section>
+            <section class="town-window-panel">
+                <h3>被動技能 (${pasEntries.length} 張)</h3>
+                <div class="town-skill-list" tabindex="0" aria-label="被動技能">${pasHtml}</div>
+            </section>
+        </div>`, 'skills');
 }
 
         let TOWN_ACTIVE_SHORTCUT = null;
@@ -670,92 +691,228 @@ function openTownCardPoolModal() {
             else if (mode === 'party') openTownPartyModal();
         }
         
-        // [I] 隨身背包與八格裝備視窗（含即時紙娃娃預覽與裝備 Tooltip）
-function openTownBagModal() {
-    const eq = saveData.equip || {};
-    const bag = saveData.bag || [];
-    const d = typeof getDerivedCombatStats === 'function' ? getDerivedCombatStats() : { maxHp: 200, moveSpeed: 235, physReducePct: 0, magReducePct: 0 };
-    const slotNames = typeof SLOT_NAMES !== 'undefined' ? SLOT_NAMES : { weapon: '武器', sub: '副手', head: '頭部', armor: '身體', gloves: '護手', shoes: '鞋靴', back: '背部', relic: '飾品' };
-    const eqHtml = Object.entries(slotNames).map(([sk, label]) => {
-        const it = eq[sk];
-        const rCol = (it && typeof RARITIES !== 'undefined' && RARITIES[it.rarity]) ? RARITIES[it.rarity].color : '#38bdf8';
-        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;background:#0f172a;border-left:3px solid ${it ? rCol : '#334155'};border-radius:5px;margin-bottom:4px;font-size:12px;"
-            ${it ? `onmouseenter="if(typeof showLobbyEquipTooltip==='function')showLobbyEquipTooltip(event,'equip','${sk}')" onmousemove="if(typeof moveLobbyTooltip==='function')moveLobbyTooltip(event)" onmouseleave="if(typeof hideLobbyTooltip==='function')hideLobbyTooltip()"` : ''}>
-            <span>[${label}] <b style="color:${it ? rCol : '#64748b'};">${it ? it.name : '未裝備'}</b></span>
-            ${it ? `<button onclick="if(typeof hideLobbyTooltip==='function')hideLobbyTooltip();unequipSlot('${sk}');openTownBagModal();" style="padding:2px 6px;background:#475569;color:#fff;border:none;border-radius:4px;cursor:pointer;">卸下</button>` : ''}
-        </div>`;
-    }).join('');
-    if (typeof repairBrokenIdentifiedItems === 'function') repairBrokenIdentifiedItems();
+const TOWN_BAG_FILTERS = {
+    weapon: { icon: 'sword', label: '只顯示武器' },
+    armor: { icon: 'armor', label: '只顯示防具' },
+    rarity: { icon: 'rarity', label: '按稀有度由高到低排序' },
+    newest: { icon: 'clock', label: '按獲取時間由新到舊排序' }
+};
+const TOWN_BAG_ARMOR_SLOTS = new Set(['head', 'armor', 'gloves', 'shoes']);
+const TOWN_BAG_SLOT_ICONS = {
+    weapon: 'sword', head: 'hat', armor: 'armor', gloves: 'glove', sub: 'shield',
+    shoes: 'boot', back: 'wing', relic: 'ring', cape: 'cape'
+};
+const TOWN_BAG_WEAPON_ICONS = { spear: 'spear', polearm: 'spear', wand: 'wand', staff: 'wand', mace: 'wand' };
+const TOWN_BAG_RARITY = { gold: 5, purple: 4, blue: 3, green: 2, white: 1 };
+const TOWN_BAG_VIEW = { filter: '', sort: '', selected: null, charId: null };
 
-    const rarRank = { gold: 5, purple: 4, blue: 3, green: 2, white: 1 };
-    const getSortPriority = (it) => {
-        if (!it || it.identified === false) return 3; // 第三順位：未鑑定
-        const chk = typeof canEquipItem === 'function' ? canEquipItem(it) : { ok: true };
-        if (chk.ok) return 1; // 第一順位：自己可穿戴置頂
-        if (chk.reason && chk.reason.includes('需要角色等級')) return 2; // 第二順位：本職但等級未到
-        return 4; // 第四順位：別職不可穿戴
-    };
-    const sortedBag = [...bag].sort((a, b) => {
-        const pa = getSortPriority(a), pb = getSortPriority(b);
-        if (pa !== pb) return pa - pb;
-        const lvDiff = (b.reqLv || 0) - (a.reqLv || 0);
-        if (lvDiff !== 0) return lvDiff;
-        return (rarRank[b.rarity] || 0) - (rarRank[a.rarity] || 0);
-    });
-
-    const bagHtml = sortedBag.length === 0 ? '<div style="color:#64748b;font-size:12px;">背包目前為空</div>' : sortedBag.map(it => {
-        const rCol = (typeof RARITIES !== 'undefined' && RARITIES[it.rarity]) ? RARITIES[it.rarity].color : '#f8fafc';
-        const sLabel = slotNames[it.slot] || '神秘';
-        const wearCheck = (it.identified !== false && typeof canEquipItem === 'function')
-            ? canEquipItem(it)
-            : { ok: it.identified !== false, reason: '' };
-
-            const sellPrice = typeof getEquipSellPrice === 'function' ? getEquipSellPrice(it) : 15;
-            const sellBtnHtml = `<button onclick="sellBagItemByUid(${it.uid})" title="直接商店回收換取 ${sellPrice} Seed" style="padding:2px 6px;background:#78350f;color:#fde047;border:1px solid #b45309;border-radius:4px;font-size:11px;cursor:pointer;">賣 ${sellPrice}</button>`;
-    
-            let primaryBtnHtml = '';
-            if (it.identified === false) {
-                primaryBtnHtml = '<span style="color:#c084fc;font-size:11px;margin-right:2px;">需鑑定</span>';
-            } else if (wearCheck.ok) {
-                primaryBtnHtml = `<button onclick="if(typeof hideLobbyTooltip==='function')hideLobbyTooltip();equipFromBag(${it.uid});openTownBagModal();" style="padding:2px 8px;background:#22c55e;color:#052e16;font-weight:bold;border:none;border-radius:4px;cursor:pointer;">穿戴</button>`;
-            } else if (wearCheck.reason && wearCheck.reason.includes('需要角色等級')) {
-                primaryBtnHtml = `<button disabled title="${wearCheck.reason}" style="padding:2px 6px;background:#334155;color:#fca5a5;border:1px solid #475569;border-radius:4px;font-size:11px;cursor:not-allowed;">LV.${it.reqLv || 1}可穿</button>`;
-            } else {
-                primaryBtnHtml = `<button disabled title="${wearCheck.reason || '不可穿戴'}" style="padding:2px 6px;background:#1e293b;color:#64748b;border:1px solid #334155;border-radius:4px;font-size:11px;cursor:not-allowed;">不可穿戴</button>`;
-            }
-            const actionHtml = `<div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">${primaryBtnHtml}${sellBtnHtml}</div>`;   
-        const itemTitle = it.identified === false
-            ? `❓ [未鑑定] 神秘${sLabel}`
-            : `${it.name || '未知裝備'} (LV.${it.reqLv || 1})${it.tradable === false ? ' 🔒' : ''}`;
-
-        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;background:#0f172a;border-left:3px solid ${rCol};border-radius:5px;margin-bottom:4px;font-size:12px;${(!wearCheck.ok && it.identified !== false) ? 'opacity:0.78;' : ''}"
-            ${it.identified !== false ? `onmouseenter="if(typeof showLobbyEquipTooltip==='function')showLobbyEquipTooltip(event,'bag','${it.uid}')" onmousemove="if(typeof moveLobbyTooltip==='function')moveLobbyTooltip(event)" onmouseleave="if(typeof hideLobbyTooltip==='function')hideLobbyTooltip()"` : ''}>
-            <span style="color:${rCol};">${itemTitle}</span>
-            ${actionHtml}
-        </div>`;
-    }).join('');
-
-    openNpcModalShell('🎒 隨身背包與即時紙娃娃 [I]', '按 I 或 ESC 關閉（移上裝備可查看屬性）', '#38bdf8', `
-        ${saveData.legacyBag?.length ? `<button type="button" onclick="openLegacyBagRecoveryModal()" style="padding:6px 10px;margin-bottom:10px;border:1px solid #38bdf8;border-radius:5px;background:#0f172a;color:#bae6fd;cursor:pointer;">舊背包領取區（${saveData.legacyBag.length}）</button>` : ''}
-        <div style="display:grid;grid-template-columns:1.1fr 1fr;gap:12px;align-items:stretch;">
-            <div style="background:#1e293b;padding:10px;border-radius:8px;">
-                <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #334155;">
-                    <canvas id="paperDollCanvas" width="76" height="92" style="background:#0f172a;border:1.5px solid #38bdf8;border-radius:8px;flex-shrink:0;"></canvas>
-                    <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:11px;">
-                        <div style="background:#0f172a;padding:4px 6px;border-radius:4px;">❤️ 生命：<b>${d.maxHp}</b></div>
-                        <div style="background:#0f172a;padding:4px 6px;border-radius:4px;">👟 移速：<b>${Math.round(d.moveSpeed)}</b></div>
-                        <div style="background:#0f172a;padding:4px 6px;border-radius:4px;">🛡️ 物減：<b style="color:#4ade80;">${d.physReducePct}%</b></div>
-                        <div style="background:#0f172a;padding:4px 6px;border-radius:4px;">💠 魔減：<b style="color:#38bdf8;">${d.magReducePct}%</b></div>
-                    </div>
-                </div>
-                ${eqHtml}
-            </div>
-            <div style="background:#1e293b;padding:10px;border-radius:8px;max-height:426px;overflow-y:auto;"><div style="font-weight:bold;color:#4ade80;margin-bottom:6px;">📦 背包清單 (${bag.length})</div>${bagHtml}</div>
-        </div>`);
-    const box = document.getElementById('npc-modal-box');
-    if (box) box.style.maxWidth = '860px';
-    if (typeof renderPaperDoll === 'function') renderPaperDoll();
+function escapeTownText(value) {
+    return String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;').replaceAll('"', '&quot;');
 }
+
+function getTownEquipmentIcon(item, slot) {
+    const template = item?.identified ? EQUIP_TEMPLATES.find(entry => entry.tplId === item.tplId) : null;
+    const art = template?.iconImage;
+    const type = item?.identified ? (item.subType || item.type || template?.subType) : '';
+    const symbol = item?.identified && slot === 'armor' && item.equipTag === 'heavy'
+        ? 'mail' : TOWN_BAG_WEAPON_ICONS[type] || TOWN_BAG_SLOT_ICONS[slot] || 'ring';
+    const fallback = `assets/ui/town-equipment/${symbol}.png`;
+    const src = typeof art === 'string' && /^assets\/(?:[\w-]+\/)*[\w-]+\.(?:png|webp)$/i.test(art) ? art : fallback;
+    return `<img src="${src}" data-fallback="${fallback}" alt="" draggable="false">`;
+}
+
+function renderPaperDoll() {
+    const canvas = document.getElementById('paperDollCanvas');
+    const charId = saveData.charId;
+    const pose = SpriteAnimManager.getShowcasePose(charId);
+    const atlas = SpriteAnimManager.ensureLoaded(charId);
+    if (!canvas || !pose || !atlas) return;
+    const ctx = canvas.getContext('2d');
+    const { dirInfo, previewPose, frames } = pose;
+    const scale = Math.min(canvas.width * .58 / Math.max(...frames.map(f => f.w)),
+        canvas.height * .74 / Math.max(...frames.map(f => f.h)));
+    const bottom = Math.max(...frames.map(f => f.ay + f.h)) * scale;
+    const floorY = canvas.height * .88;
+    const center = canvas.width / 2;
+    const animationState = {};
+    const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const draw = now => {
+        if (!canvas.isConnected || !isAnyTownModalOpen()) return;
+        if (atlas.loading) {
+            requestAnimationFrame(draw);
+            return;
+        }
+        if (!atlas.loaded) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.beginPath();
+        ctx.ellipse(center, floorY - 2, canvas.width * .26, 10, 0, 0, 2 * Math.PI);
+        ctx.strokeStyle = '#b89bd877';
+        ctx.fillStyle = '#73518a32';
+        ctx.fill();
+        ctx.stroke();
+        SpriteAnimManager.drawCharacter(ctx, charId, center, floorY - bottom, {
+            dirInfo, previewPose, footSink: 0, scale, animationState, timeSec: reducedMotion ? 0 : now / 1000
+        });
+        if (!reducedMotion && frames.length > 1) requestAnimationFrame(draw);
+    };
+    requestAnimationFrame(draw);
+}
+
+function openTownBagModal(resetScroll = false) {
+    const view = TOWN_BAG_VIEW;
+    if (view.charId !== saveData.charId) {
+        view.charId = saveData.charId;
+        view.selected = null;
+        resetScroll = true;
+    }
+    const oldList = document.querySelector('.town-bag-list');
+    const scrollTop = resetScroll ? 0 : oldList?.scrollTop || 0;
+    repairBrokenIdentifiedItems();
+    const bag = (saveData.bag || []).filter(Boolean);
+    const entries = bag.filter(item => view.filter === 'weapon' ? item.slot === 'weapon'
+        : view.filter === 'armor' ? TOWN_BAG_ARMOR_SLOTS.has(item.slot) : true).map(item => {
+        const wear = canEquipItem(item);
+        const priority = wear.ok ? 0 : !item.identified ? 2 : wear.reason?.includes('需要角色等級') ? 1 : 3;
+        return { item, wear, priority };
+    });
+    entries.sort((a, b) => {
+        if (a.priority !== b.priority) return a.priority - b.priority;
+        const rankDiff = (TOWN_BAG_RARITY[b.item.rarity] || 0) - (TOWN_BAG_RARITY[a.item.rarity] || 0);
+        const levelDiff = (b.item.reqLv || 0) - (a.item.reqLv || 0);
+        if (view.sort === 'newest') {
+            const timeDiff = (b.item.acquiredAt || 0) - (a.item.acquiredAt || 0);
+            return timeDiff || (Number(b.item.uid) - Number(a.item.uid)) || levelDiff || rankDiff;
+        }
+        return view.sort === 'rarity' ? rankDiff || levelDiff : levelDiff || rankDiff;
+    });
+    let selected = entries.find(entry => entry.item.uid === view.selected) || entries[0];
+    const eq = saveData.equip || {};
+    const slotRows = Object.entries(TOWN_BAG_SLOT_ICONS).map(([slot]) => {
+        const item = eq[slot];
+        const name = item?.name || '未裝備';
+        return `<div class="town-slot-row" data-equip-slot="${slot}">
+          <span class="town-equip-icon">${getTownEquipmentIcon(item, slot)}</span>
+          <span class="town-equip-slot">${SLOT_NAMES[slot]}</span>
+          <strong title="${escapeTownText(name)}">${escapeTownText(name)}</strong>
+          ${item ? '<button class="town-small-button" type="button" data-unequip>卸下</button>' : ''}
+        </div>`;
+    }).join('');
+    const filterButtons = Object.entries(TOWN_BAG_FILTERS).map(([id, {icon, label}]) =>
+        `<button class="town-bag-filter" type="button" data-bag-filter="${id}" aria-label="${label}" aria-pressed="${view.filter === id || view.sort === id}">
+            <img src="assets/ui/town-equipment/${icon}.png" alt=""><span class="town-filter-tip" aria-hidden="true">${label}</span>
+        </button>`).join('');
+    const itemRows = entries.map(({ item, wear }, index) => {
+        const color = (RARITIES[item.rarity] || RARITIES.white).color;
+        const title = item.identified ? (item.name || '未知裝備') : `未鑑定・${SLOT_NAMES[item.slot] || '裝備'}`;
+        const status = wear.ok ? '可穿戴' : !item.identified ? '需鑑定'
+            : wear.reason?.includes('需要角色等級') ? `LV.${item.reqLv}可穿` : '不可穿戴';
+        return `<div class="town-bag-row" data-bag-row="${index}">
+            <button class="town-bag-item" type="button" aria-pressed="false" title="${escapeTownText(wear.reason || '')}">
+              ${getTownEquipmentIcon(item, item.slot)}
+              <strong style="color:${color}">${escapeTownText(title)}${item.tradable === false ? ' 🔒' : ''}</strong>
+              <small>${status}</small>
+            </button>
+            <button class="town-small-button town-bag-sell" type="button" aria-label="出售 ${escapeTownText(title)}">賣 ${getEquipSellPrice(item)}</button>
+        </div>`;
+    }).join('');
+    openNpcModalShell('背包', '', '#d7c4eb', `
+        <div class="town-bag-layout">
+          <section class="town-window-panel">
+            <h3>穿戴裝備</h3>
+            <div class="town-equipment-layout">
+              <div class="town-slot-rows">${slotRows}</div>
+              <div class="town-paper-doll"><canvas id="paperDollCanvas" width="180" height="170" aria-label="角色紙娃娃"></canvas></div>
+            </div>
+          </section>
+          <section class="town-window-panel town-inventory-panel">
+            <div class="town-inventory-head"><h3>背包 <small>${entries.length}${entries.length !== bag.length ? ' / ' + bag.length : ''} 件</small></h3>
+              <div class="town-bag-filters" aria-label="背包分類與排序">${filterButtons}</div></div>
+            <div class="town-bag-list" tabindex="0" aria-label="背包道具列表">${itemRows || '<p>此分類沒有裝備</p>'}</div>
+            <div class="town-bag-footer">
+              <span class="town-bag-selected" aria-live="polite"></span>
+              ${saveData.legacyBag?.length ? `<button class="town-small-button" type="button" onclick="openLegacyBagRecoveryModal()">舊背包（${saveData.legacyBag.length}）</button>` : ''}
+              <button class="town-small-button town-primary-button" type="button" data-bag-equip>穿戴</button>
+            </div>
+          </section>
+        </div>`, 'bag');
+    const box = document.getElementById('npc-modal-box');
+    const list = box.querySelector('.town-bag-list');
+    const equipButton = box.querySelector('[data-bag-equip]');
+    const updateSelection = () => {
+        view.selected = selected?.item.uid;
+        for (const row of list.querySelectorAll('[data-bag-row]')) {
+            const pressed = entries[Number(row.dataset.bagRow)] === selected;
+            row.querySelector('.town-bag-item').setAttribute('aria-pressed', String(pressed));
+        }
+        box.querySelector('.town-bag-selected').textContent = selected
+            ? `${selected.item.name || '未鑑定裝備'} · ${SLOT_NAMES[selected.item.slot] || '裝備'}`
+            : '';
+        equipButton.disabled = !selected?.wear.ok;
+    };
+    const equipSelected = () => {
+        if (!selected?.wear.ok) return;
+        hideLobbyTooltip();
+        equipFromBag(selected.item.uid);
+        openTownBagModal();
+    };
+    const bindTooltip = (element, source, key) => {
+        element.addEventListener('pointerenter', event => {
+            if (event.pointerType === 'mouse') showLobbyEquipTooltip(event, source, key);
+        });
+        element.addEventListener('pointermove', event => {
+            if (event.pointerType === 'mouse' && document.getElementById('lobbyTooltip')?.style.display === 'block') moveLobbyTooltip(event);
+        });
+        element.addEventListener('pointerleave', hideLobbyTooltip);
+    };
+    for (const image of box.querySelectorAll('img[data-fallback]')) {
+        image.addEventListener('error', () => { if (!image.src.endsWith(image.dataset.fallback)) image.src = image.dataset.fallback; }, { once: true });
+    }
+    for (const line of box.querySelectorAll('[data-equip-slot]')) {
+        const slot = line.dataset.equipSlot;
+        if (!eq[slot]) continue;
+        bindTooltip(line, 'equip', slot);
+        line.querySelector('[data-unequip]').onclick = () => {
+            hideLobbyTooltip();
+            unequipSlot(slot);
+            openTownBagModal();
+        };
+    }
+    let touchClick = null;
+    for (const row of list.querySelectorAll('[data-bag-row]')) {
+        const entry = entries[Number(row.dataset.bagRow)];
+        const itemButton = row.querySelector('.town-bag-item');
+        if (entry.item.identified) bindTooltip(row, 'bag', entry.item.uid);
+        itemButton.onclick = event => {
+            const now = performance.now();
+            const touch = event.pointerType === 'touch';
+            const repeated = touch && touchClick?.entry === entry && now - touchClick.at <= 420;
+            touchClick = touch && !repeated ? { entry, at: now } : null;
+            selected = entry;
+            updateSelection();
+            if (repeated) equipSelected();
+        };
+        itemButton.ondblclick = () => {
+            if (!itemButton.isConnected) return;
+            selected = entry;
+            equipSelected();
+        };
+        row.querySelector('.town-bag-sell').onclick = () => sellBagItemByUid(entry.item.uid);
+    }
+    for (const button of box.querySelectorAll('[data-bag-filter]')) {
+        button.onclick = () => {
+            const id = button.dataset.bagFilter;
+            const field = id === 'weapon' || id === 'armor' ? 'filter' : 'sort';
+            view[field] = view[field] === id ? '' : id;
+            openTownBagModal(true);
+        };
+    }
+    equipButton.onclick = equipSelected;
+    list.scrollTop = scrollTop;
+    updateSelection();
+    renderPaperDoll();
+}
+
 
 function openLegacyBagRecoveryModal() {
     const items = saveData.legacyBag || [];
@@ -798,27 +955,26 @@ function sellBagItemByUid(uid) {
 // [C] 角色素質與配點視窗（右側同步顯示完整即時戰鬥面板總覽）
 function openTownStatsModal() {
     const labels = { S: 'STAB', H: 'HACK', I: 'INT', DEF: 'DEF', MR: 'MR', DEX: 'DEX', AGI: 'AGI' };
-    const freePts = typeof getWorkingFreePts === 'function' ? getWorkingFreePts() : (saveData.freePts || 0);
-    const alloc = typeof getWorkingAlloc === 'function' ? getWorkingAlloc() : (saveData.allocated || {});
-    const d = typeof getDerivedCombatStats === 'function' ? getDerivedCombatStats() : {};
-    const st = d.st || {};
-    const rows = Object.entries(labels).map(([k, name]) => {
-        const totalVal = st[k] ?? (typeof getNakedStat === 'function' ? getNakedStat(k) : (saveData.baseStats[k] || 0));
-        const cost = typeof getStatCost === 'function' ? getStatCost(k) : 1;
-        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;background:#0f172a;border-radius:6px;margin-bottom:4px;font-size:13px;"
-            onmouseenter="if(typeof showLobbyStatTooltip==='function')showLobbyStatTooltip(event,'${k}')" onmousemove="if(typeof moveLobbyTooltip==='function')moveLobbyTooltip(event)" onmouseleave="if(typeof hideLobbyTooltip==='function')hideLobbyTooltip()">
-            <span style="cursor:help;border-bottom:1px dashed #64748b;"><b>${name}</b>：<span style="color:#fde047;font-weight:bold;">${totalVal}</span> <span style="font-size:11px;color:#94a3b8;">(${cost}pt)</span></span>
-            <div style="display:flex;gap:3px;">
-                <button onclick="subStat('${k}');openTownStatsModal();" ${(alloc[k] || 0) <= 0 ? 'disabled' : ''} style="padding:2px 7px;background:#475569;color:#fff;border:none;border-radius:4px;cursor:pointer;">-</button>
-                <button onclick="addStat('${k}');openTownStatsModal();" ${freePts < cost ? 'disabled' : ''} style="padding:2px 7px;background:#2563eb;color:#fff;border:none;border-radius:4px;cursor:pointer;">+</button>
-                <button onclick="maxOutStat('${k}');openTownStatsModal();" ${freePts < cost ? 'disabled' : ''} style="padding:2px 5px;background:#eab308;color:#0f172a;font-weight:bold;font-size:11px;border:none;border-radius:4px;cursor:pointer;">MAX</button>
+    const freePts = getWorkingFreePts() || 0;
+    const alloc = getWorkingAlloc() || {};
+    const d = getDerivedCombatStats();
+    const rows = Object.entries(labels).map(([key, name]) => {
+        const total = d.st?.[key] ?? getNakedStat(key);
+        const cost = getStatCost(key);
+        return `<div class="town-stat-row" data-stat-key="${key}">
+            <span class="town-stat-value" onmouseenter="showLobbyStatTooltip(event,'${key}')" onmousemove="moveLobbyTooltip(event)" onmouseleave="hideLobbyTooltip()">
+                <b>${name}</b> <strong>${total}</strong> <small>(${cost}pt)</small></span>
+            <div class="town-stat-steps">
+                <button type="button" aria-label="減少 ${name}" onclick="subStat('${key}');openTownStatsModal();" ${(alloc[key] || 0) <= 0 ? 'disabled' : ''}>−</button>
+                <button type="button" aria-label="增加 ${name}" onclick="addStat('${key}');openTownStatsModal();" ${freePts < cost ? 'disabled' : ''}>+</button>
+                <button type="button" aria-label="${name} 使用剩餘點數" onclick="maxOutStat('${key}');openTownStatsModal();" ${freePts < cost ? 'disabled' : ''}>MAX</button>
             </div>
         </div>`;
     }).join('');
-    const bar = (typeof pendingAlloc !== 'undefined' && pendingAlloc) ? `<div style="display:flex;gap:6px;margin-top:8px;">
-        <button onclick="confirmStats();openTownStatsModal();" style="flex:1;padding:6px;background:#22c55e;color:#052e16;font-weight:bold;border:none;border-radius:6px;cursor:pointer;">✅ 確認配點</button>
-        <button onclick="cancelStats();openTownStatsModal();" style="flex:1;padding:6px;background:#475569;color:#fff;border:none;border-radius:6px;cursor:pointer;">↩️ 取消微調</button>
-    </div>` : '<button type="button" class="stat-btn" style="width:auto;padding:0 8px;margin-top:8px;" onclick="resetStats();openTownStatsModal()">洗點</button>';
+    const bar = pendingAlloc ? `
+        <button type="button" class="town-small-button" onclick="cancelStats();openTownStatsModal()">取消</button>
+        <button type="button" class="town-small-button town-primary-button" onclick="confirmStats();openTownStatsModal()">確認配點</button>
+    ` : '<button type="button" class="town-small-button" onclick="resetStats();openTownStatsModal()">洗點</button>';
 
     const detailItems = [
         ['物理減傷', `${d.physReducePct || 0}%`, '#4ade80'], ['魔法減傷', `${d.magReducePct || 0}%`, '#38bdf8'],
@@ -830,20 +986,37 @@ function openTownStatsModal() {
         ['經驗獲取', `${Math.round((d.expBonusMult || 1) * 100)}%`, '#38bdf8'], ['拾取範圍', `${d.pickupRange || 115}`, '#f8fafc'],
         ['射彈增加', `+${d.extraProj || 0} 發`, '#f87171'], ['❤️ 最大生命', `${d.maxHp || 200}`, '#4ade80']
     ];
-    const detailHtml = detailItems.map(([k, v, col]) => `<div style="display:flex;justify-content:space-between;padding:4px 8px;background:#0f172a;border-radius:5px;font-size:12px;"><span style="color:#94a3b8;">${k}</span><b style="color:${col};">${v}</b></div>`).join('');
-
-    openNpcModalShell('📊 角色素質與配點 [C]', `LV.${saveData.outLv || 1} ｜ 剩餘自由點數：${freePts}`, '#facc15', `
-        <div style="display:grid;grid-template-columns:1fr 1.25fr;gap:12px;">
-            <div style="background:#1e293b;padding:10px;border-radius:8px;">${rows}${bar}</div>
-            <div style="background:#1e293b;padding:10px;border-radius:8px;">
-                <div style="font-weight:bold;color:#cbd5e1;font-size:13px;margin-bottom:6px;">⚔️ 即時戰鬥面板總覽（加點即時預覽）</div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">${detailHtml}</div>
-            </div>
-        </div>`);
-    const box = document.getElementById('npc-modal-box');
-    if (box) box.style.maxWidth = '880px';
+    const detailHtml = detailItems.map(([key, value, color]) => `<div><span>${key}</span><b style="color:${color}">${value}</b></div>`).join('');
+    const character = CHARACTERS[saveData.charId] || CHARACTERS.lucien;
+    const level = saveData.outLv || 1;
+    const progress = level >= MAX_OUT_LV ? 100 : Math.min(100, Math.floor((saveData.outExp || 0) / getNextOutExp(level) * 100));
+    const name = escapeTownText(saveData.charName || character.name);
+    const variant = escapeTownText(character.variants[saveData.variantId]?.wName || '');
+    openNpcModalShell('角色', '', '#d7c4eb', `
+        <div class="town-character-layout">
+            <section class="town-window-panel town-character-id">
+                <div class="town-character-card">
+                    <img src="assets/characters/portraits/${character.id}.png" alt="">
+                    <div><strong>${name}</strong>${variant ? `<span>${variant}</span>` : ''}</div>
+                </div>
+                <dl><dt>ID</dt><dd>${escapeTownText(getTownPlayerId())}</dd>
+                    <dt>等級</dt><dd>LV. ${level}</dd>
+                    <dt>Seed</dt><dd>${(saveData.seed || 0).toLocaleString()}</dd></dl>
+                <label class="town-character-exp">經驗值 ${progress}% <progress value="${progress}" max="100"></progress></label>
+            </section>
+            <section class="town-window-panel town-character-stats">
+                <h3>角色素質</h3>
+                <div class="town-stat-rows">${rows}</div>
+                <div class="town-stat-footer"><span>剩餘點數 ${freePts}</span><div>${bar}</div></div>
+            </section>
+            <section class="town-window-panel">
+                <h3>戰鬥能力</h3>
+                <div class="town-combat-stats">${detailHtml}</div>
+            </section>
+        </div>`, 'profile');
 }
-        
+
+
         // [P] 組隊與我的世界成員列表視窗
         function openTownPartyModal(fromSocial = false) {
             const hostName = saveData.charName || '冒險者';

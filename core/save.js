@@ -40,7 +40,7 @@ const DEFAULT_SAVE = {
   allocated: { S: 0, H: 0, I: 0, DEF: 0, MR: 0, DEX: 0, AGI: 0 },
   equip: {
     weapon: null,
-    sub: null, head: null, armor: null, gloves: null, shoes: null, back: null, relic: null
+    sub: null, head: null, armor: null, gloves: null, shoes: null, back: null, relic: null, cape: null
   },
   bag: []
 };
@@ -110,7 +110,7 @@ function loadSave() {
 function deliverFirstClearReward(save, clearKey) {
   const item = save.pendingFirstClearRewards?.[clearKey];
   if (!item) return null;
-  if (!save.bag.some(entry => entry?.uid === item.uid)) save.bag.push(item);
+  if (!save.bag.some(entry => entry?.uid === item.uid)) save.bag.push(markEquipAcquired(item));
   (save.stageFirstClears ||= {})[clearKey] = true;
   delete save.pendingFirstClearRewards[clearKey];
   return item;
@@ -159,7 +159,7 @@ function checkLv15WingQuest() {
     const wingTpl = EQUIP_TEMPLATES.find(t => t.tplId === 'bk_15') || EQUIP_TEMPLATES.find(t => t.slot === 'back');
     if (wingTpl) {
       const wingItem = identifyEquipItem({ uid: generateEquipUid(), tplId: wingTpl.tplId, slot: 'back', rarity: 'green' });
-      if (wingItem) saveData.bag.push(wingItem);
+      if (wingItem) saveData.bag.push(markEquipAcquired(wingItem));
     }
   }
 }
@@ -228,7 +228,7 @@ function switchCharacterVariant(charId, variantId) {
       const index = saveData.bag.findIndex(item => item?.trialStarter && item.tplId === starterId);
       if (index >= 0) {
         const [starter] = saveData.bag.splice(index, 1);
-        if (weapon) saveData.bag.push(weapon);
+        if (weapon) saveData.bag.push(markEquipAcquired(weapon));
         saveData.equip.weapon = starter;
       }
     }
@@ -249,7 +249,7 @@ function grantTrialStarterKit(character) {
     const item = identifyEquipItem({ uid: generateEquipUid(), tplId, rarity: 'white' });
     item.startSkill = getWeaponSignatureSkill(item);
     item.trialStarter = true;
-    saveData.bag.push(item);
+    saveData.bag.push(markEquipAcquired(item));
   }
   saveData.trialStarterKitGranted = true;
 }
@@ -424,7 +424,7 @@ function getSkillDisplayName(skillId) {
 
 function showLobbyEquipTooltip(e, source, keyOrUid) {
   const tip = getLobbyTooltipEl();
-  const it = source === 'equip' ? saveData.equip[keyOrUid] : saveData.bag.find(i => i.uid === Number(keyOrUid));
+  const it = source === 'equip' ? saveData.equip[keyOrUid] : saveData.bag.find(i => i && String(i.uid) === String(keyOrUid));
   if (!it || !it.identified) return;
   const r = RARITIES[it.rarity] || RARITIES.white;
   const wTypeMap = { longsword: '長劍', blade: '彎刀', rapier: '細劍', tachi: '太刀', greatsword: '巨劍', spear: '槍', polearm: '棍', dagger: '短劍', dual_blade: '雙斧', axe: '戰斧', whip: '鞭', flail: '鏈錘', wand: '魔杖', staff: '權杖', mace: '釘錘' };
@@ -454,23 +454,6 @@ function showLobbyEquipTooltip(e, source, keyOrUid) {
 }
 function moveLobbyTooltip(e) { const tip = getLobbyTooltipEl(); tip.style.left = Math.min(window.innerWidth - 310, e.clientX + 14) + 'px'; tip.style.top = Math.min(window.innerHeight - 160, e.clientY + 14) + 'px'; }
 function hideLobbyTooltip() { const tip = document.getElementById('lobbyTooltip'); if (tip) tip.style.display = 'none'; }
-
-function renderPaperDoll() {
-  const cv = document.getElementById('paperDollCanvas');
-  if (!cv) return;
-  const c = cv.getContext('2d'); c.clearRect(0, 0, cv.width, cv.height);
-  const cx = cv.width / 2, cy = cv.height / 2 + 12, ch = getCurrentCharData();
-  if (saveData.equip.back) {
-    c.fillStyle = RARITIES[saveData.equip.back.rarity].color;
-    c.beginPath(); c.moveTo(cx, cy - 10); c.lineTo(cx - 38, cy - 34); c.lineTo(cx - 24, cy + 8); c.fill();
-    c.beginPath(); c.moveTo(cx, cy - 10); c.lineTo(cx + 38, cy - 34); c.lineTo(cx + 24, cy + 8); c.fill();
-  }
-  c.fillStyle = saveData.equip.armor ? RARITIES[saveData.equip.armor.rarity].color : (ch.color || '#3b82f6');
-  c.fillRect(cx - 12, cy - 16, 24, 30);
-  c.fillStyle = '#fde047'; c.beginPath(); c.arc(cx, cy - 24, 11, 0, Math.PI * 2); c.fill();
-  if (saveData.equip.head) { c.fillStyle = RARITIES[saveData.equip.head.rarity].color; c.fillRect(cx - 12, cy - 36, 24, 6); }
-  if (saveData.equip.weapon) { c.strokeStyle = RARITIES[saveData.equip.weapon.rarity].color; c.lineWidth = 4; c.beginPath(); c.moveTo(cx + 12, cy); c.lineTo(cx + 32, cy - 16); c.stroke(); }
-}
 
 // 片段 C：startBattle() 內讀取武器初始技能並綁定所選關卡與 4 階難度倍率
 function startBattle(stageId, diffKey, { sandbox = false, deferScene = false } = {}) {

@@ -56,8 +56,8 @@
 .mobile-layout #sandboxControlPanel { top: auto !important; bottom: var(--screen-bottom); right: var(--screen-right) !important; }
 .mobile-layout #sandboxControlPanel button, .mobile-layout #sandboxControlPanel select { min-height: 34px; }
 .mobile-layout #sandboxDpsBox { display: none; }
-.mobile-layout .panel, .mobile-layout #npc-modal-box { max-height: calc(100dvh - var(--screen-top) - var(--screen-bottom)); overflow-y: auto; }
-.mobile-layout #npc-modal-box button { min-height: 40px; }
+.mobile-layout .panel { max-height: calc(100dvh - var(--screen-top) - var(--screen-bottom)); overflow-y: auto; }
+.mobile-layout #npc-modal-box[data-panel=""] button:not(.town-modal-close) { min-height: 40px; }
 .mobile-layout #pauseModal .panel { padding: 10px; }
 .mobile-layout #pauseModal h2 { font-size: 17px; }
 .mobile-layout #pauseContent { gap: 7px; }

@@ -8,8 +8,13 @@ const RARITIES = {
 
 const SLOT_NAMES = {
   weapon: '武器', sub: '手飾', head: '頭盔', armor: '衣服',
-  gloves: '手部', shoes: '腳部', back: '翅膀', relic: '面具'
+  gloves: '手部', shoes: '腳部', back: '翅膀', relic: '面具', cape: '披風'
 };
+
+function markEquipAcquired(item) {
+  if (!Number.isSafeInteger(item.acquiredAt) || item.acquiredAt <= 0) item.acquiredAt = Date.now();
+  return item;
+}
 
 const EQUIP_TEMPLATES = [
   ...(typeof ITEM_WEAPONS !== 'undefined' ? ITEM_WEAPONS : []),
@@ -199,7 +204,7 @@ function identifyEquipItem(unidItem) {
     assignedStartSkill = `${assignedElem}1`;
   }
   const item = {
-    uid: unidItem.uid, tplId: tpl.tplId, slot: tpl.slot, subType: realSub, type: realSub,
+    uid: unidItem.uid, acquiredAt: unidItem.acquiredAt, tplId: tpl.tplId, slot: tpl.slot, subType: realSub, type: realSub,
     equipTag: tpl.equipTag || realSub || 'all', wandElem: assignedElem, name: tpl.name, rarity: unidItem.rarity, reqLv: tpl.reqLv,
     reqStats: { ...(tpl.reqStats || {}) }, startSkill: assignedStartSkill,
     engraved: false, elemRecast: false, synthCount: 0, maxSynth: 3,

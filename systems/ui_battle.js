@@ -543,7 +543,7 @@ function togglePause() {
     const clearKey = win && runCfg ? `${st.id}_${diff.key}` : null;
     const firstClearReward = clearKey ? deliverFirstClearReward(saveData, clearKey) : null;
     for (const item of runLoot) {
-      if (item.uid !== firstClearReward?.uid) saveData.bag.push(item);
+      if (item.uid !== firstClearReward?.uid) saveData.bag.push(markEquipAcquired(item));
     }
     try {
       addOutExpAndSeed(expGain, totalSeedGain);
